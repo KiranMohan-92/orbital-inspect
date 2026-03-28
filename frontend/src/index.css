@@ -1,0 +1,218 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Orbital Command Center Design System ────────────────────────────────── */
+
+:root {
+  /* Void backgrounds */
+  --bg-void: #06060a;
+  --bg-panel: rgba(12, 14, 22, 0.85);
+  --bg-panel-hover: rgba(18, 21, 33, 0.9);
+  --bg-panel-border: rgba(255, 255, 255, 0.06);
+  --bg-panel-border-hover: rgba(255, 255, 255, 0.12);
+
+  /* Accent */
+  --accent-scan: #00e5ff;
+  --accent-scan-glow: rgba(0, 229, 255, 0.15);
+  --accent-scan-dim: rgba(0, 229, 255, 0.06);
+
+  /* Text */
+  --text-primary: #e8eaed;
+  --text-secondary: #8b8fa3;
+  --text-tertiary: #555770;
+  --text-mono: #a0f0b4;
+
+  /* Severity */
+  --severity-critical: #ff1744;
+  --severity-severe: #ff6d00;
+  --severity-moderate: #ffab00;
+  --severity-minor: #aeea00;
+  --severity-healthy: #00e676;
+
+  /* Agent colors */
+  --agent-orchestrator: #e8eaed;
+  --agent-vision: #448aff;
+  --agent-environment: #00e676;
+  --agent-failure: #ff6d00;
+  --agent-priority: #ff1744;
+
+  /* Priority action colors */
+  --priority-immediate: #ff1744;
+  --priority-urgent: #ff6d00;
+  --priority-scheduled: #ffab00;
+  --priority-monitor: #00e676;
+
+  /* Typography */
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Analysis Mode Base ──────────────────────────────────────────────────── */
+
+.analysis-bg {
+  background-color: var(--bg-void);
+  background-image:
+    radial-gradient(ellipse at 50% 30%, rgba(10, 12, 20, 1) 0%, var(--bg-void) 70%),
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+}
+
+.glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--bg-panel-border);
+}
+
+.glass-panel-hover:hover {
+  background: var(--bg-panel-hover);
+  border-color: var(--bg-panel-border-hover);
+}
+
+/* ── Labels & Typography ─────────────────────────────────────────────────── */
+
+.label-mono {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.font-mono-display {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.font-body {
+  font-family: var(--font-sans);
+}
+
+/* ── Scanning Animation ──────────────────────────────────────────────────── */
+
+@keyframes scanLine {
+  0%   { top: -2px; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--accent-scan) 20%,
+    var(--accent-scan) 80%,
+    transparent 100%
+  );
+  box-shadow: 0 0 12px var(--accent-scan), 0 0 30px var(--accent-scan-glow);
+  animation: scanLine 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* ── Agent Dot Animations ────────────────────────────────────────────────── */
+
+@keyframes agentPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.4); opacity: 0.7; }
+}
+
+.agent-dot-thinking {
+  animation: agentPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(20px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+.agent-entry {
+  animation: slideInRight 0.3s ease-out;
+}
+
+/* ── Bounding Box Animations ─────────────────────────────────────────────── */
+
+@keyframes bboxFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.bbox-animate {
+  animation: bboxFadeIn 0.3s ease-out forwards;
+  opacity: 0;
+}
+
+/* ── Breathing Animation ─────────────────────────────────────────────────── */
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.7; }
+}
+
+.breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+/* ── Risk Tier Glow ──────────────────────────────────────────────────────── */
+
+@keyframes riskGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 23, 68, 0.3); }
+  50%      { box-shadow: 0 0 20px rgba(255, 23, 68, 0.6); }
+}
+
+.risk-glow-critical {
+  animation: riskGlow 2s ease-in-out infinite;
+}
+
+@keyframes riskGlowHigh {
+  0%, 100% { box-shadow: 0 0 6px rgba(255, 109, 0, 0.2); }
+  50%      { box-shadow: 0 0 14px rgba(255, 109, 0, 0.4); }
+}
+
+.risk-glow-high {
+  animation: riskGlowHigh 2.5s ease-in-out infinite;
+}
+
+/* ── Scrollbar Styling for Dark Panels ───────────────────────────────────── */
+
+.dark-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.dark-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Pulsing ring animation for CRITICAL / HIGH bridge markers (Map Mode) ── */
+@keyframes pulseRing {
+  0%   { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(2.6); opacity: 0;   }
+}
+
+.marker-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: pulseRing var(--pulse-duration, 1.4s) ease-out infinite;
+}
+
+.marker-pulse-ring-2 {
+  animation-delay: calc(var(--pulse-duration, 1.4s) / 2.5);
+}
