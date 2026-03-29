@@ -1,70 +1,102 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ── Orbital Command Center Design System ────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   ORBITAL INSPECT — Satellite Condition Intelligence Design System
+   "Bloomberg Terminal meets SpaceX Mission Control meets Palantir Gotham"
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Void backgrounds */
-  --bg-void: #06060a;
-  --bg-panel: rgba(12, 14, 22, 0.85);
-  --bg-panel-hover: rgba(18, 21, 33, 0.9);
-  --bg-panel-border: rgba(255, 255, 255, 0.06);
-  --bg-panel-border-hover: rgba(255, 255, 255, 0.12);
+  /* ── Deep Space Palette ──────────────────────────────────────────────── */
+  --bg-void: #020208;
+  --bg-deep: #060610;
+  --bg-panel: rgba(8, 10, 20, 0.88);
+  --bg-panel-hover: rgba(14, 17, 30, 0.92);
+  --bg-panel-border: rgba(100, 120, 255, 0.06);
+  --bg-panel-border-hover: rgba(100, 120, 255, 0.12);
+  --bg-input: rgba(255, 255, 255, 0.03);
+  --bg-input-focus: rgba(100, 120, 255, 0.06);
 
-  /* Accent */
-  --accent-scan: #00e5ff;
-  --accent-scan-glow: rgba(0, 229, 255, 0.15);
-  --accent-scan-dim: rgba(0, 229, 255, 0.06);
+  /* ── Orbital Accent ─────────────────────────────────────────────────── */
+  --accent-orbital: #4d7cff;
+  --accent-orbital-glow: rgba(77, 124, 255, 0.2);
+  --accent-orbital-dim: rgba(77, 124, 255, 0.06);
+  --accent-scan: #00d4ff;
+  --accent-scan-glow: rgba(0, 212, 255, 0.15);
+  --accent-scan-dim: rgba(0, 212, 255, 0.05);
 
-  /* Text */
-  --text-primary: #e8eaed;
-  --text-secondary: #8b8fa3;
-  --text-tertiary: #555770;
-  --text-mono: #a0f0b4;
+  /* ── Text Hierarchy ─────────────────────────────────────────────────── */
+  --text-primary: #e4e6ef;
+  --text-secondary: #8890a8;
+  --text-tertiary: #4a5070;
+  --text-data: #7dd3fc;
+  --text-money: #34d399;
+  --text-warning: #fbbf24;
 
-  /* Severity */
-  --severity-critical: #ff1744;
-  --severity-severe: #ff6d00;
-  --severity-moderate: #ffab00;
-  --severity-minor: #aeea00;
-  --severity-healthy: #00e676;
+  /* ── Severity System ────────────────────────────────────────────────── */
+  --severity-critical: #ef4444;
+  --severity-severe: #f97316;
+  --severity-moderate: #eab308;
+  --severity-minor: #84cc16;
+  --severity-healthy: #22c55e;
 
-  /* Agent colors */
-  --agent-orchestrator: #e8eaed;
-  --agent-vision: #448aff;
-  --agent-environment: #00e676;
-  --agent-failure: #ff6d00;
-  --agent-priority: #ff1744;
+  /* ── Underwriting Colors ────────────────────────────────────────────── */
+  --uw-standard: #22c55e;
+  --uw-elevated: #eab308;
+  --uw-exclusions: #f97316;
+  --uw-investigate: #8b5cf6;
+  --uw-uninsurable: #ef4444;
 
-  /* Priority action colors */
-  --priority-immediate: #ff1744;
-  --priority-urgent: #ff6d00;
-  --priority-scheduled: #ffab00;
-  --priority-monitor: #00e676;
+  /* ── Agent Identity Colors ──────────────────────────────────────────── */
+  --agent-classification: #a78bfa;
+  --agent-vision: #60a5fa;
+  --agent-environment: #34d399;
+  --agent-failure: #fb923c;
+  --agent-insurance: #f87171;
 
-  /* Typography */
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  /* ── Typography ─────────────────────────────────────────────────────── */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  --font-sans: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
 }
 
-/* ── Analysis Mode Base ──────────────────────────────────────────────────── */
+/* ── Global Reset for Space Theme ──────────────────────────────────────── */
 
-.analysis-bg {
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-void);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Orbital Background ────────────────────────────────────────────────── */
+
+.orbital-bg {
   background-color: var(--bg-void);
   background-image:
-    radial-gradient(ellipse at 50% 30%, rgba(10, 12, 20, 1) 0%, var(--bg-void) 70%),
-    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
-    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+    /* Subtle blue nebula glow at top center */
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(30, 40, 80, 0.25) 0%, transparent 70%),
+    /* Faint warm glow bottom right */
+    radial-gradient(ellipse 60% 40% at 85% 90%, rgba(60, 30, 20, 0.08) 0%, transparent 60%),
+    /* Grid overlay — mission control */
+    repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(100,120,255,0.015) 59px, rgba(100,120,255,0.015) 60px),
+    repeating-linear-gradient(90deg, transparent, transparent 59px, rgba(100,120,255,0.015) 59px, rgba(100,120,255,0.015) 60px);
 }
+
+/* ── Glass Panels ──────────────────────────────────────────────────────── */
 
 .glass-panel {
   background: var(--bg-panel);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
   border: 1px solid var(--bg-panel-border);
+}
+
+.glass-panel-hover {
+  transition: background 0.2s, border-color 0.2s;
 }
 
 .glass-panel-hover:hover {
@@ -72,13 +104,13 @@
   border-color: var(--bg-panel-border-hover);
 }
 
-/* ── Labels & Typography ─────────────────────────────────────────────────── */
+/* ── Typography Classes ────────────────────────────────────────────────── */
 
 .label-mono {
   font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 0.65rem;
-  letter-spacing: 0.12em;
+  font-weight: 500;
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
@@ -88,16 +120,28 @@
   font-weight: 700;
 }
 
+.font-mono-data {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  color: var(--text-data);
+}
+
 .font-body {
   font-family: var(--font-sans);
 }
 
-/* ── Scanning Animation ──────────────────────────────────────────────────── */
+.text-money {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text-money);
+}
+
+/* ── Orbital Scan Line ─────────────────────────────────────────────────── */
 
 @keyframes scanLine {
   0%   { top: -2px; opacity: 0; }
-  10%  { opacity: 1; }
-  90%  { opacity: 1; }
+  5%   { opacity: 0.8; }
+  95%  { opacity: 0.8; }
   100% { top: 100%; opacity: 0; }
 }
 
@@ -105,114 +149,184 @@
   position: absolute;
   left: 0;
   right: 0;
-  height: 2px;
+  height: 1px;
   background: linear-gradient(90deg,
     transparent 0%,
-    var(--accent-scan) 20%,
-    var(--accent-scan) 80%,
+    var(--accent-scan) 15%,
+    rgba(255,255,255,0.9) 50%,
+    var(--accent-scan) 85%,
     transparent 100%
   );
-  box-shadow: 0 0 12px var(--accent-scan), 0 0 30px var(--accent-scan-glow);
-  animation: scanLine 3s ease-in-out infinite;
+  box-shadow:
+    0 0 8px var(--accent-scan),
+    0 0 24px var(--accent-scan-glow),
+    0 -4px 16px var(--accent-scan-dim),
+    0 4px 16px var(--accent-scan-dim);
+  animation: scanLine 4s ease-in-out infinite;
   pointer-events: none;
   z-index: 10;
 }
 
-/* ── Agent Dot Animations ────────────────────────────────────────────────── */
+/* ── Agent Status Animations ───────────────────────────────────────────── */
 
 @keyframes agentPulse {
   0%, 100% { transform: scale(1); opacity: 1; }
-  50%      { transform: scale(1.4); opacity: 0.7; }
+  50%      { transform: scale(1.5); opacity: 0.6; }
 }
 
 .agent-dot-thinking {
-  animation: agentPulse 1.2s ease-in-out infinite;
+  animation: agentPulse 1.4s ease-in-out infinite;
 }
 
 @keyframes slideInRight {
-  from { transform: translateX(20px); opacity: 0; }
+  from { transform: translateX(16px); opacity: 0; }
   to   { transform: translateX(0); opacity: 1; }
 }
 
 .agent-entry {
-  animation: slideInRight 0.3s ease-out;
+  animation: slideInRight 0.25s ease-out;
 }
 
-/* ── Bounding Box Animations ─────────────────────────────────────────────── */
+/* ── Bounding Box Reveal ───────────────────────────────────────────────── */
 
 @keyframes bboxFadeIn {
-  from { opacity: 0; transform: scale(0.95); }
+  from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
 }
 
 .bbox-animate {
-  animation: bboxFadeIn 0.3s ease-out forwards;
+  animation: bboxFadeIn 0.4s ease-out forwards;
   opacity: 0;
 }
 
-/* ── Breathing Animation ─────────────────────────────────────────────────── */
+/* ── Breathing / Idle State ────────────────────────────────────────────── */
 
 @keyframes breathe {
-  0%, 100% { opacity: 0.3; }
-  50%      { opacity: 0.7; }
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 0.5; }
 }
 
 .breathe {
-  animation: breathe 3s ease-in-out infinite;
+  animation: breathe 4s ease-in-out infinite;
 }
 
-/* ── Risk Tier Glow ──────────────────────────────────────────────────────── */
+/* ── Risk Tier Glow Effects ────────────────────────────────────────────── */
 
-@keyframes riskGlow {
-  0%, 100% { box-shadow: 0 0 8px rgba(255, 23, 68, 0.3); }
-  50%      { box-shadow: 0 0 20px rgba(255, 23, 68, 0.6); }
+@keyframes riskGlowCritical {
+  0%, 100% { box-shadow: 0 0 6px rgba(239, 68, 68, 0.2), inset 0 0 6px rgba(239, 68, 68, 0.05); }
+  50%      { box-shadow: 0 0 18px rgba(239, 68, 68, 0.4), inset 0 0 12px rgba(239, 68, 68, 0.08); }
 }
 
 .risk-glow-critical {
-  animation: riskGlow 2s ease-in-out infinite;
+  animation: riskGlowCritical 2s ease-in-out infinite;
 }
 
 @keyframes riskGlowHigh {
-  0%, 100% { box-shadow: 0 0 6px rgba(255, 109, 0, 0.2); }
-  50%      { box-shadow: 0 0 14px rgba(255, 109, 0, 0.4); }
+  0%, 100% { box-shadow: 0 0 4px rgba(249, 115, 22, 0.15); }
+  50%      { box-shadow: 0 0 12px rgba(249, 115, 22, 0.3); }
 }
 
 .risk-glow-high {
   animation: riskGlowHigh 2.5s ease-in-out infinite;
 }
 
-/* ── Scrollbar Styling for Dark Panels ───────────────────────────────────── */
+/* ── Power Budget Gauge ────────────────────────────────────────────────── */
 
-.dark-scrollbar::-webkit-scrollbar {
-  width: 4px;
+@keyframes gaugeReveal {
+  from { width: 0%; }
 }
 
-.dark-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+.gauge-fill {
+  animation: gaugeReveal 1.2s ease-out;
 }
 
-.dark-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
+/* ── Orbital Ring Animation (subtle background element) ────────────────── */
+
+@keyframes orbitSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
-.dark-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+.orbit-ring {
+  animation: orbitSpin 120s linear infinite;
+  opacity: 0.03;
 }
 
-/* ── Pulsing ring animation for CRITICAL / HIGH bridge markers (Map Mode) ── */
-@keyframes pulseRing {
-  0%   { transform: scale(0.9); opacity: 0.7; }
-  100% { transform: scale(2.6); opacity: 0;   }
+/* ── Insurance Recommendation Badge ────────────────────────────────────── */
+
+.uw-badge {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  padding: 6px 14px;
+  border-radius: 4px;
 }
 
-.marker-pulse-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  animation: pulseRing var(--pulse-duration, 1.4s) ease-out infinite;
+.uw-standard       { background: rgba(34,197,94,0.1);  color: var(--uw-standard);    border: 1px solid rgba(34,197,94,0.25); }
+.uw-elevated       { background: rgba(234,179,8,0.1);  color: var(--uw-elevated);    border: 1px solid rgba(234,179,8,0.25); }
+.uw-exclusions     { background: rgba(249,115,22,0.1); color: var(--uw-exclusions);  border: 1px solid rgba(249,115,22,0.25); }
+.uw-investigate    { background: rgba(139,92,246,0.1); color: var(--uw-investigate); border: 1px solid rgba(139,92,246,0.25); }
+.uw-uninsurable    { background: rgba(239,68,68,0.1);  color: var(--uw-uninsurable); border: 1px solid rgba(239,68,68,0.25); }
+
+/* ── Data Cards ────────────────────────────────────────────────────────── */
+
+.data-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--bg-panel-border);
+  border-radius: 8px;
+  padding: 12px 14px;
 }
 
-.marker-pulse-ring-2 {
-  animation-delay: calc(var(--pulse-duration, 1.4s) / 2.5);
+.data-card-accent {
+  border-left: 2px solid var(--accent-orbital);
+}
+
+/* ── Input Fields ──────────────────────────────────────────────────────── */
+
+.orbital-input {
+  background: var(--bg-input);
+  border: 1px solid var(--bg-panel-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.orbital-input:focus {
+  background: var(--bg-input-focus);
+  border-color: rgba(77, 124, 255, 0.3);
+}
+
+.orbital-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+
+.dark-scrollbar::-webkit-scrollbar { width: 3px; }
+.dark-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.dark-scrollbar::-webkit-scrollbar-thumb { background: rgba(100, 120, 255, 0.1); border-radius: 2px; }
+.dark-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(100, 120, 255, 0.2); }
+
+/* ── Dollar Amount Formatting ──────────────────────────────────────────── */
+
+.money-positive { color: var(--text-money); }
+.money-negative { color: var(--severity-critical); }
+.money-large {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+}
+
+/* ── Divider ───────────────────────────────────────────────────────────── */
+
+.orbital-divider {
+  border: none;
+  border-top: 1px solid var(--bg-panel-border);
+  margin: 0;
 }
