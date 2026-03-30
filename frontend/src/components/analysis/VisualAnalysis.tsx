@@ -1,7 +1,6 @@
-import { useRef } from "react";
-import BoundingBoxOverlay from "./BoundingBoxOverlay";
 import type { UseAnalysisReturn } from "../../hooks/useAnalysisState";
-import type { SatelliteDamageItem, SatelliteDamagesAssessment } from "../../types";
+import type { SatelliteDamagesAssessment } from "../../types";
+import EvidenceViewer from "./EvidenceViewer";
 
 interface VisualAnalysisProps {
   analysis: UseAnalysisReturn;
@@ -9,14 +8,12 @@ interface VisualAnalysisProps {
 
 export default function VisualAnalysis({ analysis }: VisualAnalysisProps) {
   const { state, toggleAnnotations } = analysis;
-  const imgRef = useRef<HTMLImageElement>(null);
 
   const isIdle = state.analysisStatus === "idle";
   const isAnalyzing = state.analysisStatus === "analyzing";
   const hasImage = !!state.imagePreviewUrl;
 
   const visionPayload = state.agents.satellite_vision.payload as SatelliteDamagesAssessment | null;
-  const damages: SatelliteDamageItem[] = visionPayload?.damages || [];
 
   return (
     <div className="flex-1 relative flex items-center justify-center overflow-hidden"
@@ -31,11 +28,13 @@ export default function VisualAnalysis({ analysis }: VisualAnalysisProps) {
         }} />
       </div>
 
-      {/* Vignette */}
-      <div className="absolute inset-0 pointer-events-none" style={{
-        background: "radial-gradient(ellipse at center, transparent 30%, rgba(2,2,8,0.8) 100%)",
-        zIndex: 2,
-      }} />
+      {/* Vignette — only shown in idle/no-image state */}
+      {!hasImage && (
+        <div className="absolute inset-0 pointer-events-none" style={{
+          background: "radial-gradient(ellipse at center, transparent 30%, rgba(2,2,8,0.8) 100%)",
+          zIndex: 2,
+        }} />
+      )}
 
       {/* Awaiting target */}
       {!hasImage && (
@@ -59,67 +58,24 @@ export default function VisualAnalysis({ analysis }: VisualAnalysisProps) {
         </div>
       )}
 
-      {/* Image display */}
+      {/* Zoomable evidence viewer — shown when image is available */}
       {hasImage && (
-        <div className="relative max-w-full max-h-full flex items-center justify-center">
-          <img ref={imgRef} src={state.imagePreviewUrl!} alt="Satellite target"
-            className="max-w-full max-h-full object-contain relative" style={{ zIndex: 1 }} />
-          {damages.length > 0 && (
-            <BoundingBoxOverlay damages={damages} imageRef={imgRef} visible={state.showAnnotations} />
-          )}
-        </div>
+        <EvidenceViewer
+          imageUrl={state.imagePreviewUrl!}
+          damages={visionPayload?.damages ?? []}
+          overallSeverity={visionPayload?.overall_severity ?? ""}
+          totalPowerImpact={visionPayload?.total_power_impact_pct ?? 0}
+          componentAssessed={visionPayload?.component_assessed ?? ""}
+          showAnnotations={state.showAnnotations}
+          onToggleAnnotations={toggleAnnotations}
+        />
       )}
 
-      {/* Scan line */}
+      {/* Scan line during analysis */}
       {isAnalyzing && hasImage && <div className="scan-line" />}
 
-      {/* Toolbar */}
-      {hasImage && !isIdle && (
-        <div className="absolute top-3 right-3 flex gap-1.5 z-20">
-          {damages.length > 0 && (
-            <button onClick={toggleAnnotations}
-              className="px-3 py-1.5 rounded-md text-xs font-mono-display tracking-wider transition-all"
-              style={{
-                background: state.showAnnotations ? "var(--accent-orbital-dim)" : "rgba(255,255,255,0.04)",
-                border: `1px solid ${state.showAnnotations ? "rgba(77,124,255,0.3)" : "var(--bg-panel-border)"}`,
-                color: state.showAnnotations ? "var(--accent-orbital)" : "var(--text-tertiary)",
-              }}>
-              {state.showAnnotations ? "ANNOTATIONS ON" : "ANNOTATIONS OFF"}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Vision summary badge */}
-      {visionPayload && (
-        <div className="absolute top-3 left-3 flex items-center gap-3 z-20">
-          <div className="px-3 py-1.5 rounded-md font-mono-display text-xs"
-            style={{ background: "rgba(2,2,8,0.8)", backdropFilter: "blur(8px)", color: "var(--text-data)" }}>
-            {visionPayload.component_assessed?.toUpperCase() || "COMPONENT"} — {visionPayload.overall_severity}
-          </div>
-          {(visionPayload.total_power_impact_pct ?? 0) > 0 && (
-            <div className="px-3 py-1.5 rounded-md font-mono-display text-xs"
-              style={{
-                background: "rgba(2,2,8,0.8)", backdropFilter: "blur(8px)",
-                color: (visionPayload.total_power_impact_pct ?? 0) > 10 ? "var(--severity-critical)"
-                  : (visionPayload.total_power_impact_pct ?? 0) > 5 ? "var(--severity-severe)"
-                  : "var(--severity-moderate)",
-              }}>
-              PWR IMPACT: -{(visionPayload.total_power_impact_pct ?? 0).toFixed(1)}%
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Damage count */}
-      {damages.length > 0 && (
-        <div className="absolute bottom-3 left-3 px-3 py-1.5 rounded-md z-20"
-          style={{ background: "rgba(2,2,8,0.8)", backdropFilter: "blur(8px)" }}>
-          <p className="font-mono-display text-xs" style={{ color: "var(--accent-scan)" }}>
-            {damages.length} ANOMAL{damages.length !== 1 ? "IES" : "Y"} DETECTED
-          </p>
-        </div>
-      )}
+      {/* Suppress unused variable warning */}
+      {isIdle && null}
     </div>
   );
 }
