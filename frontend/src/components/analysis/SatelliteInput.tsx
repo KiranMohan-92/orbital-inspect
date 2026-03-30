@@ -1,12 +1,14 @@
 import { useRef, useState, type DragEvent, type ChangeEvent } from "react";
 import type { UseAnalysisReturn } from "../../hooks/useAnalysisState";
+import DemoSelector from "./DemoSelector";
 
 interface SatelliteInputProps {
   analysis: UseAnalysisReturn;
   onAnalyze: () => void;
+  onDemo?: (demoId: string) => void;
 }
 
-export default function SatelliteInput({ analysis, onAnalyze }: SatelliteInputProps) {
+export default function SatelliteInput({ analysis, onAnalyze, onDemo }: SatelliteInputProps) {
   const { state, setImage, setNoradId, reset } = analysis;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -143,6 +145,14 @@ export default function SatelliteInput({ analysis, onAnalyze }: SatelliteInputPr
             ))}
           </div>
         </div>
+
+        {/* Divider */}
+        <hr className="orbital-divider" />
+
+        {/* Demo Cases */}
+        {onDemo && (
+          <DemoSelector onSelectDemo={onDemo} disabled={isAnalyzing} />
+        )}
       </div>
 
       {/* Analyze Button */}

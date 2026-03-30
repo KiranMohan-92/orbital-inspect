@@ -7,7 +7,7 @@ import IntelligenceReport from "./IntelligenceReport";
 export default function AnalysisMode() {
   const analysis = useAnalysisState();
   const { state } = analysis;
-  const { analyzeImage } = useSSE(analysis);
+  const { analyzeImage, analyzeDemo } = useSSE(analysis);
 
   const handleAnalyze = () => {
     if (!state.image) return;
@@ -23,7 +23,7 @@ export default function AnalysisMode() {
         {/* Panel A: Target Acquisition (300px) */}
         <div className="w-[300px] flex-shrink-0 flex flex-col glass-panel overflow-hidden"
           style={{ borderRight: "1px solid var(--bg-panel-border)" }}>
-          <SatelliteInput analysis={analysis} onAnalyze={handleAnalyze} />
+          <SatelliteInput analysis={analysis} onAnalyze={handleAnalyze} onDemo={analyzeDemo} />
         </div>
 
         {/* Panel B: Visual Analysis (flex-1) */}
