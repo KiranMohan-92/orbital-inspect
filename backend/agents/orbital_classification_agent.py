@@ -97,6 +97,16 @@ async def classify_satellite(
             image_bytes=image_bytes,
             image_mime=image_mime,
         ) if agent else await _fallback(prompt, image_bytes, image_mime)
+
+        # Fail-closed: reject unparseable agent responses
+        if "error" in data and "raw_text" in data:
+            log.warning("Classification returned unparseable response")
+            return ClassificationResult(
+                valid=False,
+                rejection_reason="Agent response could not be parsed",
+                degraded=True,
+            )
+
         return ClassificationResult(**data)
     except Exception as e:
         log.error("Classification failed", exc_info=True)

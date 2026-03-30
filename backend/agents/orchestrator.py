@@ -52,14 +52,25 @@ async def run_satellite_pipeline(
     Yields SSE-formatted events for each agent stage. The frontend
     consumes these via EventSource to show real-time progress.
     """
+    # Generate analysis_id and sequence counter for SSE v2
+    analysis_id = uuid.uuid4().hex
+    seq = 0
+
+    def _event(evt: AgentEvent) -> dict:
+        nonlocal seq
+        evt.analysis_id = analysis_id
+        evt.sequence = seq
+        seq += 1
+        return format_sse_event(evt)
+
     # Queue all agents
     for agent_name in AGENT_ORDER:
-        yield format_sse_event(AgentEvent.queued(agent_name))
+        yield _event(AgentEvent.queued(agent_name))
 
     evidence_gaps: list[str] = []
 
     # ── Stage 1: Orbital Classification ──────────────────────────────
-    yield format_sse_event(AgentEvent.thinking(
+    yield _event(AgentEvent.thinking(
         "orbital_classification", "Identifying satellite type, bus platform, and orbital regime..."
     ))
 
@@ -77,21 +88,21 @@ async def run_satellite_pipeline(
             circuit_breaker=gemini_breaker,
         )
         classification_dict = classification.model_dump()
-        yield format_sse_event(AgentEvent.complete("orbital_classification", classification_dict))
+        yield _event(AgentEvent.complete("orbital_classification", classification_dict))
     except CircuitBreakerOpen:
         msg = _safe_error("orbital_classification", Exception("Service temporarily unavailable"))
-        yield format_sse_event(AgentEvent.error("orbital_classification", msg))
+        yield _event(AgentEvent.error("orbital_classification", msg))
         yield format_sse_error("Gemini API circuit breaker is open — service recovering")
         return
     except Exception as e:
         msg = _safe_error("orbital_classification", e)
-        yield format_sse_event(AgentEvent.error("orbital_classification", msg))
+        yield _event(AgentEvent.error("orbital_classification", msg))
         yield format_sse_error("Pipeline failed at satellite classification")
         return
 
     # Fail-closed: reject non-satellite imagery
     if not classification.valid:
-        yield format_sse_event(AgentEvent.error(
+        yield _event(AgentEvent.error(
             "orbital_classification",
             classification.rejection_reason or "Image rejected: not a satellite"
         ))
@@ -107,7 +118,7 @@ async def run_satellite_pipeline(
     )
 
     # ── Stage 2: Satellite Vision ────────────────────────────────────
-    yield format_sse_event(AgentEvent.thinking(
+    yield _event(AgentEvent.thinking(
         "satellite_vision", "Scanning for micrometeorite impacts, solar cell degradation, thermal damage..."
     ))
 
@@ -124,16 +135,16 @@ async def run_satellite_pipeline(
             circuit_breaker=gemini_breaker,
         )
         vision_dict = vision.model_dump()
-        yield format_sse_event(AgentEvent.complete("satellite_vision", vision_dict))
+        yield _event(AgentEvent.complete("satellite_vision", vision_dict))
     except Exception as e:
         msg = _safe_error("satellite_vision", e)
-        yield format_sse_event(AgentEvent.error("satellite_vision", msg))
+        yield _event(AgentEvent.error("satellite_vision", msg))
         vision = None
         vision_dict = {}
         evidence_gaps.append("satellite_vision")
 
     # ── Stage 3: Orbital Environment ─────────────────────────────────
-    yield format_sse_event(AgentEvent.thinking(
+    yield _event(AgentEvent.thinking(
         "orbital_environment", "Querying NASA ORDEM debris flux and NOAA space weather..."
     ))
 
@@ -166,16 +177,16 @@ async def run_satellite_pipeline(
             circuit_breaker=gemini_breaker,
         )
         environment_dict = environment.model_dump()
-        yield format_sse_event(AgentEvent.complete("orbital_environment", environment_dict))
+        yield _event(AgentEvent.complete("orbital_environment", environment_dict))
     except Exception as e:
         msg = _safe_error("orbital_environment", e)
-        yield format_sse_event(AgentEvent.error("orbital_environment", msg))
+        yield _event(AgentEvent.error("orbital_environment", msg))
         environment = None
         environment_dict = {}
         evidence_gaps.append("orbital_environment")
 
     # ── Stage 4: Failure Mode Analysis ───────────────────────────────
-    yield format_sse_event(AgentEvent.thinking(
+    yield _event(AgentEvent.thinking(
         "failure_mode", "Analyzing failure mechanisms and matching historical precedents..."
     ))
 
@@ -192,16 +203,16 @@ async def run_satellite_pipeline(
             circuit_breaker=gemini_breaker,
         )
         failure_mode_dict = failure_mode.model_dump()
-        yield format_sse_event(AgentEvent.complete("failure_mode", failure_mode_dict))
+        yield _event(AgentEvent.complete("failure_mode", failure_mode_dict))
     except Exception as e:
         msg = _safe_error("failure_mode", e)
-        yield format_sse_event(AgentEvent.error("failure_mode", msg))
+        yield _event(AgentEvent.error("failure_mode", msg))
         failure_mode = None
         failure_mode_dict = {}
         evidence_gaps.append("failure_mode")
 
     # ── Stage 5: Insurance Risk Assessment ───────────────────────────
-    yield format_sse_event(AgentEvent.thinking(
+    yield _event(AgentEvent.thinking(
         "insurance_risk", "Computing risk matrix, financial exposure, and underwriting recommendation..."
     ))
 
@@ -240,10 +251,10 @@ async def run_satellite_pipeline(
                     + insurance_risk_dict.get("recommendation_rationale", "")
                 )
 
-        yield format_sse_event(AgentEvent.complete("insurance_risk", insurance_risk_dict))
+        yield _event(AgentEvent.complete("insurance_risk", insurance_risk_dict))
     except Exception as e:
         msg = _safe_error("insurance_risk", e)
-        yield format_sse_event(AgentEvent.error("insurance_risk", msg))
+        yield _event(AgentEvent.error("insurance_risk", msg))
 
     # ── Pipeline Complete ────────────────────────────────────────────
     yield format_sse_done()

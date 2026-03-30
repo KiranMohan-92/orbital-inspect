@@ -71,6 +71,31 @@ try:
 except ImportError:
     pass
 
+# Mount API routers
+try:
+    from api.reports import router as reports_router
+    app.include_router(reports_router)
+except ImportError:
+    pass
+
+try:
+    from api.webhooks import router as webhooks_router
+    app.include_router(webhooks_router)
+except ImportError:
+    pass
+
+try:
+    from api.precedents import router as precedents_router
+    app.include_router(precedents_router)
+except ImportError:
+    pass
+
+try:
+    from api.portfolio import router as portfolio_router
+    app.include_router(portfolio_router)
+except ImportError:
+    pass
+
 
 # ── Demo cache directory ─────────────────────────────────────────────
 DEMO_DIR = Path(__file__).parent / "data" / "demo_cache"

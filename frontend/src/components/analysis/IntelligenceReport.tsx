@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import AgentFeed from "./AgentFeed";
 import InsuranceRiskCard from "./InsuranceRiskCard";
+import { RiskMatrixDrilldown, DegradationTimeline } from "../viz";
 import type { UseAnalysisReturn } from "../../hooks/useAnalysisState";
-import type { InsuranceRiskReport } from "../../types";
+import type { InsuranceRiskReport, SatelliteFailureModeAnalysis, ClassificationResult } from "../../types";
 
 interface Props {
   analysis: UseAnalysisReturn;
@@ -10,6 +12,8 @@ interface Props {
 export default function IntelligenceReport({ analysis }: Props) {
   const { state, AGENT_ORDER } = analysis;
   const insurancePayload = state.agents.insurance_risk.payload as InsuranceRiskReport | null;
+  const failureModePayload = state.agents.failure_mode.payload as SatelliteFailureModeAnalysis | null;
+  const classificationPayload = state.agents.orbital_classification.payload as ClassificationResult | null;
   const isComplete = state.analysisStatus === "complete" && insurancePayload;
 
   return (
@@ -35,6 +39,30 @@ export default function IntelligenceReport({ analysis }: Props) {
         {/* Insurance Risk Report */}
         {isComplete && insurancePayload && (
           <InsuranceRiskCard report={insurancePayload} />
+        )}
+
+        {/* Risk Matrix Drilldown */}
+        {isComplete && insurancePayload?.risk_matrix && (
+          <Suspense fallback={<div className="text-xs text-center py-4" style={{ color: "var(--text-tertiary)" }}>Loading visualization...</div>}>
+            <RiskMatrixDrilldown
+              riskMatrix={insurancePayload.risk_matrix}
+              riskTier={insurancePayload.risk_tier ?? "UNKNOWN"}
+            />
+          </Suspense>
+        )}
+
+        {/* Degradation Timeline */}
+        {isComplete && (classificationPayload || failureModePayload) && (
+          <Suspense fallback={<div className="text-xs text-center py-4" style={{ color: "var(--text-tertiary)" }}>Loading timeline...</div>}>
+            <DegradationTimeline
+              designLifeYears={classificationPayload?.design_life_years ?? null}
+              estimatedAgeYears={classificationPayload?.estimated_age_years ?? null}
+              remainingLifeYears={insurancePayload?.estimated_remaining_life_years ?? null}
+              powerMarginPct={insurancePayload?.power_margin_percentage ?? null}
+              annualDegradationPct={insurancePayload?.annual_degradation_rate_pct ?? null}
+              damages={((state.agents.satellite_vision.payload as Record<string, unknown>)?.damages as Array<{ type: string; severity: string }>) ?? []}
+            />
+          </Suspense>
         )}
 
         {/* Idle state */}
