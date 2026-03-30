@@ -18,7 +18,9 @@ import uuid
 from typing import AsyncGenerator
 
 from models.events import AgentEvent
+from services.resilience import resilient_call, gemini_breaker, CircuitBreakerOpen
 from services.sse_service import format_sse_event, format_sse_done, format_sse_error
+from config import settings
 
 log = logging.getLogger(__name__)
 
@@ -63,14 +65,24 @@ async def run_satellite_pipeline(
 
     try:
         from agents.orbital_classification_agent import classify_satellite
-        classification = await classify_satellite(
-            image_bytes=image_bytes,
-            image_mime=image_mime,
-            norad_id=norad_id,
-            additional_context=additional_context,
+        classification = await resilient_call(
+            lambda: classify_satellite(
+                image_bytes=image_bytes,
+                image_mime=image_mime,
+                norad_id=norad_id,
+                additional_context=additional_context,
+            ),
+            timeout_seconds=settings.AGENT_TIMEOUT_SECONDS,
+            max_retries=2,
+            circuit_breaker=gemini_breaker,
         )
         classification_dict = classification.model_dump()
         yield format_sse_event(AgentEvent.complete("orbital_classification", classification_dict))
+    except CircuitBreakerOpen:
+        msg = _safe_error("orbital_classification", Exception("Service temporarily unavailable"))
+        yield format_sse_event(AgentEvent.error("orbital_classification", msg))
+        yield format_sse_error("Gemini API circuit breaker is open — service recovering")
+        return
     except Exception as e:
         msg = _safe_error("orbital_classification", e)
         yield format_sse_event(AgentEvent.error("orbital_classification", msg))
@@ -101,10 +113,15 @@ async def run_satellite_pipeline(
 
     try:
         from agents.satellite_vision_agent import analyze_satellite_image
-        vision = await analyze_satellite_image(
-            image_bytes=image_bytes,
-            image_mime=image_mime,
-            satellite_context=sat_context,
+        vision = await resilient_call(
+            lambda: analyze_satellite_image(
+                image_bytes=image_bytes,
+                image_mime=image_mime,
+                satellite_context=sat_context,
+            ),
+            timeout_seconds=settings.AGENT_TIMEOUT_SECONDS,
+            max_retries=2,
+            circuit_breaker=gemini_breaker,
         )
         vision_dict = vision.model_dump()
         yield format_sse_event(AgentEvent.complete("satellite_vision", vision_dict))
@@ -137,11 +154,16 @@ async def run_satellite_pipeline(
 
     try:
         from agents.orbital_environment_agent import analyze_orbital_environment
-        environment = await analyze_orbital_environment(
-            altitude_km=altitude_km,
-            inclination_deg=inclination_deg,
-            orbital_regime=classification.orbital_regime,
-            satellite_context=sat_context,
+        environment = await resilient_call(
+            lambda: analyze_orbital_environment(
+                altitude_km=altitude_km,
+                inclination_deg=inclination_deg,
+                orbital_regime=classification.orbital_regime,
+                satellite_context=sat_context,
+            ),
+            timeout_seconds=settings.AGENT_TIMEOUT_SECONDS,
+            max_retries=2,
+            circuit_breaker=gemini_breaker,
         )
         environment_dict = environment.model_dump()
         yield format_sse_event(AgentEvent.complete("orbital_environment", environment_dict))
@@ -159,10 +181,15 @@ async def run_satellite_pipeline(
 
     try:
         from agents.satellite_failure_mode_agent import analyze_failure_modes
-        failure_mode = await analyze_failure_modes(
-            classification_context=json.dumps(classification_dict, default=str),
-            vision_context=json.dumps(vision_dict, default=str),
-            environment_context=json.dumps(environment_dict, default=str),
+        failure_mode = await resilient_call(
+            lambda: analyze_failure_modes(
+                classification_context=json.dumps(classification_dict, default=str),
+                vision_context=json.dumps(vision_dict, default=str),
+                environment_context=json.dumps(environment_dict, default=str),
+            ),
+            timeout_seconds=settings.AGENT_TIMEOUT_SECONDS,
+            max_retries=2,
+            circuit_breaker=gemini_breaker,
         )
         failure_mode_dict = failure_mode.model_dump()
         yield format_sse_event(AgentEvent.complete("failure_mode", failure_mode_dict))
@@ -189,11 +216,16 @@ async def run_satellite_pipeline(
 
     try:
         from agents.insurance_risk_agent import assess_insurance_risk
-        insurance_risk = await assess_insurance_risk(
-            classification_context=json.dumps(classification_dict, default=str),
-            vision_context=json.dumps(vision_dict, default=str),
-            environment_context=json.dumps(environment_dict, default=str),
-            failure_mode_context=json.dumps(failure_mode_dict, default=str) + evidence_gap_context,
+        insurance_risk = await resilient_call(
+            lambda: assess_insurance_risk(
+                classification_context=json.dumps(classification_dict, default=str),
+                vision_context=json.dumps(vision_dict, default=str),
+                environment_context=json.dumps(environment_dict, default=str),
+                failure_mode_context=json.dumps(failure_mode_dict, default=str) + evidence_gap_context,
+            ),
+            timeout_seconds=settings.AGENT_TIMEOUT_SECONDS,
+            max_retries=2,
+            circuit_breaker=gemini_breaker,
         )
         insurance_risk_dict = insurance_risk.model_dump()
 

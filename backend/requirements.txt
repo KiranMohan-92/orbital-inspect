@@ -15,3 +15,4 @@ aiosqlite>=0.20.0
 alembic>=1.13.0
 arq>=0.26.0
 structlog>=24.0.0
+PyJWT>=2.8.0
