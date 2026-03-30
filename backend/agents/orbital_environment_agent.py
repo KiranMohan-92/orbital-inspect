@@ -17,6 +17,8 @@ from services.ordem_service import format_flux_summary, lookup_radiation, lookup
 from services.space_weather_service import fetch_space_weather, format_weather_summary
 from models.satellite import OrbitalEnvironmentAnalysis
 
+log = logging.getLogger(__name__)
+
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "orbital_environment_prompt.txt"
 _PROMPT_TEMPLATE = _PROMPT_PATH.read_text()
 

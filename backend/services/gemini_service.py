@@ -9,9 +9,14 @@ import json
 import uuid
 import asyncio
 import logging
+import os
 from config import settings
 
 log = logging.getLogger(__name__)
+
+if settings.GEMINI_API_KEY:
+    os.environ.setdefault("GEMINI_API_KEY", settings.GEMINI_API_KEY)
+    os.environ.setdefault("GOOGLE_API_KEY", settings.GEMINI_API_KEY)
 
 _ADK_AVAILABLE = False
 
@@ -63,7 +68,7 @@ async def run_adk_agent(
         return await _run_fallback(agent, user_message, image_bytes, image_mime)
 
     user_id = f"user_{uuid.uuid4().hex[:8]}"
-    session = _session_service.create_session(
+    session = await _session_service.create_session(
         app_name=APP_NAME,
         user_id=user_id,
         state=session_state or {},
@@ -127,7 +132,7 @@ async def _run_fallback(
     model_name = getattr(agent, "model", settings.GEMINI_MODEL) or settings.GEMINI_MODEL
 
     if client is None:
-        return {"error": "No Gemini client available"}
+        raise RuntimeError("No Gemini client available")
 
     contents_parts = []
     if instruction:

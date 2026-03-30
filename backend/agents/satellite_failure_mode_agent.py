@@ -16,6 +16,8 @@ from services.gemini_service import (
 )
 from models.satellite import SatelliteFailureModeAnalysis
 
+log = logging.getLogger(__name__)
+
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "satellite_failure_mode_prompt.txt"
 _PROMPT_TEMPLATE = _PROMPT_PATH.read_text()
 

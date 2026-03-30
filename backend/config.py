@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
     GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     REDIS_URL: str = "redis://localhost:6379"
     DEMO_MODE: bool = True
 
@@ -27,7 +27,10 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "json"  # "json" or "console"
 
     # CORS
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:5173", "http://localhost:5174", "http://localhost:5175",
+        "http://localhost:5176", "http://localhost:5177", "http://localhost:3000",
+    ]
 
 
 settings = Settings()

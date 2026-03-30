@@ -93,8 +93,8 @@ async def fetch_space_weather() -> SpaceWeatherSnapshot:
                     snapshot.kp_index = kp_val
                     snapshot.kp_category = _classify_kp(kp_val)
                     snapshot.data_sources.append("NOAA Planetary K-index")
-        except Exception as e:
-            log.warning("Kp fetch failed", error=str(e))
+        except Exception:
+            log.warning("Kp fetch failed", exc_info=True)
 
         # 2. Solar wind plasma (DSCOVR)
         try:
@@ -110,8 +110,8 @@ async def fetch_space_weather() -> SpaceWeatherSnapshot:
                             snapshot.solar_wind_speed_km_s = float(speed)
                             snapshot.data_sources.append("DSCOVR Solar Wind Plasma")
                             break
-        except Exception as e:
-            log.warning("Solar wind fetch failed", error=str(e))
+        except Exception:
+            log.warning("Solar wind fetch failed", exc_info=True)
 
         # 3. GOES X-ray flux
         try:
@@ -124,8 +124,8 @@ async def fetch_space_weather() -> SpaceWeatherSnapshot:
                     snapshot.xray_flux = xray
                     snapshot.flare_class = _classify_flare(xray)
                     snapshot.data_sources.append("GOES X-ray Flux")
-        except Exception as e:
-            log.warning("X-ray fetch failed", error=str(e))
+        except Exception:
+            log.warning("X-ray fetch failed", exc_info=True)
 
         # 4. GOES proton flux
         try:
@@ -139,8 +139,8 @@ async def fetch_space_weather() -> SpaceWeatherSnapshot:
                             snapshot.proton_flux_pfu = float(entry.get("flux", 0))
                             snapshot.data_sources.append("GOES Proton Flux")
                             break
-        except Exception as e:
-            log.warning("Proton flux fetch failed", error=str(e))
+        except Exception:
+            log.warning("Proton flux fetch failed", exc_info=True)
 
         # Storm warning if Kp >= 5 or proton event
         snapshot.storm_warning = snapshot.kp_index >= 5 or snapshot.proton_flux_pfu >= 10

@@ -52,6 +52,15 @@ def test_classification_result_degraded_defaults_to_false():
     assert result.degraded is False
 
 
+def test_classification_result_coerces_string_expected_components():
+    result = ClassificationResult(
+        valid=True,
+        satellite_type="communications",
+        expected_components="solar_array, antenna_reflector, bus",
+    )
+    assert result.expected_components == ["solar_array", "antenna_reflector", "bus"]
+
+
 # ─── InsuranceRiskReport ─────────────────────────────────────────────────────
 
 def test_insurance_risk_report_with_valid_data(sample_insurance_risk_result):

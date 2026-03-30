@@ -116,7 +116,10 @@ def generate_pdf_report(analysis_data: dict, report_id: str = "") -> bytes | Non
     try:
         from weasyprint import HTML
         pdf_bytes = HTML(string=html).write_pdf()
-        log.info("PDF report generated", report_id=report_id, size_bytes=len(pdf_bytes))
+        log.info(
+            "PDF report generated",
+            extra={"report_id": report_id, "size_bytes": len(pdf_bytes)},
+        )
         return pdf_bytes
     except ImportError:
         log.warning("WeasyPrint not available — returning HTML only")

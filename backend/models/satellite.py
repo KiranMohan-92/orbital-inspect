@@ -1,6 +1,6 @@
 """Satellite domain models for Orbital Inspect."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime, timezone
 from enum import Enum
@@ -63,6 +63,19 @@ class ClassificationResult(BaseModel):
     operator: str | None = None
     notes: str = ""
     degraded: bool = False
+
+    @field_validator("expected_components", mode="before")
+    @classmethod
+    def _normalize_expected_components(cls, value):
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [
+                item.strip(" -\t")
+                for item in value.replace("\n", ",").split(",")
+                if item.strip()
+            ]
+        return value
 
 
 class SatelliteDamageItem(BaseModel):

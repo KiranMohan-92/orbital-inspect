@@ -16,6 +16,8 @@ from services.gemini_service import (
 )
 from models.satellite import InsuranceRiskReport
 
+log = logging.getLogger(__name__)
+
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "insurance_risk_prompt.txt"
 _PROMPT_TEMPLATE = _PROMPT_PATH.read_text()
 
