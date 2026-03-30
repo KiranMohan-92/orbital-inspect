@@ -11,11 +11,21 @@ import type { UseAnalysisReturn } from "./useAnalysisState";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
+const VALID_AGENTS = new Set<string>([
+  "orbital_classification", "satellite_vision", "orbital_environment",
+  "failure_mode", "insurance_risk",
+]);
+
 interface SSEEventData {
   agent: AgentName;
   status: AgentStatusType;
   payload: Record<string, unknown>;
   timestamp: number;
+  analysis_id: string;
+  event_id: string;
+  sequence: number;
+  schema_version: string;
+  degraded: boolean;
 }
 
 // ── Shared SSE Stream Parser ────────────────────────────────────────────────
@@ -45,6 +55,7 @@ async function consumeSSEStream(response: Response, handlers: SSEHandlers): Prom
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
+      buffer = buffer.replace(/\r\n/g, "\n"); // Normalize CRLF
 
       // SSE events are delimited by double newlines
       const events = buffer.split("\n\n");
@@ -85,8 +96,11 @@ async function consumeSSEStream(response: Response, handlers: SSEHandlers): Prom
 
         if (eventType === "agent_event") {
           try {
-            const data: SSEEventData = JSON.parse(eventData);
-            handlers.onAgentEvent(data);
+            const data = JSON.parse(eventData) as SSEEventData;
+            // Validate agent name before dispatching to prevent state corruption
+            if (data.agent && data.status && VALID_AGENTS.has(data.agent)) {
+              handlers.onAgentEvent(data);
+            }
           } catch {
             // Skip malformed events silently
           }
@@ -106,17 +120,29 @@ async function consumeSSEStream(response: Response, handlers: SSEHandlers): Prom
 export function useSSE(analysis: UseAnalysisReturn) {
   const { updateAgent, startAnalysis, completeAnalysis, errorAnalysis } = analysis;
   const abortRef = useRef<AbortController | null>(null);
+  const analysisIdRef = useRef<string>("");
+  const lastSequenceRef = useRef<number>(-1);
 
   const cancel = useCallback(() => {
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
     }
+    analysisIdRef.current = "";
+    lastSequenceRef.current = -1;
   }, []);
 
   /** Dispatch an SSE agent event to the analysis state. */
   const handleAgentEvent = useCallback(
     (data: SSEEventData) => {
+      if (data.analysis_id && !analysisIdRef.current) {
+        analysisIdRef.current = data.analysis_id;
+      }
+      if (data.sequence > 0 && data.sequence !== lastSequenceRef.current + 1) {
+        console.warn(`SSE sequence gap: expected ${lastSequenceRef.current + 1}, got ${data.sequence}`);
+      }
+      lastSequenceRef.current = data.sequence;
+
       const message =
         data.status === "thinking"
           ? (typeof data.payload?.message === "string" ? data.payload.message : "Processing...")
@@ -139,18 +165,15 @@ export function useSSE(analysis: UseAnalysisReturn) {
       abortRef.current = controller;
 
       const formData = new FormData();
-      formData.append("file", image);
+      formData.append("image", image);
 
       if (context) {
-        const filtered: Record<string, string> = {};
-        for (const [k, v] of Object.entries(context)) {
-          if (v && v.trim()) filtered[k] = v.trim();
-        }
-        if (Object.keys(filtered).length > 0) {
-          formData.append("context", JSON.stringify(filtered));
-        }
+        if (context.noradId) formData.append("norad_id", context.noradId);
+        if (context.additionalContext) formData.append("context", context.additionalContext);
       }
 
+      analysisIdRef.current = "";
+      lastSequenceRef.current = -1;
       startAnalysis();
 
       try {
@@ -171,7 +194,10 @@ export function useSSE(analysis: UseAnalysisReturn) {
           onError: errorAnalysis,
         });
       } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (err instanceof DOMException && err.name === "AbortError") {
+          completeAnalysis();
+          return;
+        }
         const message =
           err instanceof TypeError
             ? "Cannot reach backend — is it running on http://localhost:8000?"
@@ -195,7 +221,7 @@ export function useSSE(analysis: UseAnalysisReturn) {
 
       try {
         const response = await fetch(
-          `${API_BASE}/api/analyze-demo?scenario=${encodeURIComponent(scenario)}`,
+          `${API_BASE}/api/demo/${encodeURIComponent(scenario)}`,
           { method: "POST", signal: controller.signal }
         );
 
@@ -210,7 +236,10 @@ export function useSSE(analysis: UseAnalysisReturn) {
           onError: errorAnalysis,
         });
       } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (err instanceof DOMException && err.name === "AbortError") {
+          completeAnalysis();
+          return;
+        }
         errorAnalysis(err instanceof Error ? err.message : "Demo analysis failed");
       }
     },
@@ -225,31 +254,32 @@ export function useSSE(analysis: UseAnalysisReturn) {
 /** Generate a brief summary message for the agent feed when an agent completes. */
 function summarizePayload(agent: AgentName, payload: Record<string, unknown>): string {
   switch (agent) {
-    case "orchestrator": {
-      const structType = payload.structure_type as string;
-      const env = payload.environment_category as string;
-      return structType ? `${structType} in ${env}` : "Validated";
+    case "orbital_classification": {
+      const satType = payload.satellite_type as string;
+      const regime = payload.orbital_regime as string;
+      return satType ? `${satType} — ${regime || "unknown regime"}` : "Classified";
     }
-    case "vision": {
+    case "satellite_vision": {
       const damages = payload.damages as unknown[];
       const severity = payload.overall_severity as string;
-      if (damages?.length) return `${damages.length} damage(s) — ${severity}`;
+      if (damages?.length) return `${damages.length} anomal${damages.length !== 1 ? "ies" : "y"} — ${severity}`;
       return severity ? `Overall: ${severity}` : "Analysis complete";
     }
-    case "environment": {
+    case "orbital_environment": {
       const stressors = payload.stressors as unknown[];
-      return stressors?.length ? `${stressors.length} stressor(s) identified` : "Analysis complete";
+      return stressors?.length ? `${stressors.length} stressor(s) identified` : "Environment assessed";
     }
     case "failure_mode": {
       const mode = payload.failure_mode as string;
-      return mode || "Classification complete";
+      const rate = payload.progression_rate as string;
+      return mode ? `${mode} — ${rate || ""}` : "Mechanisms analyzed";
     }
-    case "priority": {
+    case "insurance_risk": {
       const tier = payload.risk_tier as string;
       const composite = payload.risk_matrix as Record<string, unknown>;
-      return tier
-        ? `${tier} (${composite?.composite || "?"}/125)`
-        : "Assessment complete";
+      const rec = payload.underwriting_recommendation as string;
+      if (tier && rec) return `${tier} (${composite?.composite || "?"}/125) — ${rec.replace(/_/g, " ")}`;
+      return tier ? `${tier}` : "Assessment complete";
     }
     default:
       return "Complete";

@@ -1,4 +1,5 @@
 import { useAnalysisState } from "../../hooks/useAnalysisState";
+import { useSSE } from "../../hooks/useSSE";
 import SatelliteInput from "./SatelliteInput";
 import VisualAnalysis from "./VisualAnalysis";
 import IntelligenceReport from "./IntelligenceReport";
@@ -6,11 +7,13 @@ import IntelligenceReport from "./IntelligenceReport";
 export default function AnalysisMode() {
   const analysis = useAnalysisState();
   const { state } = analysis;
+  const { analyzeImage } = useSSE(analysis);
 
   const handleAnalyze = () => {
     if (!state.image) return;
-    analysis.startAnalysis();
-    // TODO: Wire to SSE endpoint in next phase
+    analyzeImage(state.image, {
+      noradId: state.noradId || undefined,
+    });
   };
 
   return (

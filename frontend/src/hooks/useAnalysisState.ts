@@ -66,8 +66,8 @@ function reducer(state: AnalysisFullState, action: Action): AnalysisFullState {
           ...state.agents,
           [action.agent]: {
             status: action.status,
-            message: action.message || state.agents[action.agent].message,
-            payload: action.payload || state.agents[action.agent].payload,
+            message: action.message ?? state.agents[action.agent].message,
+            payload: action.payload ?? state.agents[action.agent].payload,
             timestamp: Date.now(),
           },
         },

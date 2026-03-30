@@ -62,6 +62,7 @@ class ClassificationResult(BaseModel):
     estimated_age_years: float | None = None
     operator: str | None = None
     notes: str = ""
+    degraded: bool = False
 
 
 class SatelliteDamageItem(BaseModel):
@@ -86,6 +87,7 @@ class SatelliteDamagesAssessment(BaseModel):
     total_power_impact_pct: float = 0.0
     healthy_areas_noted: str = ""
     component_assessed: str = ""        # Which component was analyzed (solar_array, antenna, bus)
+    degraded: bool = False
 
 
 class OrbitalStressor(BaseModel):
@@ -111,6 +113,7 @@ class OrbitalEnvironmentAnalysis(BaseModel):
     accelerating_factors: list[str] = []
     mitigating_factors: list[str] = []
     data_sources: list[str] = []
+    degraded: bool = False
 
 
 class SatellitePrecedent(BaseModel):
@@ -135,6 +138,7 @@ class SatelliteFailureModeAnalysis(BaseModel):
     remaining_life_revision_years: float | None = None
     time_to_critical: str = ""
     historical_precedents: list[SatellitePrecedent] = []
+    degraded: bool = False
 
 
 class RiskMatrixDimension(BaseModel):
@@ -183,6 +187,9 @@ class InsuranceRiskReport(BaseModel):
     recommended_actions: list[dict] = []
     worst_case_scenario: str = ""
     summary: str = ""
+    degraded: bool = False
+    evidence_gaps: list[str] = []
+    report_completeness: str = "COMPLETE"
 
 
 class SatelliteConditionReport(BaseModel):

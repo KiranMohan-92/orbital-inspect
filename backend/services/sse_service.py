@@ -38,16 +38,34 @@ def format_sse_error(message: str) -> dict:
     }
 
 
-def thinking_event(agent: str, message: str) -> dict:
+def thinking_event(
+    agent: str,
+    message: str,
+    analysis_id: str = "",
+    sequence: int = 0,
+    degraded: bool = False,
+) -> dict:
     """Convenience: create and format a 'thinking' SSE event."""
-    return format_sse_event(AgentEvent.thinking(agent, message))
+    return format_sse_event(AgentEvent.thinking(agent, message, analysis_id=analysis_id, sequence=sequence, degraded=degraded))
 
 
-def complete_event(agent: str, payload: dict) -> dict:
+def complete_event(
+    agent: str,
+    payload: dict,
+    analysis_id: str = "",
+    sequence: int = 0,
+    degraded: bool = False,
+) -> dict:
     """Convenience: create and format a 'complete' SSE event."""
-    return format_sse_event(AgentEvent.complete(agent, payload))
+    return format_sse_event(AgentEvent.complete(agent, payload, analysis_id=analysis_id, sequence=sequence, degraded=degraded))
 
 
-def error_event(agent: str, reason: str) -> dict:
+def error_event(
+    agent: str,
+    reason: str,
+    analysis_id: str = "",
+    sequence: int = 0,
+    degraded: bool = False,
+) -> dict:
     """Convenience: create and format an 'error' SSE event."""
-    return format_sse_event(AgentEvent.error(agent, reason))
+    return format_sse_event(AgentEvent.error(agent, reason, analysis_id=analysis_id, sequence=sequence, degraded=degraded))

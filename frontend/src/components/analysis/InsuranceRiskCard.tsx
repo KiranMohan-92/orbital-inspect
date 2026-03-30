@@ -37,7 +37,7 @@ interface Props {
 export default function InsuranceRiskCard({ report }: Props) {
   const tierColor = TIER_COLORS[report.risk_tier] || "var(--text-secondary)";
   const isHighRisk = report.risk_tier === "CRITICAL" || report.risk_tier === "HIGH";
-  const uwStyle = UW_STYLES[report.underwriting_recommendation] || UW_STYLES.FURTHER_INVESTIGATION;
+  const uwStyle = UW_STYLES[report.underwriting_recommendation as UnderwritingRecommendation] || UW_STYLES.FURTHER_INVESTIGATION;
 
   return (
     <div className="flex flex-col gap-4 font-body">

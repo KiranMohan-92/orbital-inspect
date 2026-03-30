@@ -10,7 +10,7 @@ from services.gemini_service import (
     is_adk_available,
     run_adk_agent,
     get_model_name,
-    _parse_json_response,
+    parse_json_response,
 )
 from models.satellite import ClassificationResult
 
@@ -98,10 +98,12 @@ async def classify_satellite(
     except Exception as e:
         print(f"[OrbitalClassification] Error: {e}")
         return ClassificationResult(
-            valid=True,
+            valid=False,
+            rejection_reason="Classification unavailable: agent error",
             satellite_type="other",
             orbital_regime="UNKNOWN",
             notes=f"Classification failed: {e}",
+            degraded=True,
         )
 
 
@@ -126,6 +128,6 @@ async def _fallback(prompt: str, image_bytes: bytes, image_mime: str) -> dict:
             ),
         )
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     response = await loop.run_in_executor(None, _sync)
-    return _parse_json_response(response.text or "{}")
+    return parse_json_response(response.text or "{}")

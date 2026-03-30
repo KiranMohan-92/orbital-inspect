@@ -90,10 +90,10 @@ async def run_adk_agent(
                     if part.text:
                         final_text += part.text
 
-    return _parse_json_response(final_text)
+    return parse_json_response(final_text)
 
 
-def _parse_json_response(text: str) -> dict:
+def parse_json_response(text: str) -> dict:
     """Extract JSON from agent response, handling markdown code fences."""
     text = text.strip()
     if text.startswith("```"):
@@ -144,6 +144,6 @@ async def _run_fallback(
             ),
         )
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     response = await loop.run_in_executor(None, _sync_call)
-    return _parse_json_response(response.text or "")
+    return parse_json_response(response.text or "")

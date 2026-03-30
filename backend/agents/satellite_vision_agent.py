@@ -11,7 +11,7 @@ from services.gemini_service import (
     is_adk_available,
     run_adk_agent,
     get_model_name,
-    _parse_json_response,
+    parse_json_response,
 )
 from models.satellite import SatelliteDamagesAssessment
 
@@ -83,6 +83,7 @@ async def analyze_satellite_image(
             overall_pattern="Vision analysis failed",
             overall_severity="MODERATE",
             overall_confidence=0.0,
+            degraded=True,
         )
 
 
@@ -107,6 +108,6 @@ async def _fallback(prompt: str, image_bytes: bytes, image_mime: str) -> dict:
             ),
         )
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     response = await loop.run_in_executor(None, _sync)
-    return _parse_json_response(response.text or "{}")
+    return parse_json_response(response.text or "{}")

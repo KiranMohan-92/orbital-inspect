@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import type { DamageItem } from "../../types";
+import type { SatelliteDamageItem } from "../../types";
 
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: "#ff1744",
@@ -9,7 +9,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 interface BoundingBoxOverlayProps {
-  damages: DamageItem[];
+  damages: SatelliteDamageItem[];
   imageRef: React.RefObject<HTMLImageElement | null>;
   visible: boolean;
 }

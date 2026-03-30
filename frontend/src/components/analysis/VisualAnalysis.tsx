@@ -97,15 +97,15 @@ export default function VisualAnalysis({ analysis }: VisualAnalysisProps) {
             style={{ background: "rgba(2,2,8,0.8)", backdropFilter: "blur(8px)", color: "var(--text-data)" }}>
             {visionPayload.component_assessed?.toUpperCase() || "COMPONENT"} — {visionPayload.overall_severity}
           </div>
-          {visionPayload.total_power_impact_pct > 0 && (
+          {(visionPayload.total_power_impact_pct ?? 0) > 0 && (
             <div className="px-3 py-1.5 rounded-md font-mono-display text-xs"
               style={{
                 background: "rgba(2,2,8,0.8)", backdropFilter: "blur(8px)",
-                color: visionPayload.total_power_impact_pct > 10 ? "var(--severity-critical)"
-                  : visionPayload.total_power_impact_pct > 5 ? "var(--severity-severe)"
+                color: (visionPayload.total_power_impact_pct ?? 0) > 10 ? "var(--severity-critical)"
+                  : (visionPayload.total_power_impact_pct ?? 0) > 5 ? "var(--severity-severe)"
                   : "var(--severity-moderate)",
               }}>
-              PWR IMPACT: -{visionPayload.total_power_impact_pct.toFixed(1)}%
+              PWR IMPACT: -{(visionPayload.total_power_impact_pct ?? 0).toFixed(1)}%
             </div>
           )}
         </div>
