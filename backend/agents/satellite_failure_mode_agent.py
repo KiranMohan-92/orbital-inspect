@@ -6,6 +6,7 @@ failure mode, its progression rate, and relevant insurance claim precedents.
 Uses Google Search grounding for up-to-date satellite incident data.
 """
 
+import logging
 from pathlib import Path
 from services.gemini_service import (
     is_adk_available,
@@ -76,7 +77,7 @@ async def analyze_failure_modes(
         ) if agent else await _fallback(prompt)
         return SatelliteFailureModeAnalysis(**data)
     except Exception as e:
-        print(f"[FailureMode] Error: {e}")
+        log.error("Failure mode analysis failed", exc_info=True)
         return SatelliteFailureModeAnalysis(
             failure_mode="Analysis failed",
             mechanism=str(e),

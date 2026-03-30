@@ -5,7 +5,10 @@ Uses CelesTrak API for orbital parameter enrichment when NORAD ID is provided.
 Classifies satellite type, bus platform, orbital regime, and expected components.
 """
 
+import logging
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 from services.gemini_service import (
     is_adk_available,
     run_adk_agent,
@@ -79,7 +82,7 @@ async def classify_satellite(
                     f"  RCS size: {sat_data['rcs_size']}"
                 )
         except Exception as e:
-            print(f"[OrbitalClassification] CelesTrak lookup failed: {e}")
+            log.warning("CelesTrak lookup failed", exc_info=True)
 
     prompt = f"Classify this satellite image.{celestrak_context}"
     if additional_context:
@@ -96,7 +99,7 @@ async def classify_satellite(
         ) if agent else await _fallback(prompt, image_bytes, image_mime)
         return ClassificationResult(**data)
     except Exception as e:
-        print(f"[OrbitalClassification] Error: {e}")
+        log.error("Classification failed", exc_info=True)
         return ClassificationResult(
             valid=False,
             rejection_reason="Classification unavailable: agent error",

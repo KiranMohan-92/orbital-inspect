@@ -5,6 +5,7 @@ Combines NASA ORDEM debris flux tables, NOAA SWPC space weather data,
 and radiation/thermal models to quantify environmental stressors.
 """
 
+import logging
 from pathlib import Path
 from services.gemini_service import (
     is_adk_available,
@@ -103,7 +104,7 @@ async def analyze_orbital_environment(
         weather = await fetch_space_weather()
         enrichment_parts.append(format_weather_summary(weather))
     except Exception as e:
-        print(f"[OrbitalEnvironment] Space weather fetch failed: {e}")
+        log.warning("Space weather fetch failed", exc_info=True)
         enrichment_parts.append("Space weather: data unavailable (NOAA SWPC unreachable)")
 
     # Build prompt with all enrichment data
@@ -127,7 +128,7 @@ async def analyze_orbital_environment(
         ) if agent else await _fallback(prompt)
         return OrbitalEnvironmentAnalysis(**data)
     except Exception as e:
-        print(f"[OrbitalEnvironment] Error: {e}")
+        log.error("Environment analysis failed", exc_info=True)
         return OrbitalEnvironmentAnalysis(
             orbital_regime=orbital_regime,
             altitude_km=altitude_km,

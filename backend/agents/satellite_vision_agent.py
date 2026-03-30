@@ -6,6 +6,7 @@ degradation, thermal blanket damage, deployment anomalies, and debris strikes.
 Returns bounding boxes with confidence scores and power impact estimates.
 """
 
+import logging
 from pathlib import Path
 from services.gemini_service import (
     is_adk_available,
@@ -78,7 +79,7 @@ async def analyze_satellite_image(
         ) if agent else await _fallback(prompt, image_bytes, image_mime)
         return SatelliteDamagesAssessment(**data)
     except Exception as e:
-        print(f"[SatelliteVision] Error: {e}")
+        log.error("Vision analysis failed", exc_info=True)
         return SatelliteDamagesAssessment(
             overall_pattern="Vision analysis failed",
             overall_severity="MODERATE",

@@ -6,6 +6,7 @@ with underwriting recommendation, financial exposure estimates, and consistency
 cross-validation. This agent's output is what insurers pay $50K-500K for.
 """
 
+import logging
 from pathlib import Path
 from services.gemini_service import (
     is_adk_available,
@@ -86,7 +87,7 @@ async def assess_insurance_risk(
         report = _enforce_consistency(report)
         return report
     except Exception as e:
-        print(f"[InsuranceRisk] Error: {e}")
+        log.error("Insurance risk assessment failed", exc_info=True)
         return InsuranceRiskReport(
             consistency_check={"passed": False, "anomalies": ["Agent processing error"], "confidence_adjustment": "LOW"},
             risk_matrix={

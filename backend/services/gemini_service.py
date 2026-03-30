@@ -8,7 +8,10 @@ Inherited from DeepInspect, adapted for satellite inspection domain.
 import json
 import uuid
 import asyncio
+import logging
 from config import settings
+
+log = logging.getLogger(__name__)
 
 _ADK_AVAILABLE = False
 
@@ -22,9 +25,9 @@ try:
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
     _ADK_AVAILABLE = True
-    print("[GeminiService] Google ADK loaded successfully")
+    log.info("Google ADK loaded successfully")
 except ImportError as e:
-    print(f"[GeminiService] ADK not available ({e}), using raw Gemini fallback")
+    log.warning("ADK not available, using raw Gemini fallback", extra={"error": str(e)})
     try:
         from google import genai
         from google.genai import types

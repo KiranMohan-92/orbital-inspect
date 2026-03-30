@@ -12,7 +12,10 @@ All endpoints are free, no API key required.
 """
 
 import httpx
+import logging
 from dataclasses import dataclass
+
+log = logging.getLogger(__name__)
 
 SWPC_BASE = "https://services.swpc.noaa.gov"
 
@@ -91,7 +94,7 @@ async def fetch_space_weather() -> SpaceWeatherSnapshot:
                     snapshot.kp_category = _classify_kp(kp_val)
                     snapshot.data_sources.append("NOAA Planetary K-index")
         except Exception as e:
-            print(f"[SpaceWeather] Kp fetch failed: {e}")
+            log.warning("Kp fetch failed", error=str(e))
 
         # 2. Solar wind plasma (DSCOVR)
         try:
@@ -108,7 +111,7 @@ async def fetch_space_weather() -> SpaceWeatherSnapshot:
                             snapshot.data_sources.append("DSCOVR Solar Wind Plasma")
                             break
         except Exception as e:
-            print(f"[SpaceWeather] Solar wind fetch failed: {e}")
+            log.warning("Solar wind fetch failed", error=str(e))
 
         # 3. GOES X-ray flux
         try:
@@ -122,7 +125,7 @@ async def fetch_space_weather() -> SpaceWeatherSnapshot:
                     snapshot.flare_class = _classify_flare(xray)
                     snapshot.data_sources.append("GOES X-ray Flux")
         except Exception as e:
-            print(f"[SpaceWeather] X-ray fetch failed: {e}")
+            log.warning("X-ray fetch failed", error=str(e))
 
         # 4. GOES proton flux
         try:
@@ -137,7 +140,7 @@ async def fetch_space_weather() -> SpaceWeatherSnapshot:
                             snapshot.data_sources.append("GOES Proton Flux")
                             break
         except Exception as e:
-            print(f"[SpaceWeather] Proton flux fetch failed: {e}")
+            log.warning("Proton flux fetch failed", error=str(e))
 
         # Storm warning if Kp >= 5 or proton event
         snapshot.storm_warning = snapshot.kp_index >= 5 or snapshot.proton_flux_pfu >= 10
