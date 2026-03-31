@@ -8,6 +8,9 @@ import logging
 
 log = logging.getLogger(__name__)
 
+# Prevent decompression bombs — max 25 megapixels (5000x5000)
+Image.MAX_IMAGE_PIXELS = 25_000_000
+
 SEVERITY_COLORS: dict[str, tuple[int, int, int]] = {
     "CRITICAL": (239, 68, 68),    # Red
     "SEVERE":   (249, 115, 22),   # Orange

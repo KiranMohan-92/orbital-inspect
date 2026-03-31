@@ -20,32 +20,27 @@ export default function IntelligenceReport({ analysis }: Props) {
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const handleDownloadReport = useCallback(async () => {
-    const analysisId = (state.agents.orbital_classification.payload as Record<string, unknown>)?.analysis_id;
     setPdfLoading(true);
     try {
-      // Generate report HTML from current analysis data inline
-      const reportData = {
-        classification: state.agents.orbital_classification.payload || {},
-        vision: state.agents.satellite_vision.payload || {},
-        environment: state.agents.orbital_environment.payload || {},
-        failure_mode: state.agents.failure_mode.payload || {},
-        insurance_risk: state.agents.insurance_risk.payload || {},
-      };
-      // Open in new tab as printable HTML report
-      const blob = new Blob(
-        [`<html><head><title>Satellite Condition Report</title></head><body>
-          <h1>Satellite Condition Report</h1>
-          <p>Generated: ${new Date().toISOString()}</p>
-          <pre>${JSON.stringify(reportData, null, 2)}</pre>
-          <script>window.print()</script>
-        </body></html>`],
-        { type: "text/html" }
-      );
+      // Call backend NASA-format report generator
+      const response = await fetch(`${API_BASE}/api/reports/inline/generate-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          classification: state.agents.orbital_classification.payload || {},
+          vision: state.agents.satellite_vision.payload || {},
+          environment: state.agents.orbital_environment.payload || {},
+          failure_mode: state.agents.failure_mode.payload || {},
+          insurance_risk: state.agents.insurance_risk.payload || {},
+        }),
+      });
+      if (!response.ok) throw new Error(`Report generation failed: ${response.status}`);
+      const html = await response.text();
+      const blob = new Blob([html], { type: "text/html" });
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
     } catch {
-      // Fallback: just print current page
       window.print();
     } finally {
       setPdfLoading(false);

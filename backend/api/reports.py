@@ -244,3 +244,20 @@ async def generate_pdf(
             return HTMLResponse(content=html, media_type="text/html")
     except ImportError:
         raise HTTPException(status_code=503, detail="PDF service not available")
+
+
+@router.post("/inline/generate-pdf")
+async def generate_inline_pdf(
+    data: dict,
+    user: CurrentUser | None = Depends(get_current_user),
+):
+    """Generate a NASA-grade report from inline analysis data (no DB required)."""
+    try:
+        from services.pdf_report_service import generate_html_report
+        from starlette.responses import HTMLResponse
+
+        html = generate_html_report(data)
+        return HTMLResponse(content=html, media_type="text/html")
+    except Exception as e:
+        log.error("Inline PDF generation failed: %s", e)
+        raise HTTPException(status_code=500, detail="Report generation failed")

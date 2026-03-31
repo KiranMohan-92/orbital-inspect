@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -12,10 +13,19 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./orbital_inspect.db"
 
-    # Auth (Sprint 3)
+    # Auth
     AUTH_ENABLED: bool = False
     JWT_SECRET: str = "dev-secret-change-in-production"
     JWT_EXPIRY_MINUTES: int = 60
+
+    @model_validator(mode="after")
+    def validate_jwt_secret(self):
+        if self.AUTH_ENABLED and self.JWT_SECRET == "dev-secret-change-in-production":
+            raise ValueError(
+                "JWT_SECRET must be set to a strong random value when AUTH_ENABLED=true. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
+        return self
 
     # Resilience
     AGENT_TIMEOUT_SECONDS: int = 120
