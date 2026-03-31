@@ -4,7 +4,7 @@ import { useState, useCallback, useRef } from "react";
 
 interface RiskDimension {
   score: number;
-  reasoning: string;
+  reasoning?: string;
 }
 
 interface RiskMatrix {
@@ -143,7 +143,7 @@ interface DimCardProps {
   title: string;
   abbrev: string;
   score: number;
-  reasoning: string;
+  reasoning?: string;
   index: number;
 }
 

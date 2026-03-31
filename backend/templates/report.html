@@ -2,374 +2,1785 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Satellite Condition Report — {{ report_id }}</title>
+<title>SATELLITE CONDITION REPORT — {{ report_id }}</title>
 <style>
-  @page { size: A4; margin: 2cm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Helvetica Neue', Arial, sans-serif;
-    font-size: 10pt;
-    color: #1a1a2e;
-    line-height: 1.5;
-    background: #fff;
-  }
-  .page-break { page-break-before: always; }
+/* ============================================================
+   ORBITAL INSPECT — NASA TECHNICAL REPORT FORMAT
+   A4 print-ready, self-contained, no external dependencies
+   ============================================================ */
 
-  /* Header */
-  .report-header {
-    border-bottom: 3px solid #1a1a2e;
-    padding-bottom: 16px;
-    margin-bottom: 24px;
+@page {
+  size: A4;
+  margin: 2cm 2cm 2.5cm 2cm;
+  @bottom-center {
+    content: "Orbital Inspect — Satellite Condition Intelligence  |  " counter(page);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 7.5pt;
+    color: #6b7280;
+    border-top: 1px solid #d1d5db;
+    padding-top: 4pt;
   }
-  .report-header h1 {
-    font-size: 22pt;
-    font-weight: 700;
-    color: #1a1a2e;
-    letter-spacing: 0.05em;
+  @top-right {
+    content: "{{ report_id }}  |  UNCLASSIFIED";
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 7pt;
+    color: #9ca3af;
   }
-  .report-header .subtitle {
-    font-size: 11pt;
-    color: #666;
-    margin-top: 4px;
-  }
-  .report-header .meta {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 12px;
-    font-size: 9pt;
-    color: #888;
-  }
+}
 
-  /* Classification badge */
-  .classification-badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 3px;
-    font-weight: 700;
-    font-size: 9pt;
-    letter-spacing: 0.08em;
-    color: white;
-  }
+@page :first {
+  @bottom-center { content: ""; }
+  @top-right { content: ""; }
+}
 
-  /* Section headers */
-  .section { margin-bottom: 24px; }
-  .section h2 {
-    font-size: 14pt;
-    font-weight: 700;
-    color: #1a1a2e;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 6px;
-    margin-bottom: 12px;
-  }
-  .section h3 {
-    font-size: 11pt;
-    font-weight: 600;
-    margin-bottom: 8px;
-  }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* Tables */
-  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-  th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 9pt; }
-  th { background: #f5f5f8; font-weight: 600; color: #444; }
+body {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 10pt;
+  color: #111827;
+  line-height: 1.55;
+  background: #ffffff;
+  counter-reset: page;
+}
 
-  /* Risk matrix */
-  .risk-matrix { display: flex; gap: 16px; margin-bottom: 16px; }
-  .risk-dim {
-    flex: 1;
-    text-align: center;
-    padding: 12px;
-    border-radius: 6px;
-    background: #f8f8fc;
-    border: 1px solid #eee;
-  }
-  .risk-dim .score { font-size: 24pt; font-weight: 700; }
-  .risk-dim .label { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.1em; color: #888; }
+/* ---- PAGE BREAKS ---- */
+.page-break { page-break-before: always; break-before: page; }
+.avoid-break { page-break-inside: avoid; break-inside: avoid; }
 
-  /* UW badge */
-  .uw-badge {
-    display: inline-block;
-    padding: 8px 20px;
-    border-radius: 4px;
-    font-weight: 700;
-    font-size: 11pt;
-    letter-spacing: 0.05em;
-  }
+/* ---- COVER PAGE ---- */
+.cover-page {
+  min-height: 267mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0;
+}
 
-  /* Metrics grid */
-  .metrics-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-  .metric-card {
-    padding: 12px;
-    background: #f8f8fc;
-    border-radius: 6px;
-    border: 1px solid #eee;
-  }
-  .metric-card .value { font-size: 16pt; font-weight: 700; }
-  .metric-card .label { font-size: 8pt; text-transform: uppercase; color: #888; }
+.cover-classification-bar {
+  background: #111827;
+  color: #f9fafb;
+  text-align: center;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  padding: 7px 0;
+}
 
-  /* Stressor list */
-  .stressor { padding: 8px 12px; margin-bottom: 6px; border-left: 3px solid; border-radius: 0 4px 4px 0; background: #f8f8fc; }
+.cover-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 30px;
+  text-align: center;
+}
 
-  /* Precedent cards */
-  .precedent { padding: 10px 12px; margin-bottom: 8px; border: 1px solid #eee; border-radius: 4px; background: #fafafa; }
-  .precedent .name { font-weight: 600; }
-  .precedent .claim { color: #ef4444; font-weight: 600; }
+.cover-org-line {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 8.5pt;
+  letter-spacing: 0.2em;
+  color: #6b7280;
+  text-transform: uppercase;
+  margin-bottom: 32px;
+}
 
-  /* Footer */
-  .report-footer {
-    margin-top: 32px;
-    padding-top: 12px;
-    border-top: 1px solid #ddd;
-    font-size: 8pt;
-    color: #999;
-    text-align: center;
-  }
+.cover-separator {
+  width: 80px;
+  height: 3px;
+  background: #111827;
+  margin: 0 auto 24px;
+}
 
-  /* Completeness warning */
-  .partial-warning {
-    background: #fef3c7;
-    border: 1px solid #f59e0b;
-    border-radius: 4px;
-    padding: 10px 14px;
-    margin-bottom: 16px;
-    font-size: 9pt;
-    color: #92400e;
-  }
+.cover-title {
+  font-family: Georgia, serif;
+  font-size: 26pt;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.cover-subtitle {
+  font-family: Georgia, serif;
+  font-size: 13pt;
+  color: #374151;
+  margin-bottom: 36px;
+  font-style: italic;
+}
+
+.cover-meta-box {
+  border: 1.5px solid #d1d5db;
+  border-radius: 2px;
+  padding: 20px 32px;
+  text-align: left;
+  width: 100%;
+  max-width: 440px;
+  margin-bottom: 36px;
+  background: #f9fafb;
+}
+
+.cover-meta-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 9pt;
+}
+
+.cover-meta-row .label {
+  font-family: 'Courier New', Courier, monospace;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 8pt;
+  min-width: 130px;
+}
+
+.cover-meta-row .value {
+  font-family: 'Courier New', Courier, monospace;
+  color: #111827;
+  font-weight: 700;
+  text-align: right;
+  font-size: 9pt;
+}
+
+.cover-dist-statement {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 7.5pt;
+  color: #6b7280;
+  text-align: center;
+  max-width: 480px;
+  line-height: 1.4;
+  margin-bottom: 24px;
+}
+
+.cover-footer-bar {
+  border-top: 2px solid #111827;
+  padding-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 8pt;
+}
+
+.cover-footer-brand {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #111827;
+  font-size: 9pt;
+}
+
+.cover-footer-date {
+  font-family: 'Courier New', Courier, monospace;
+  color: #6b7280;
+  font-size: 8pt;
+}
+
+/* ---- SECTION RUNNING HEADER ---- */
+.section-running-header {
+  background: #111827;
+  color: #f9fafb;
+  padding: 6px 14px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 8pt;
+  letter-spacing: 0.1em;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+/* ---- PARTIAL WARNING ---- */
+.partial-warning {
+  background: #fef3c7;
+  border: 1.5px solid #f59e0b;
+  border-left: 5px solid #f59e0b;
+  border-radius: 2px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  font-size: 9pt;
+  color: #78350f;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* ---- SECTION STRUCTURE ---- */
+.section { margin-bottom: 28px; }
+
+.section-heading {
+  font-family: Georgia, serif;
+  font-size: 14pt;
+  font-weight: 700;
+  color: #111827;
+  border-bottom: 2px solid #111827;
+  padding-bottom: 5px;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.subsection-heading {
+  font-family: Georgia, serif;
+  font-size: 11pt;
+  font-weight: 700;
+  color: #1f2937;
+  border-bottom: 1px solid #d1d5db;
+  padding-bottom: 3px;
+  margin-top: 16px;
+  margin-bottom: 10px;
+}
+
+.subsubsection-heading {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 9pt;
+  font-weight: 700;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+p { margin-bottom: 8px; }
+
+/* ---- TABLES ---- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 14px;
+  font-size: 9pt;
+}
+
+thead th {
+  background: #111827;
+  color: #f9fafb;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 8pt;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  text-align: left;
+  border: none;
+}
+
+tbody tr:nth-child(even) { background: #f9fafb; }
+tbody tr:nth-child(odd)  { background: #ffffff; }
+
+tbody tr:hover { background: #f3f4f6; }
+
+td, th {
+  padding: 6px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: top;
+}
+
+.data-table th {
+  background: #f3f4f6;
+  color: #374151;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 8.5pt;
+  font-weight: 700;
+  width: 38%;
+  border-right: 2px solid #d1d5db;
+}
+
+.data-table td {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 9pt;
+  color: #111827;
+}
+
+/* ---- BADGES ---- */
+.severity-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+}
+
+.uw-badge {
+  display: inline-block;
+  padding: 10px 24px;
+  border-radius: 3px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.classification-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 2px;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+  font-size: 8pt;
+  letter-spacing: 0.1em;
+  color: #ffffff;
+}
+
+/* ---- EXECUTIVE SUMMARY ---- */
+.exec-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.exec-key-finding {
+  background: #f9fafb;
+  border: 1.5px solid #d1d5db;
+  border-left: 4px solid #111827;
+  padding: 14px 16px;
+  border-radius: 0 2px 2px 0;
+}
+
+.exec-key-finding .heading {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.exec-key-finding p {
+  font-size: 9.5pt;
+  color: #111827;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.exec-uw-panel {
+  text-align: center;
+  background: #f9fafb;
+  border: 1.5px solid #d1d5db;
+  padding: 14px 16px;
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.exec-gauge {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.exec-gauge img {
+  max-width: 180px;
+  max-height: 140px;
+}
+
+/* ---- METRICS GRID ---- */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.metric-card {
+  padding: 12px 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 2px;
+  border-top: 3px solid #111827;
+}
+
+.metric-card .value {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 15pt;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.1;
+}
+
+.metric-card .label {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 7.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6b7280;
+  margin-top: 3px;
+}
+
+/* ---- STRESSORS ---- */
+.stressor {
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  border-left: 4px solid #d1d5db;
+  border-radius: 0 2px 2px 0;
+  background: #f9fafb;
+  font-size: 9pt;
+}
+
+.stressor strong {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* ---- PRECEDENTS ---- */
+.precedent {
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 2px;
+  background: #f9fafb;
+  font-size: 9pt;
+}
+
+.precedent .name {
+  font-weight: 700;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.precedent .claim {
+  color: #ef4444;
+  font-weight: 700;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* ---- ACTION TABLE ---- */
+.action-table th { background: #374151; }
+.action-row-immediate td { background: #fef2f2; }
+.action-row-short td { background: #fffbeb; }
+.action-row-routine td { background: #f0fdf4; }
+
+/* ---- ROOT CAUSE CHAIN ---- */
+.root-cause-chain {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px 0;
+}
+
+.root-cause-chain li {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 4px;
+  font-size: 9pt;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.root-cause-chain li::before {
+  content: "▶";
+  color: #6b7280;
+  margin-right: 8px;
+  font-size: 8pt;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.root-cause-chain li:not(:last-child)::after {
+  display: none;
+}
+
+/* ---- FINDINGS LIST ---- */
+.findings-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px 0;
+}
+
+.findings-list li {
+  padding: 5px 10px 5px 14px;
+  margin-bottom: 4px;
+  border-left: 3px solid #d1d5db;
+  font-size: 9pt;
+  background: #f9fafb;
+}
+
+/* ---- CHART CONTAINERS ---- */
+.chart-container {
+  margin: 14px 0;
+  text-align: center;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.chart-container img {
+  max-width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 2px;
+}
+
+.chart-caption {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 7.5pt;
+  color: #6b7280;
+  text-align: center;
+  margin-top: 5px;
+  font-style: italic;
+}
+
+/* ---- APPENDIX / GLOSSARY ---- */
+.glossary-term {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 9pt;
+}
+
+.glossary-term dt {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+  color: #111827;
+  font-size: 9pt;
+}
+
+.glossary-term dd {
+  color: #374151;
+  margin-left: 16px;
+  margin-top: 2px;
+}
+
+/* ---- FINANCIAL EXPOSURE BOX ---- */
+.exposure-box {
+  border: 2px solid #ef4444;
+  border-radius: 2px;
+  padding: 14px 16px;
+  margin: 12px 0;
+  background: #fef2f2;
+}
+
+.exposure-box .heading {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ef4444;
+  margin-bottom: 8px;
+}
+
+.exposure-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.exposure-item {
+  text-align: center;
+}
+
+.exposure-item .val {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13pt;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.exposure-item .lbl {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 7pt;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+/* ---- METHODOLOGY PIPELINE ---- */
+.pipeline-step {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  font-size: 9pt;
+}
+
+.pipeline-step .step-num {
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 700;
+  background: #111827;
+  color: #f9fafb;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8pt;
+  flex-shrink: 0;
+  margin-right: 10px;
+  margin-top: 1px;
+}
+
+.pipeline-step .step-body { flex: 1; }
+.pipeline-step .step-name { font-weight: 700; font-family: 'Courier New', Courier, monospace; }
+
+/* ---- CONFIDENCE TABLE ---- */
+.confidence-meter {
+  display: inline-block;
+  height: 6px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+/* ---- UTILITY ---- */
+.monospace { font-family: 'Courier New', Courier, monospace; }
+.text-muted { color: #6b7280; }
+.text-danger { color: #ef4444; }
+.text-warning { color: #d97706; }
+.text-success { color: #16a34a; }
+.text-center { text-align: center; }
+.mt-8 { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.bold { font-weight: 700; }
 </style>
 </head>
 <body>
 
-<!-- COVER / HEADER -->
-<div class="report-header">
-  <h1>SATELLITE CONDITION REPORT</h1>
-  <div class="subtitle">Orbital Inspect — Satellite Condition Intelligence Platform</div>
-  <div class="meta">
-    <span>Report ID: {{ report_id or 'DRAFT' }}</span>
-    <span>Generated: {{ generated_at }}</span>
-    <span>
-      {% if report_completeness != 'COMPLETE' %}
-        <span class="classification-badge" style="background: #f59e0b;">PARTIAL</span>
-      {% else %}
-        <span class="classification-badge" style="background: #22c55e;">COMPLETE</span>
+<!-- ================================================================
+     COVER PAGE
+     ================================================================ -->
+<div class="cover-page">
+  <div class="cover-classification-bar">UNCLASSIFIED // DISTRIBUTION STATEMENT A</div>
+
+  <div class="cover-body">
+    <div class="cover-org-line">Orbital Inspect — Satellite Condition Intelligence Platform</div>
+    <div class="cover-separator"></div>
+
+    <div class="cover-title">SATELLITE CONDITION REPORT</div>
+    <div class="cover-subtitle">
+      {% if classification.get('satellite_type') %}
+        {{ classification.get('satellite_type') | title }} &nbsp;/&nbsp;
       {% endif %}
-    </span>
+      {% if classification.get('orbital_regime') %}
+        {{ classification.get('orbital_regime') }} Orbit &nbsp;/&nbsp;
+      {% endif %}
+      {% if classification.get('operator') %}
+        {{ classification.get('operator') }}
+      {% endif %}
+    </div>
+
+    <div class="cover-meta-box avoid-break">
+      <div class="cover-meta-row">
+        <span class="label">Report ID</span>
+        <span class="value">{{ report_id }}</span>
+      </div>
+      <div class="cover-meta-row">
+        <span class="label">Date</span>
+        <span class="value">{{ generated_at }}</span>
+      </div>
+      <div class="cover-meta-row">
+        <span class="label">Bus / Platform</span>
+        <span class="value">{{ classification.get('bus_platform', 'N/A') }}</span>
+      </div>
+      <div class="cover-meta-row">
+        <span class="label">Orbital Regime</span>
+        <span class="value">{{ classification.get('orbital_regime', 'N/A') }}</span>
+      </div>
+      <div class="cover-meta-row">
+        <span class="label">Risk Tier</span>
+        <span class="value" style="color: {{ insurance_risk.get('risk_tier', '') | severity_color }};">
+          {{ insurance_risk.get('risk_tier', 'N/A') }}
+        </span>
+      </div>
+      <div class="cover-meta-row">
+        <span class="label">UW Recommendation</span>
+        <span class="value" style="color: {{ insurance_risk.get('underwriting_recommendation', '') | uw_color }};">
+          {{ (insurance_risk.get('underwriting_recommendation', 'N/A') or 'N/A') | replace('_', ' ') }}
+        </span>
+      </div>
+      <div class="cover-meta-row">
+        <span class="label">Report Status</span>
+        <span class="value">
+          {% if report_completeness != 'COMPLETE' %}
+            <span class="classification-badge" style="background:#f59e0b;">PARTIAL</span>
+          {% else %}
+            <span class="classification-badge" style="background:#22c55e;">COMPLETE</span>
+          {% endif %}
+        </span>
+      </div>
+    </div>
+
+    <div class="cover-dist-statement">
+      DISTRIBUTION STATEMENT A: Approved for public release; distribution is unlimited.<br>
+      This automated assessment is produced by Orbital Inspect using AI-powered visual analysis
+      and publicly available orbital environment databases. It supplements but does not replace
+      professional underwriting judgment.
+    </div>
+  </div>
+
+  <div class="cover-footer-bar">
+    <span class="cover-footer-brand">ORBITAL INSPECT</span>
+    <span class="cover-footer-date monospace">{{ generated_at }}</span>
+    <span class="classification-badge" style="background:#111827;">UNCLASSIFIED</span>
   </div>
 </div>
 
-{% if evidence_gaps %}
-<div class="partial-warning">
-  <strong>PARTIAL REPORT:</strong> The following analysis stages were unavailable: {{ evidence_gaps | join(', ') }}.
-  Underwriting recommendation has been set to FURTHER_INVESTIGATION.
-</div>
-{% endif %}
 
-<!-- SATELLITE CLASSIFICATION -->
-{% if classification %}
-<div class="section">
-  <h2>1. Satellite Classification</h2>
-  <table>
-    <tr><th>Satellite Type</th><td>{{ classification.get('satellite_type', 'N/A') }}</td></tr>
-    <tr><th>Bus Platform</th><td>{{ classification.get('bus_platform', 'N/A') }}</td></tr>
-    <tr><th>Orbital Regime</th><td>{{ classification.get('orbital_regime', 'N/A') }}</td></tr>
-    <tr><th>Design Life</th><td>{{ classification.get('design_life_years', 'N/A') }} years</td></tr>
-    <tr><th>Estimated Age</th><td>{{ classification.get('estimated_age_years', 'N/A') }} years</td></tr>
-    <tr><th>Operator</th><td>{{ classification.get('operator', 'N/A') }}</td></tr>
-    <tr><th>Expected Components</th><td>{{ (classification.get('expected_components', []) or []) | join(', ') }}</td></tr>
-  </table>
-</div>
-{% endif %}
+<!-- ================================================================
+     EXECUTIVE SUMMARY
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>EXECUTIVE SUMMARY</span>
+    <span>{{ report_id }}</span>
+  </div>
 
-<!-- DAMAGE ASSESSMENT -->
-{% if vision %}
-<div class="section">
-  <h2>2. Visual Damage Assessment</h2>
-  <p><strong>Overall Severity:</strong>
-    <span style="color: {{ vision.get('overall_severity', '') | severity_color }}; font-weight: 700;">
-      {{ vision.get('overall_severity', 'N/A') }}
-    </span>
-    &nbsp;|&nbsp;
-    <strong>Power Impact:</strong> {{ vision.get('total_power_impact_pct', 0) | format_pct }}
-    &nbsp;|&nbsp;
-    <strong>Confidence:</strong> {{ (vision.get('overall_confidence', 0) * 100) | round(1) }}%
-  </p>
+  {% if evidence_gaps %}
+  <div class="partial-warning">
+    &#9888; PARTIAL REPORT: The following analysis stages were unavailable or degraded:
+    {{ evidence_gaps | join(', ') }}.
+    Underwriting recommendation defaulted to FURTHER_INVESTIGATION pending complete data.
+  </div>
+  {% endif %}
 
-  {% if vision.get('damages') %}
-  <table>
-    <thead>
-      <tr><th>#</th><th>Type</th><th>Severity</th><th>Confidence</th><th>Power Impact</th><th>Description</th></tr>
-    </thead>
-    <tbody>
-    {% for d in vision.get('damages', []) %}
+  <div class="section">
+    <div class="section-heading">Executive Summary</div>
+
+    <!-- UW recommendation + gauge side by side -->
+    <div class="exec-summary-grid avoid-break">
+      <div class="exec-uw-panel">
+        <div style="font-family:'Courier New',Courier,monospace;font-size:8pt;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:8px;">Underwriting Recommendation</div>
+        <span class="uw-badge"
+          style="background:{{ insurance_risk.get('underwriting_recommendation','') | uw_color }}20;
+                 color:{{ insurance_risk.get('underwriting_recommendation','') | uw_color }};
+                 border:2px solid {{ insurance_risk.get('underwriting_recommendation','') | uw_color }};">
+          {{ (insurance_risk.get('underwriting_recommendation','N/A') or 'N/A') | replace('_',' ') }}
+        </span>
+        <div style="margin-top:10px;font-family:'Courier New',Courier,monospace;font-size:9pt;">
+          Risk Tier: <strong style="color:{{ insurance_risk.get('risk_tier','') | severity_color }};">{{ insurance_risk.get('risk_tier','N/A') }}</strong>
+        </div>
+      </div>
+
+      {% if charts.composite_gauge %}
+      <div class="exec-gauge">
+        <div style="font-family:'Courier New',Courier,monospace;font-size:8pt;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:6px;text-align:center;">Composite Risk Score</div>
+        <img src="{{ charts.composite_gauge }}" alt="Composite Risk Gauge" style="max-width:200px;max-height:155px;">
+      </div>
+      {% else %}
+        {% set rm = insurance_risk.get('risk_matrix', {}) %}
+        {% if rm.get('composite') %}
+        <div style="text-align:center;padding:20px;">
+          <div style="font-family:'Courier New',Courier,monospace;font-size:28pt;font-weight:700;color:#111827;">{{ rm.get('composite') }}</div>
+          <div style="font-family:'Courier New',Courier,monospace;font-size:9pt;color:#6b7280;">/ 125 COMPOSITE</div>
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+
+    <!-- Key finding -->
+    <div class="exec-key-finding avoid-break" style="margin-bottom:14px;">
+      <div class="heading">Key Finding</div>
+      <p>{{ insurance_risk.get('summary', 'No summary available.') }}</p>
+    </div>
+
+    <!-- Top damage findings -->
+    {% set damages = vision.get('damages', []) %}
+    {% if damages %}
+    <div class="subsection-heading">2.1 &nbsp;Top Damage Findings</div>
+    <ul class="findings-list">
+      {% for d in damages[:5] %}
+      <li>
+        <span class="severity-badge" style="background:{{ d.get('severity','') | severity_color }};">{{ d.get('severity','') }}</span>
+        &nbsp;
+        <strong>{{ d.get('type','') | replace('_',' ') | title }}</strong>
+        {% if d.get('description') %} — {{ d.get('description') }}{% endif %}
+        {% if d.get('estimated_power_impact_pct') %}
+          <span class="text-muted monospace">(Power impact: {{ d.get('estimated_power_impact_pct') | format_pct }})</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+      {% if damages | length > 5 %}
+      <li class="text-muted" style="border-left-color:#9ca3af;">
+        … and {{ damages | length - 5 }} additional anomalies — see Section 2 for full inventory.
+      </li>
+      {% endif %}
+    </ul>
+    {% endif %}
+
+    <!-- Financial exposure summary -->
+    {% if insurance_risk.get('replacement_cost_usd') or insurance_risk.get('depreciated_value_usd') %}
+    <div class="exposure-box avoid-break">
+      <div class="heading">Financial Exposure Summary</div>
+      <div class="exposure-grid">
+        <div class="exposure-item">
+          <div class="val">{{ insurance_risk.get('replacement_cost_usd') | format_usd }}</div>
+          <div class="lbl">Replacement Cost</div>
+        </div>
+        <div class="exposure-item">
+          <div class="val">{{ insurance_risk.get('depreciated_value_usd') | format_usd }}</div>
+          <div class="lbl">Depreciated Value</div>
+        </div>
+        <div class="exposure-item">
+          <div class="val">{{ insurance_risk.get('revenue_at_risk_annual_usd') | format_usd }}</div>
+          <div class="lbl">Annual Revenue at Risk</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Immediate actions -->
+    {% if insurance_risk.get('recommended_actions') %}
+    <div class="subsection-heading">Immediate Actions Required</div>
+    <table>
+      <thead><tr><th>Priority</th><th>Action</th><th>Timeframe</th></tr></thead>
+      <tbody>
+      {% for action in insurance_risk.get('recommended_actions', [])[:4] %}
       <tr>
-        <td>{{ d.get('id', loop.index) }}</td>
-        <td>{{ d.get('type', '') | replace('_', ' ') | title }}</td>
-        <td style="color: {{ d.get('severity', '') | severity_color }}; font-weight: 600;">{{ d.get('severity', '') }}</td>
-        <td>{{ (d.get('confidence', 0) * 100) | round(1) }}%</td>
-        <td>{{ d.get('estimated_power_impact_pct', 0) | format_pct }}</td>
-        <td>{{ d.get('description', '') }}</td>
+        <td>
+          <span class="severity-badge" style="background:{{ action.get('priority','') | severity_color }};">
+            {{ action.get('priority','') }}
+          </span>
+        </td>
+        <td>{{ action.get('action', '') }}</td>
+        <td class="monospace">{{ action.get('timeframe', '') }}</td>
       </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+  </div>
+</div>
+
+
+<!-- ================================================================
+     SECTION 1: SATELLITE IDENTIFICATION
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>SECTION 1 — SATELLITE IDENTIFICATION</span>
+    <span>{{ report_id }}</span>
+  </div>
+
+  <div class="section">
+    <div class="section-heading">1.0 &nbsp;Satellite Identification</div>
+
+    <div class="subsection-heading">1.1 &nbsp;Classification Parameters</div>
+    <table class="data-table avoid-break">
+      <tbody>
+        <tr><th>Satellite Type</th><td>{{ classification.get('satellite_type', 'N/A') | title }}</td></tr>
+        <tr><th>Bus / Platform</th><td>{{ classification.get('bus_platform', 'N/A') }}</td></tr>
+        <tr><th>Orbital Regime</th><td>{{ classification.get('orbital_regime', 'N/A') }}</td></tr>
+        <tr><th>Operator</th><td>{{ classification.get('operator', 'N/A') }}</td></tr>
+        <tr><th>Design Life</th><td>{{ classification.get('design_life_years', 'N/A') }} years</td></tr>
+        <tr><th>Estimated Age</th><td>{{ classification.get('estimated_age_years', 'N/A') }} years</td></tr>
+        <tr><th>Life Fraction Consumed</th><td>
+          {% set dl = classification.get('design_life_years') %}
+          {% set age = classification.get('estimated_age_years') %}
+          {% if dl and age %}
+            {{ ((age / dl) * 100) | round(1) }}%
+          {% else %}N/A{% endif %}
+        </td></tr>
+        <tr><th>Expected Components</th><td>{{ (classification.get('expected_components', []) or []) | join(', ') or 'N/A' }}</td></tr>
+        <tr><th>Launch Vehicle Class</th><td>{{ classification.get('launch_vehicle', 'N/A') }}</td></tr>
+        <tr><th>NORAD ID</th><td>{{ classification.get('norad_id', 'N/A') }}</td></tr>
+        <tr><th>International Designator</th><td>{{ classification.get('intl_designator', 'N/A') }}</td></tr>
+        <tr><th>Classification Confidence</th><td>{{ classification.get('confidence', 'N/A') }}</td></tr>
+        <tr><th>Classification Notes</th><td>{{ classification.get('notes', 'N/A') }}</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Satellite image if available -->
+    {% if charts.annotated_image %}
+    <div class="subsection-heading">1.2 &nbsp;Primary Imagery</div>
+    <div class="chart-container">
+      <img src="{{ charts.annotated_image }}" alt="Satellite Image — Damage Annotated"
+           style="max-width:100%;max-height:340px;object-fit:contain;">
+      <div class="chart-caption">
+        Figure 1-1: Primary satellite imagery.
+        {% if vision.get('damages') %}Damage regions annotated (color-coded by severity).{% endif %}
+        Source: Operator-supplied / AI analysis.
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Degradation timeline -->
+    {% if charts.degradation %}
+    <div class="subsection-heading avoid-break">1.3 &nbsp;Operational Life Projection</div>
+    <div class="chart-container">
+      <img src="{{ charts.degradation }}" alt="Degradation Timeline">
+      <div class="chart-caption">
+        Figure 1-2: Power margin degradation over operational life.
+        Dashed line = projected; vertical markers indicate design EOL and revised EOL.
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+
+<!-- ================================================================
+     SECTION 2: VISUAL DAMAGE ASSESSMENT
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>SECTION 2 — VISUAL DAMAGE ASSESSMENT</span>
+    <span>{{ report_id }}</span>
+  </div>
+
+  <div class="section">
+    <div class="section-heading">2.0 &nbsp;Visual Damage Assessment</div>
+
+    {% if vision %}
+    <div class="subsection-heading">2.1 &nbsp;Assessment Overview</div>
+    <table class="data-table avoid-break">
+      <tbody>
+        <tr><th>Overall Severity</th>
+            <td><span class="severity-badge" style="background:{{ vision.get('overall_severity','') | severity_color }};">
+              {{ vision.get('overall_severity','N/A') }}
+            </span></td></tr>
+        <tr><th>Total Power Impact</th><td>{{ vision.get('total_power_impact_pct', 0) | format_pct }}</td></tr>
+        <tr><th>Overall Confidence</th><td>{{ ((vision.get('overall_confidence', 0) or 0) * 100) | round(1) }}%</td></tr>
+        <tr><th>Number of Anomalies</th><td>{{ (vision.get('damages', []) or []) | length }}</td></tr>
+        <tr><th>Overall Pattern</th><td>{{ vision.get('overall_pattern', 'N/A') }}</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Annotated image (repeated here for damage context) -->
+    {% if charts.annotated_image %}
+    <div class="chart-container avoid-break">
+      <img src="{{ charts.annotated_image }}" alt="Annotated Satellite Imagery"
+           style="max-width:100%;max-height:300px;object-fit:contain;">
+      <div class="chart-caption">Figure 2-1: Annotated satellite imagery. Bounding boxes color-coded by severity level.</div>
+    </div>
+    {% endif %}
+
+    <!-- Damage distribution chart -->
+    {% if charts.damage_dist %}
+    <div class="chart-container avoid-break" style="max-width:55%;margin:14px auto;">
+      <img src="{{ charts.damage_dist }}" alt="Damage Severity Distribution">
+      <div class="chart-caption">Figure 2-2: Anomaly count by severity classification.</div>
+    </div>
+    {% endif %}
+
+    <!-- Full damage inventory table -->
+    {% if vision.get('damages') %}
+    <div class="subsection-heading">2.2 &nbsp;Damage Inventory</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:5%">#</th>
+          <th style="width:20%">Type</th>
+          <th style="width:12%">Severity</th>
+          <th style="width:10%">Confidence</th>
+          <th style="width:12%">Power Impact</th>
+          <th style="width:41%">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for d in vision.get('damages', []) %}
+        <tr>
+          <td class="monospace">{{ d.get('id', loop.index) }}</td>
+          <td>{{ d.get('type', '') | replace('_', ' ') | title }}</td>
+          <td>
+            <span class="severity-badge" style="background:{{ d.get('severity','') | severity_color }};">
+              {{ d.get('severity', 'N/A') }}
+            </span>
+          </td>
+          <td class="monospace">{{ ((d.get('confidence', 0) or 0) * 100) | round(1) }}%</td>
+          <td class="monospace">{{ d.get('estimated_power_impact_pct', 0) | format_pct }}</td>
+          <td>{{ d.get('description', '') }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Location notes -->
+    {% if vision.get('location_notes') %}
+    <div class="subsubsection-heading">Damage Location Notes</div>
+    <p>{{ vision.get('location_notes') }}</p>
+    {% endif %}
+
+    <!-- Structural integrity -->
+    {% if vision.get('structural_integrity') %}
+    <div class="subsubsection-heading">Structural Integrity Assessment</div>
+    <p>{{ vision.get('structural_integrity') }}</p>
+    {% endif %}
+
+    {% else %}
+    <p class="text-muted monospace">No visual damage assessment data available for this report.</p>
+    {% endif %}
+  </div>
+</div>
+
+
+<!-- ================================================================
+     SECTION 3: ORBITAL ENVIRONMENT
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>SECTION 3 — ORBITAL ENVIRONMENT</span>
+    <span>{{ report_id }}</span>
+  </div>
+
+  <div class="section">
+    <div class="section-heading">3.0 &nbsp;Orbital Environment Assessment</div>
+
+    {% if environment %}
+    <div class="subsection-heading">3.1 &nbsp;Orbital Parameters</div>
+    <table class="data-table avoid-break">
+      <tbody>
+        <tr><th>Orbital Regime</th><td>{{ environment.get('orbital_regime', 'N/A') }}</td></tr>
+        <tr><th>Altitude</th><td>{{ environment.get('altitude_km', 'N/A') }} km</td></tr>
+        <tr><th>Inclination</th><td>{{ environment.get('inclination_deg', 'N/A') }}</td></tr>
+        <tr><th>Eccentricity</th><td>{{ environment.get('eccentricity', 'N/A') }}</td></tr>
+        <tr><th>Debris Flux Density</th><td>{{ environment.get('debris_flux_density', 'N/A') }}</td></tr>
+        <tr><th>Collision Probability</th><td>{{ environment.get('collision_probability', 'N/A') }}</td></tr>
+        <tr><th>Radiation Dose Rate</th><td>{{ environment.get('radiation_dose_rate', 'N/A') }}</td></tr>
+        <tr><th>Thermal Cycling Range</th><td>{{ environment.get('thermal_cycling_range', 'N/A') }}</td></tr>
+        <tr><th>Atomic Oxygen Flux</th><td>{{ environment.get('atomic_oxygen_flux', 'N/A') }}</td></tr>
+        <tr><th>Solar Activity Index</th><td>{{ environment.get('solar_activity_index', 'N/A') }}</td></tr>
+        <tr><th>Magnetospheric Zone</th><td>{{ environment.get('magnetospheric_zone', 'N/A') }}</td></tr>
+        <tr><th>Data Sources</th><td>{{ (environment.get('data_sources', []) or []) | join(', ') or 'N/A' }}</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Stressors -->
+    {% if environment.get('stressors') %}
+    <div class="subsection-heading">3.2 &nbsp;Environmental Stressors</div>
+    {% for s in environment.get('stressors', []) %}
+    <div class="stressor" style="border-left-color:{{ s.get('severity','') | severity_color }};">
+      <strong>{{ s.get('name', '') }}</strong>
+      &nbsp;—&nbsp;
+      <span style="color:{{ s.get('severity','') | severity_color }};font-weight:700;font-family:'Courier New',Courier,monospace;">
+        {{ s.get('severity', '') }}
+      </span>
+      {% if s.get('description') %}<br><span style="font-size:8.5pt;">{{ s.get('description') }}</span>{% endif %}
+      {% if s.get('measured_value') %}<br><span class="text-muted monospace" style="font-size:8pt;">Measured value: {{ s.get('measured_value') }}</span>{% endif %}
+    </div>
     {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-  <p><strong>Overall Pattern:</strong> {{ vision.get('overall_pattern', 'N/A') }}</p>
+    {% endif %}
+
+    <!-- Environment summary -->
+    {% if environment.get('summary') %}
+    <div class="subsection-heading">3.3 &nbsp;Environmental Impact Summary</div>
+    <p>{{ environment.get('summary') }}</p>
+    {% endif %}
+
+    {% else %}
+    <p class="text-muted monospace">No orbital environment data available for this report.</p>
+    {% endif %}
+  </div>
 </div>
-{% endif %}
 
-<!-- ORBITAL ENVIRONMENT -->
-{% if environment %}
-<div class="section page-break">
-  <h2>3. Orbital Environment Assessment</h2>
-  <table>
-    <tr><th>Orbital Regime</th><td>{{ environment.get('orbital_regime', 'N/A') }}</td></tr>
-    <tr><th>Altitude</th><td>{{ environment.get('altitude_km', 'N/A') }} km</td></tr>
-    <tr><th>Debris Flux</th><td>{{ environment.get('debris_flux_density', 'N/A') }}</td></tr>
-    <tr><th>Collision Probability</th><td>{{ environment.get('collision_probability', 'N/A') }}</td></tr>
-    <tr><th>Radiation Dose</th><td>{{ environment.get('radiation_dose_rate', 'N/A') }}</td></tr>
-    <tr><th>Thermal Cycling</th><td>{{ environment.get('thermal_cycling_range', 'N/A') }}</td></tr>
-    <tr><th>Atomic Oxygen</th><td>{{ environment.get('atomic_oxygen_flux', 'N/A') }}</td></tr>
-  </table>
 
-  {% if environment.get('stressors') %}
-  <h3>Environmental Stressors</h3>
-  {% for s in environment.get('stressors', []) %}
-  <div class="stressor" style="border-color: {{ s.get('severity', '') | severity_color }};">
-    <strong>{{ s.get('name', '') }}</strong> — <span style="color: {{ s.get('severity', '') | severity_color }};">{{ s.get('severity', '') }}</span><br>
-    {{ s.get('description', '') }}
-    {% if s.get('measured_value') %}<br><em>Measured: {{ s.get('measured_value') }}</em>{% endif %}
+<!-- ================================================================
+     SECTION 4: FAILURE MODE ANALYSIS
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>SECTION 4 — FAILURE MODE ANALYSIS</span>
+    <span>{{ report_id }}</span>
   </div>
-  {% endfor %}
-  {% endif %}
+
+  <div class="section">
+    <div class="section-heading">4.0 &nbsp;Failure Mode Analysis</div>
+
+    {% if failure_mode %}
+    <div class="subsection-heading">4.1 &nbsp;Primary Failure Mode</div>
+    <table class="data-table avoid-break">
+      <tbody>
+        <tr><th>Failure Mode</th><td><strong>{{ failure_mode.get('failure_mode', 'N/A') }}</strong></td></tr>
+        <tr><th>Failure Mechanism</th><td>{{ failure_mode.get('mechanism', 'N/A') }}</td></tr>
+        <tr><th>Progression Rate</th><td>
+          <span style="font-weight:700;color:{{ failure_mode.get('progression_rate','') | severity_color }};">
+            {{ failure_mode.get('progression_rate', 'N/A') }}
+          </span>
+        </td></tr>
+        <tr><th>Power Degradation Est.</th><td>{{ failure_mode.get('power_degradation_estimate_pct', 0) | format_pct }} / year</td></tr>
+        <tr><th>Remaining Life (Revised)</th><td>{{ failure_mode.get('remaining_life_revision_years', 'N/A') }} years</td></tr>
+        <tr><th>Time to Critical</th><td>{{ failure_mode.get('time_to_critical', 'N/A') }}</td></tr>
+        <tr><th>Affected Subsystems</th><td>{{ (failure_mode.get('affected_subsystems', []) or []) | join(', ') or 'N/A' }}</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Root cause chain -->
+    {% if failure_mode.get('root_cause_chain') %}
+    <div class="subsection-heading">4.2 &nbsp;Root Cause Chain</div>
+    <ol class="root-cause-chain">
+    {% for cause in failure_mode.get('root_cause_chain', []) %}
+      <li>{{ cause }}</li>
+    {% endfor %}
+    </ol>
+    {% endif %}
+
+    <!-- Progression assessment -->
+    {% if failure_mode.get('progression_assessment') %}
+    <div class="subsection-heading">4.3 &nbsp;Progression Assessment</div>
+    <p>{{ failure_mode.get('progression_assessment') }}</p>
+    {% endif %}
+
+    <!-- Mitigation options -->
+    {% if failure_mode.get('mitigation_options') %}
+    <div class="subsection-heading">4.4 &nbsp;Mitigation Options</div>
+    <ul class="findings-list">
+    {% for m in failure_mode.get('mitigation_options', []) %}
+      <li>{{ m }}</li>
+    {% endfor %}
+    </ul>
+    {% endif %}
+
+    <!-- Historical precedents -->
+    {% if failure_mode.get('historical_precedents') %}
+    <div class="subsection-heading">4.5 &nbsp;Historical Precedents</div>
+    <table class="avoid-break">
+      <thead>
+        <tr><th>Satellite</th><th>Year</th><th>Outcome</th><th>Claim Amount</th><th>Relevance</th></tr>
+      </thead>
+      <tbody>
+      {% for p in failure_mode.get('historical_precedents', []) %}
+      <tr>
+        <td class="monospace"><strong>{{ p.get('satellite', '') }}</strong></td>
+        <td class="monospace">{{ p.get('year', '') }}</td>
+        <td>{{ p.get('outcome', '') }}</td>
+        <td class="monospace text-danger">
+          {% if p.get('claim_amount_usd') %}
+            {{ p.get('claim_amount_usd') | string | replace('_',' ') }}
+          {% else %}N/A{% endif %}
+        </td>
+        <td style="font-size:8.5pt;">{{ p.get('relevance', '') }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% else %}
+    <p class="text-muted monospace">No failure mode analysis data available for this report.</p>
+    {% endif %}
+  </div>
 </div>
-{% endif %}
 
-<!-- FAILURE MODE -->
-{% if failure_mode %}
-<div class="section">
-  <h2>4. Failure Mode Analysis</h2>
-  <table>
-    <tr><th>Primary Failure Mode</th><td>{{ failure_mode.get('failure_mode', 'N/A') }}</td></tr>
-    <tr><th>Mechanism</th><td>{{ failure_mode.get('mechanism', 'N/A') }}</td></tr>
-    <tr><th>Progression Rate</th><td style="font-weight: 600;">{{ failure_mode.get('progression_rate', 'N/A') }}</td></tr>
-    <tr><th>Power Degradation</th><td>{{ failure_mode.get('power_degradation_estimate_pct', 0) | format_pct }} /year</td></tr>
-    <tr><th>Remaining Life (revised)</th><td>{{ failure_mode.get('remaining_life_revision_years', 'N/A') }} years</td></tr>
-    <tr><th>Time to Critical</th><td>{{ failure_mode.get('time_to_critical', 'N/A') }}</td></tr>
-  </table>
 
-  {% if failure_mode.get('root_cause_chain') %}
-  <h3>Root Cause Chain</h3>
-  <ol>
-  {% for cause in failure_mode.get('root_cause_chain', []) %}
-    <li>{{ cause }}</li>
-  {% endfor %}
-  </ol>
-  {% endif %}
-
-  {% if failure_mode.get('historical_precedents') %}
-  <h3>Historical Precedents</h3>
-  {% for p in failure_mode.get('historical_precedents', []) %}
-  <div class="precedent">
-    <span class="name">{{ p.get('satellite', '') }}</span> ({{ p.get('year', '') }})
-    {% if p.get('claim_amount_usd') %} — <span class="claim">{{ p.get('claim_amount_usd', '') }}</span>{% endif %}<br>
-    {{ p.get('outcome', '') }}<br>
-    <em>Relevance: {{ p.get('relevance', '') }}</em>
+<!-- ================================================================
+     SECTION 5: INSURANCE RISK ASSESSMENT
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>SECTION 5 — INSURANCE RISK ASSESSMENT</span>
+    <span>{{ report_id }}</span>
   </div>
-  {% endfor %}
-  {% endif %}
+
+  <div class="section">
+    <div class="section-heading">5.0 &nbsp;Insurance Risk Assessment</div>
+
+    {% if insurance_risk %}
+
+    <!-- UW recommendation banner -->
+    <div style="text-align:center;margin-bottom:18px;" class="avoid-break">
+      <span class="uw-badge"
+        style="background:{{ insurance_risk.get('underwriting_recommendation','') | uw_color }}18;
+               color:{{ insurance_risk.get('underwriting_recommendation','') | uw_color }};
+               border:2.5px solid {{ insurance_risk.get('underwriting_recommendation','') | uw_color }};">
+        {{ (insurance_risk.get('underwriting_recommendation','N/A') or 'N/A') | replace('_',' ') }}
+      </span>
+      <div style="margin-top:8px;font-family:'Courier New',Courier,monospace;font-size:10pt;">
+        Risk Tier: <strong style="color:{{ insurance_risk.get('risk_tier','') | severity_color }};">{{ insurance_risk.get('risk_tier','N/A') }}</strong>
+      </div>
+    </div>
+
+    <!-- Risk matrix chart + composite gauge side by side -->
+    <div class="subsection-heading">5.1 &nbsp;Risk Matrix</div>
+    {% set rm = insurance_risk.get('risk_matrix', {}) %}
+
+    {% if charts.risk_matrix %}
+    <div class="chart-container avoid-break">
+      <img src="{{ charts.risk_matrix }}" alt="Risk Matrix Chart" style="max-width:85%;max-height:220px;">
+      <div class="chart-caption">
+        Figure 5-1: Three-axis risk matrix (Severity × Probability × Consequence).
+        Composite score {{ rm.get('composite','N/A') }}/125.
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Dimension detail table -->
+    {% if rm %}
+    <table class="avoid-break" style="margin-top:10px;">
+      <thead>
+        <tr><th style="width:18%">Dimension</th><th style="width:10%">Score</th><th>Reasoning</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="monospace"><strong>SEVERITY</strong></td>
+          <td class="monospace" style="font-size:12pt;font-weight:700;">{{ rm.get('severity', {}).get('score', 'N/A') }} <span class="text-muted" style="font-size:8pt;">/5</span></td>
+          <td>{{ rm.get('severity', {}).get('reasoning', 'N/A') }}</td>
+        </tr>
+        <tr>
+          <td class="monospace"><strong>PROBABILITY</strong></td>
+          <td class="monospace" style="font-size:12pt;font-weight:700;">{{ rm.get('probability', {}).get('score', 'N/A') }} <span class="text-muted" style="font-size:8pt;">/5</span></td>
+          <td>{{ rm.get('probability', {}).get('reasoning', 'N/A') }}</td>
+        </tr>
+        <tr>
+          <td class="monospace"><strong>CONSEQUENCE</strong></td>
+          <td class="monospace" style="font-size:12pt;font-weight:700;">{{ rm.get('consequence', {}).get('score', 'N/A') }} <span class="text-muted" style="font-size:8pt;">/5</span></td>
+          <td>{{ rm.get('consequence', {}).get('reasoning', 'N/A') }}</td>
+        </tr>
+        <tr style="background:#f3f4f6;">
+          <td class="monospace"><strong>COMPOSITE</strong></td>
+          <td class="monospace" style="font-size:13pt;font-weight:700;color:{{ insurance_risk.get('risk_tier','') | severity_color }};">{{ rm.get('composite','N/A') }} <span class="text-muted" style="font-size:8pt;">/125</span></td>
+          <td class="monospace text-muted" style="font-size:8.5pt;">S × P × C (max 5×5×5 = 125)</td>
+        </tr>
+      </tbody>
+    </table>
+    {% endif %}
+
+    <!-- Insurance metrics grid -->
+    <div class="subsection-heading">5.2 &nbsp;Insurance Metrics</div>
+    <div class="metrics-grid avoid-break">
+      <div class="metric-card">
+        <div class="value">{{ insurance_risk.get('estimated_remaining_life_years', 'N/A') }}</div>
+        <div class="label">Remaining Life (years)</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">{{ insurance_risk.get('power_margin_percentage') | format_pct }}</div>
+        <div class="label">Power Margin</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">{{ insurance_risk.get('annual_degradation_rate_pct') | format_pct }}</div>
+        <div class="label">Annual Degradation</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">{{ insurance_risk.get('replacement_cost_usd') | format_usd }}</div>
+        <div class="label">Replacement Cost</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">{{ insurance_risk.get('depreciated_value_usd') | format_usd }}</div>
+        <div class="label">Depreciated Value</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">{{ insurance_risk.get('revenue_at_risk_annual_usd') | format_usd }}</div>
+        <div class="label">Revenue at Risk / year</div>
+      </div>
+    </div>
+
+    <!-- Financial exposure -->
+    {% if insurance_risk.get('replacement_cost_usd') %}
+    <div class="exposure-box avoid-break">
+      <div class="heading">Financial Exposure Detail</div>
+      <div class="exposure-grid">
+        <div class="exposure-item">
+          <div class="val">{{ insurance_risk.get('replacement_cost_usd') | format_usd }}</div>
+          <div class="lbl">Total Replacement</div>
+        </div>
+        <div class="exposure-item">
+          <div class="val">{{ insurance_risk.get('depreciated_value_usd') | format_usd }}</div>
+          <div class="lbl">Current Asset Value</div>
+        </div>
+        <div class="exposure-item">
+          <div class="val">{{ insurance_risk.get('revenue_at_risk_annual_usd') | format_usd }}</div>
+          <div class="lbl">Annual Revenue Exposure</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Recommendation rationale -->
+    <div class="subsection-heading">5.3 &nbsp;Recommendation Rationale</div>
+    <p>{{ insurance_risk.get('recommendation_rationale', 'N/A') }}</p>
+
+    <!-- Worst case scenario -->
+    {% if insurance_risk.get('worst_case_scenario') %}
+    <div class="subsection-heading">5.4 &nbsp;Worst Case Scenario</div>
+    <div class="exec-key-finding" style="border-left-color:#ef4444;background:#fef2f2;">
+      <div class="heading" style="color:#ef4444;">Worst Case Projection</div>
+      <p class="text-danger">{{ insurance_risk.get('worst_case_scenario') }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Recommended actions table -->
+    {% if insurance_risk.get('recommended_actions') %}
+    <div class="subsection-heading mt-12">5.5 &nbsp;Recommended Actions</div>
+    <table class="avoid-break">
+      <thead class="action-table">
+        <tr><th style="width:18%">Priority</th><th style="width:12%">Timeframe</th><th>Action</th><th style="width:20%">Rationale</th></tr>
+      </thead>
+      <tbody>
+      {% for action in insurance_risk.get('recommended_actions', []) %}
+      <tr>
+        <td>
+          <span class="severity-badge" style="background:{{ action.get('priority','') | severity_color }};">
+            {{ action.get('priority', '') }}
+          </span>
+        </td>
+        <td class="monospace" style="font-size:8.5pt;">{{ action.get('timeframe', '') }}</td>
+        <td>{{ action.get('action', '') }}</td>
+        <td style="font-size:8.5pt;">{{ action.get('rationale', '') }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% else %}
+    <p class="text-muted monospace">No insurance risk assessment data available for this report.</p>
+    {% endif %}
+  </div>
 </div>
-{% endif %}
 
-<!-- INSURANCE RISK ASSESSMENT -->
-{% if insurance_risk %}
-<div class="section page-break">
-  <h2>5. Insurance Risk Assessment</h2>
 
-  <!-- Underwriting Recommendation -->
-  <div style="text-align: center; margin-bottom: 20px;">
-    <span class="uw-badge" style="background: {{ insurance_risk.get('underwriting_recommendation', '') | uw_color }}20; color: {{ insurance_risk.get('underwriting_recommendation', '') | uw_color }}; border: 2px solid {{ insurance_risk.get('underwriting_recommendation', '') | uw_color }};">
-      {{ (insurance_risk.get('underwriting_recommendation', 'N/A') or 'N/A') | replace('_', ' ') }}
-    </span>
-    <div style="margin-top: 8px; font-size: 11pt; font-weight: 700; color: {{ insurance_risk.get('risk_tier', '') | severity_color }};">
-      Risk Tier: {{ insurance_risk.get('risk_tier', 'N/A') }}
-    </div>
+<!-- ================================================================
+     SECTION 6: RECOMMENDATIONS
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>SECTION 6 — RECOMMENDATIONS</span>
+    <span>{{ report_id }}</span>
   </div>
 
-  <!-- Risk Matrix -->
-  {% set rm = insurance_risk.get('risk_matrix', {}) %}
-  <div class="risk-matrix">
-    <div class="risk-dim">
-      <div class="score" style="color: {{ rm.get('severity', {}).get('score', 0) | string | severity_color if rm.get('severity', {}).get('score', 0) >= 4 else '#1a1a2e' }};">{{ rm.get('severity', {}).get('score', 'N/A') }}</div>
-      <div class="label">Severity / 5</div>
-      <div style="font-size: 8pt; color: #666; margin-top: 4px;">{{ rm.get('severity', {}).get('reasoning', '') }}</div>
-    </div>
-    <div class="risk-dim">
-      <div class="score">{{ rm.get('probability', {}).get('score', 'N/A') }}</div>
-      <div class="label">Probability / 5</div>
-      <div style="font-size: 8pt; color: #666; margin-top: 4px;">{{ rm.get('probability', {}).get('reasoning', '') }}</div>
-    </div>
-    <div class="risk-dim">
-      <div class="score">{{ rm.get('consequence', {}).get('score', 'N/A') }}</div>
-      <div class="label">Consequence / 5</div>
-      <div style="font-size: 8pt; color: #666; margin-top: 4px;">{{ rm.get('consequence', {}).get('reasoning', '') }}</div>
-    </div>
+  <div class="section">
+    <div class="section-heading">6.0 &nbsp;Recommendations</div>
+
+    <div class="subsection-heading">6.1 &nbsp;Immediate Actions (0–30 days)</div>
+    {% set immediate_actions = [] %}
+    {% if insurance_risk.get('recommended_actions') %}
+      {% for a in insurance_risk.get('recommended_actions', []) %}
+        {% if a.get('priority') in ['CRITICAL','SEVERE','HIGH'] or 'immediate' in (a.get('timeframe','') | lower) %}
+          {% if immediate_actions.append(a) %}{% endif %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if immediate_actions %}
+    <ul class="findings-list">
+    {% for a in immediate_actions %}
+      <li>
+        <span class="severity-badge" style="background:{{ a.get('priority','') | severity_color }};">{{ a.get('priority','') }}</span>
+        &nbsp;<strong>{{ a.get('action','') }}</strong>
+        {% if a.get('rationale') %}<span class="text-muted"> — {{ a.get('rationale') }}</span>{% endif %}
+      </li>
+    {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted monospace">No immediate-priority actions identified.</p>
+    {% endif %}
+
+    <div class="subsection-heading">6.2 &nbsp;Short-Term Actions (30–180 days)</div>
+    {% set short_actions = [] %}
+    {% if insurance_risk.get('recommended_actions') %}
+      {% for a in insurance_risk.get('recommended_actions', []) %}
+        {% if a.get('priority') in ['MODERATE','MEDIUM'] or 'month' in (a.get('timeframe','') | lower) %}
+          {% if short_actions.append(a) %}{% endif %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if short_actions %}
+    <ul class="findings-list">
+    {% for a in short_actions %}
+      <li>
+        <span class="severity-badge" style="background:{{ a.get('priority','') | severity_color }};">{{ a.get('priority','') }}</span>
+        &nbsp;<strong>{{ a.get('action','') }}</strong>
+        {% if a.get('rationale') %}<span class="text-muted"> — {{ a.get('rationale') }}</span>{% endif %}
+      </li>
+    {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted monospace">No short-term actions beyond standard monitoring protocol.</p>
+    {% endif %}
+
+    <div class="subsection-heading">6.3 &nbsp;Routine Monitoring (Ongoing)</div>
+    {% set routine_actions = [] %}
+    {% if insurance_risk.get('recommended_actions') %}
+      {% for a in insurance_risk.get('recommended_actions', []) %}
+        {% if a.get('priority') in ['MINOR','LOW'] or 'annual' in (a.get('timeframe','') | lower) or 'ongoing' in (a.get('timeframe','') | lower) %}
+          {% if routine_actions.append(a) %}{% endif %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    <ul class="findings-list">
+    {% if routine_actions %}
+    {% for a in routine_actions %}
+      <li>
+        <span class="severity-badge" style="background:{{ a.get('priority','') | severity_color }};">{{ a.get('priority','') }}</span>
+        &nbsp;<strong>{{ a.get('action','') }}</strong>
+        {% if a.get('rationale') %}<span class="text-muted"> — {{ a.get('rationale') }}</span>{% endif %}
+      </li>
+    {% endfor %}
+    {% else %}
+      <li>Continue standard telemetry monitoring per manufacturer schedule.</li>
+      <li>Annual visual inspection via operator imagery where available.</li>
+      <li>Re-run Orbital Inspect assessment at each insurance renewal cycle.</li>
+    {% endif %}
+    </ul>
+
   </div>
-  <div style="text-align: center; font-size: 10pt; margin-bottom: 16px;">
-    <strong>Composite Score:</strong> {{ rm.get('composite', 'N/A') }} / 125
-  </div>
-
-  <!-- Insurance Metrics -->
-  <h3>Insurance Metrics</h3>
-  <div class="metrics-grid">
-    <div class="metric-card">
-      <div class="value">{{ insurance_risk.get('estimated_remaining_life_years', 'N/A') }}</div>
-      <div class="label">Remaining Life (years)</div>
-    </div>
-    <div class="metric-card">
-      <div class="value">{{ insurance_risk.get('power_margin_percentage') | format_pct }}</div>
-      <div class="label">Power Margin</div>
-    </div>
-    <div class="metric-card">
-      <div class="value">{{ insurance_risk.get('annual_degradation_rate_pct') | format_pct }}</div>
-      <div class="label">Annual Degradation</div>
-    </div>
-    <div class="metric-card">
-      <div class="value">{{ insurance_risk.get('replacement_cost_usd') | format_usd }}</div>
-      <div class="label">Replacement Cost</div>
-    </div>
-    <div class="metric-card">
-      <div class="value">{{ insurance_risk.get('depreciated_value_usd') | format_usd }}</div>
-      <div class="label">Depreciated Value</div>
-    </div>
-    <div class="metric-card">
-      <div class="value">{{ insurance_risk.get('revenue_at_risk_annual_usd') | format_usd }}</div>
-      <div class="label">Revenue at Risk / year</div>
-    </div>
-  </div>
-
-  <!-- Rationale -->
-  <h3>Recommendation Rationale</h3>
-  <p>{{ insurance_risk.get('recommendation_rationale', 'N/A') }}</p>
-
-  {% if insurance_risk.get('worst_case_scenario') %}
-  <h3>Worst Case Scenario</h3>
-  <p style="color: #ef4444;">{{ insurance_risk.get('worst_case_scenario', '') }}</p>
-  {% endif %}
-
-  <h3>Executive Summary</h3>
-  <p>{{ insurance_risk.get('summary', 'N/A') }}</p>
 </div>
-{% endif %}
 
-<!-- FOOTER -->
-<div class="report-footer">
-  <p>This report was generated by Orbital Inspect — Satellite Condition Intelligence Platform.</p>
-  <p>Report ID: {{ report_id or 'DRAFT' }} | Generated: {{ generated_at }} | Classification: UNCLASSIFIED</p>
-  <p style="margin-top: 8px;">Disclaimer: This automated assessment supplements, but does not replace, professional underwriting judgment.
-  Data sources include NASA ORDEM, NOAA SWPC, CelesTrak, and AI-powered visual analysis.</p>
+
+<!-- ================================================================
+     APPENDIX A: METHODOLOGY
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>APPENDIX A — METHODOLOGY</span>
+    <span>{{ report_id }}</span>
+  </div>
+
+  <div class="section">
+    <div class="section-heading">Appendix A &nbsp;— &nbsp;Methodology</div>
+
+    <div class="subsection-heading">A.1 &nbsp;Assessment Pipeline</div>
+    <p style="margin-bottom:12px;">
+      This report is produced by the Orbital Inspect multi-agent analysis pipeline.
+      Each stage is executed by a specialized AI agent and its outputs are forwarded
+      as structured context to downstream stages. The pipeline is designed to replicate
+      the analytical reasoning of a senior satellite insurance engineer.
+    </p>
+
+    <div class="pipeline-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <span class="step-name">CLASSIFICATION AGENT</span><br>
+        <span style="font-size:9pt;">Identifies satellite type, bus platform, orbital regime, design life, and expected
+        component configuration from imagery and metadata. Draws on a curated database of
+        over 800 known satellite designs.</span>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <span class="step-name">VISION ANALYSIS AGENT</span><br>
+        <span style="font-size:9pt;">Performs computer vision analysis of the primary satellite image to identify
+        structural anomalies, surface damage, solar array degradation, antenna deformation,
+        and thermal coating deterioration. Returns bounding boxes, severity classification,
+        confidence scores, and estimated power impact per anomaly.</span>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <span class="step-name">ENVIRONMENT ASSESSMENT AGENT</span><br>
+        <span style="font-size:9pt;">Queries NASA ORDEM debris flux model, NOAA SWPC solar activity data,
+        CelesTrak orbital conjunction analysis, and AP-8/AE-8 radiation belt models
+        to characterize the operational environment at the satellite's orbital regime.</span>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <span class="step-name">FAILURE MODE ANALYSIS AGENT</span><br>
+        <span style="font-size:9pt;">Correlates visual damage patterns with known failure modes using a knowledge base
+        of historical satellite anomaly and total loss events. Constructs a root cause chain
+        and assesses progression rate drawing on NASA GSFC, ESA, and Lloyd's claims data.</span>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <span class="step-name">INSURANCE RISK AGENT</span><br>
+        <span style="font-size:9pt;">Synthesizes all upstream agent outputs to produce the three-axis risk matrix
+        (Severity × Probability × Consequence), composite score, financial exposure model,
+        underwriting recommendation, and recommended actions. Follows Lloyd's Space Market
+        Association underwriting guidelines.</span>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <span class="step-name">REPORT GENERATOR</span><br>
+        <span style="font-size:9pt;">Renders this document from structured agent outputs. Charts are generated
+        server-side using matplotlib. Damage overlays are rendered using Pillow image processing.
+        All assets are embedded as base64 data URIs for a self-contained, offline-capable document.</span>
+      </div>
+    </div>
+
+    <div class="subsection-heading">A.2 &nbsp;Data Sources</div>
+    <table>
+      <thead><tr><th>Source</th><th>Data Provided</th><th>Update Frequency</th></tr></thead>
+      <tbody>
+        <tr><td class="monospace">NASA ORDEM 3.1</td><td>Debris flux density by orbital regime and altitude</td><td>Annual model update</td></tr>
+        <tr><td class="monospace">NOAA SWPC</td><td>Solar activity (Kp index, F10.7, CME events)</td><td>Real-time / 3-day forecast</td></tr>
+        <tr><td class="monospace">CelesTrak</td><td>Conjunction alerts, TLE data, debris catalog</td><td>Daily</td></tr>
+        <tr><td class="monospace">ESA DISCOS</td><td>Satellite design database, historical anomalies</td><td>Quarterly</td></tr>
+        <tr><td class="monospace">Lloyd's SMA</td><td>Historical claims, underwriting precedents</td><td>Annual</td></tr>
+        <tr><td class="monospace">NASA GCAT</td><td>Launch manifest, orbital parameters, operator data</td><td>Weekly</td></tr>
+        <tr><td class="monospace">AP-8 / AE-8</td><td>Trapped radiation belt particle flux models</td><td>Static model</td></tr>
+      </tbody>
+    </table>
+
+    <div class="subsection-heading">A.3 &nbsp;Confidence Framework</div>
+    <p>
+      Each agent assigns a confidence score (0.0–1.0) to its primary outputs based on
+      image quality, data completeness, and precedent coverage. Scores below 0.60 trigger
+      evidence gap flags and degrade the overall report completeness status.
+      Composite report confidence is the harmonic mean of all agent confidence scores.
+    </p>
+
+  </div>
+</div>
+
+
+<!-- ================================================================
+     APPENDIX B: UNCERTAINTY & EVIDENCE GAPS
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>APPENDIX B — UNCERTAINTY &amp; EVIDENCE GAPS</span>
+    <span>{{ report_id }}</span>
+  </div>
+
+  <div class="section">
+    <div class="section-heading">Appendix B &nbsp;— &nbsp;Uncertainty &amp; Evidence Completeness</div>
+
+    <div class="subsection-heading">B.1 &nbsp;Report Completeness Status</div>
+    <table class="data-table avoid-break">
+      <tbody>
+        <tr><th>Overall Status</th>
+            <td>
+              {% if report_completeness == 'COMPLETE' %}
+                <span class="classification-badge" style="background:#22c55e;">COMPLETE</span>
+              {% else %}
+                <span class="classification-badge" style="background:#f59e0b;">{{ report_completeness }}</span>
+              {% endif %}
+            </td></tr>
+        <tr><th>Evidence Gaps</th>
+            <td>
+              {% if evidence_gaps %}
+                {% for gap in evidence_gaps %}
+                  <span class="classification-badge" style="background:#f59e0b;margin-right:4px;">{{ gap }}</span>
+                {% endfor %}
+              {% else %}
+                <span class="text-success monospace">None — all analysis stages completed successfully</span>
+              {% endif %}
+            </td></tr>
+        <tr><th>Vision Confidence</th>
+            <td class="monospace">{{ ((vision.get('overall_confidence', 0) or 0) * 100) | round(1) }}%</td></tr>
+        <tr><th>Classification Confidence</th>
+            <td class="monospace">{{ classification.get('confidence', 'N/A') }}</td></tr>
+      </tbody>
+    </table>
+
+    {% if evidence_gaps %}
+    <div class="partial-warning">
+      <strong>IMPORTANT:</strong> This report is PARTIAL. The following analytical stages produced
+      incomplete or unavailable outputs: {{ evidence_gaps | join(', ') }}.
+      Underwriting recommendations in a partial report are set to FURTHER_INVESTIGATION by default
+      and must not be used as a final underwriting determination without supplementary analysis.
+    </div>
+    {% endif %}
+
+    <div class="subsection-heading">B.2 &nbsp;Limitations and Caveats</div>
+    <ul class="findings-list">
+      <li>This assessment is based on a single-epoch image. Temporal change detection requires multiple imagery epochs and is outside scope unless explicitly provided.</li>
+      <li>Internal component damage (propellant tank integrity, electrical harness, battery cell health) cannot be assessed from external imagery and is not covered by this report.</li>
+      <li>Telemetry data (if available) would materially improve confidence in power margin and degradation rate estimates. This report relies on population-statistical models in the absence of telemetry.</li>
+      <li>Orbital conjunction data is accurate as of report generation date. Conjunction risk is dynamic and should be re-evaluated at each insurance renewal.</li>
+      <li>Historical precedent claims data is drawn from publicly reported events. Private settlements are not represented and actual market loss experience may differ.</li>
+      <li>All financial exposure estimates are indicative only. Actual replacement cost and revenue figures must be confirmed with the operator and broker before policy issuance.</li>
+    </ul>
+
+    <div class="subsection-heading">B.3 &nbsp;Confidence Score Breakdown</div>
+    <table>
+      <thead><tr><th>Analysis Stage</th><th>Confidence</th><th>Status</th></tr></thead>
+      <tbody>
+        {% set stages = [
+          ('Satellite Classification', classification.get('confidence')),
+          ('Visual Damage Analysis',   vision.get('overall_confidence')),
+          ('Orbital Environment',      environment.get('confidence')),
+          ('Failure Mode Analysis',    failure_mode.get('confidence')),
+          ('Insurance Risk Model',     insurance_risk.get('confidence')),
+        ] %}
+        {% for stage_name, stage_conf in stages %}
+        <tr>
+          <td class="monospace">{{ stage_name }}</td>
+          <td>
+            {% if stage_conf is not none %}
+              {% set pct = (stage_conf | float * 100) | round(0) | int %}
+              {% if pct >= 80 %}
+                <span style="color:#16a34a;font-weight:700;font-family:'Courier New',Courier,monospace;">{{ pct }}%</span>
+              {% elif pct >= 60 %}
+                <span style="color:#d97706;font-weight:700;font-family:'Courier New',Courier,monospace;">{{ pct }}%</span>
+              {% else %}
+                <span style="color:#dc2626;font-weight:700;font-family:'Courier New',Courier,monospace;">{{ pct }}%</span>
+              {% endif %}
+            {% else %}
+              <span class="text-muted monospace">N/A</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if stage_name | lower | replace(' ','_') in (evidence_gaps | join(',') | lower) %}
+              <span class="classification-badge" style="background:#f59e0b;">DEGRADED</span>
+            {% else %}
+              <span class="classification-badge" style="background:#22c55e;">OK</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+  </div>
+</div>
+
+
+<!-- ================================================================
+     APPENDIX C: GLOSSARY
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>APPENDIX C — GLOSSARY</span>
+    <span>{{ report_id }}</span>
+  </div>
+
+  <div class="section">
+    <div class="section-heading">Appendix C &nbsp;— &nbsp;Glossary</div>
+
+    <div class="subsection-heading">C.1 &nbsp;Insurance Terms</div>
+    <dl>
+      <div class="glossary-term">
+        <dt>Composite Risk Score</dt>
+        <dd>A single integer (0–125) derived as Severity × Probability × Consequence (each scored 1–5).
+            Used as the primary quantitative risk signal for underwriting decisions.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>Underwriting Recommendation</dt>
+        <dd>The formal Orbital Inspect recommendation to the underwriter.
+            Categories: INSURABLE_STANDARD, INSURABLE_ELEVATED_PREMIUM, INSURABLE_WITH_EXCLUSIONS,
+            FURTHER_INVESTIGATION, UNINSURABLE.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>Risk Tier</dt>
+        <dd>Qualitative summary of composite score: LOW (&lt;30%), MEDIUM (30–60%),
+            HIGH (60–80%), CRITICAL (&gt;80% of maximum 125).</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>Replacement Cost</dt>
+        <dd>Estimated cost to procure, integrate, launch, and commission an equivalent
+            replacement satellite at current market prices. Includes launch insurance allowance.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>Depreciated Value</dt>
+        <dd>Replacement cost pro-rated by remaining design life fraction. Used as the insurable
+            value basis for total loss calculations.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>Revenue at Risk</dt>
+        <dd>Annualized revenue from satellite operations (transponder lease, data services, etc.)
+            that would be lost in a total loss event. Source: operator disclosure or market rates.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>Distribution Statement A</dt>
+        <dd>U.S. Government distribution statement indicating the document is approved for
+            public release without restriction. Orbital Inspect applies this statement to
+            UNCLASSIFIED reports for consistency with aerospace documentation standards.</dd>
+      </div>
+    </dl>
+
+    <div class="subsection-heading">C.2 &nbsp;Orbital Mechanics &amp; Engineering Terms</div>
+    <dl>
+      <div class="glossary-term">
+        <dt>GEO (Geostationary Earth Orbit)</dt>
+        <dd>Circular orbit at ~35,786 km altitude, 0° inclination. Satellite appears stationary
+            relative to Earth's surface. Primary orbit for communications and weather satellites.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>LEO (Low Earth Orbit)</dt>
+        <dd>Orbits between ~160 km and ~2,000 km altitude. Higher debris density and radiation
+            from the South Atlantic Anomaly; shorter orbital periods (~90 min).</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>MEO (Medium Earth Orbit)</dt>
+        <dd>Orbits between ~2,000 km and ~35,786 km. Intersects the Van Allen radiation belts;
+            used primarily for navigation constellations (GPS, Galileo, GLONASS).</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>MMOD (Micrometeoroid and Orbital Debris)</dt>
+        <dd>Collective term for natural micrometeoroids and man-made orbital debris particles.
+            Primary cause of surface cratering, solar array cell damage, and thermal coating degradation.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>TID (Total Ionizing Dose)</dt>
+        <dd>Cumulative radiation dose absorbed by electronic components over operational life.
+            Measured in krad(Si). Exceeding design TID limit causes transistor parameter shifts
+            and eventual component failure.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>SEU (Single Event Upset)</dt>
+        <dd>A change in state of a memory cell or logic element caused by a single energetic
+            particle strike. Can cause software errors, safe-mode entry, or in severe cases,
+            latch-up requiring power cycle.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>EOL (End of Life)</dt>
+        <dd>The point at which a satellite can no longer maintain its operational mission,
+            typically defined by propellant depletion, power margin falling below minimum
+            threshold, or critical component failure.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>ESD (Electrostatic Discharge)</dt>
+        <dd>Sudden release of static charge built up on spacecraft surfaces due to the plasma
+            environment. Can cause surface material damage, anomalous electrical events,
+            and solar array degradation, particularly in GEO during geomagnetic storms.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>Power Margin</dt>
+        <dd>Remaining available power as a percentage of beginning-of-life power generation
+            capacity. A margin below 15% is considered critical. Primary driver of remaining
+            life estimates.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>Thermal Cycling</dt>
+        <dd>Repeated temperature excursions experienced by spacecraft structures and materials
+            as the satellite moves between sunlight and eclipse. Primary driver of joint fatigue,
+            multi-layer insulation degradation, and adhesive bond failures.</dd>
+      </div>
+      <div class="glossary-term">
+        <dt>Bus Platform</dt>
+        <dd>The standardized satellite bus (structural, power, thermal, and attitude control
+            subsystems) onto which mission-specific payloads are integrated. Examples:
+            Boeing 702, Airbus Eurostar-3000, SSL-1300, Thales Spacebus-4000.</dd>
+      </div>
+    </dl>
+
+  </div>
+</div>
+
+<!-- ================================================================
+     DOCUMENT CLOSE
+     ================================================================ -->
+<div class="page-break">
+  <div class="section-running-header">
+    <span>END OF REPORT</span>
+    <span>{{ report_id }}</span>
+  </div>
+
+  <div style="text-align:center;padding:60px 40px;">
+    <div style="font-family:'Courier New',Courier,monospace;font-size:9pt;letter-spacing:0.2em;color:#6b7280;margin-bottom:24px;text-transform:uppercase;">
+      — End of Document —
+    </div>
+    <div style="width:60px;height:2px;background:#111827;margin:0 auto 24px;"></div>
+    <div style="font-family:'Courier New',Courier,monospace;font-size:8pt;color:#9ca3af;line-height:1.7;">
+      <strong style="font-size:10pt;color:#374151;letter-spacing:0.1em;">ORBITAL INSPECT</strong><br>
+      Satellite Condition Intelligence Platform<br>
+      Report ID: {{ report_id }}<br>
+      Generated: {{ generated_at }}<br>
+      Classification: UNCLASSIFIED<br>
+      Distribution: Statement A — Unlimited
+    </div>
+    <div style="margin-top:28px;padding:14px 24px;border:1.5px solid #d1d5db;display:inline-block;border-radius:2px;background:#f9fafb;">
+      <div style="font-family:'Courier New',Courier,monospace;font-size:8pt;color:#6b7280;max-width:440px;line-height:1.6;">
+        <strong style="color:#374151;">Disclaimer:</strong>
+        This automated assessment is produced by Orbital Inspect using AI-powered visual analysis,
+        publicly available orbital environment databases, and machine learning models trained on
+        historical satellite anomaly data. It supplements but does not replace the professional
+        judgment of a qualified satellite insurance underwriter. All financial exposure figures
+        are indicative estimates only. Orbital Inspect accepts no liability for underwriting
+        decisions made solely on the basis of this report.
+      </div>
+    </div>
+    <div style="margin-top:20px;font-family:'Courier New',Courier,monospace;font-size:8pt;color:#9ca3af;">
+      &copy; {{ generated_year }} Orbital Inspect. All rights reserved.
+    </div>
+  </div>
 </div>
 
 </body>

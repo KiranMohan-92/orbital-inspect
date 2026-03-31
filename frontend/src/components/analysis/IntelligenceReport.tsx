@@ -1,9 +1,11 @@
-import { Suspense } from "react";
+import { Suspense, useCallback, useState } from "react";
 import AgentFeed from "./AgentFeed";
 import InsuranceRiskCard from "./InsuranceRiskCard";
 import { RiskMatrixDrilldown, DegradationTimeline } from "../viz";
 import type { UseAnalysisReturn } from "../../hooks/useAnalysisState";
 import type { InsuranceRiskReport, SatelliteFailureModeAnalysis, ClassificationResult } from "../../types";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 interface Props {
   analysis: UseAnalysisReturn;
@@ -15,6 +17,40 @@ export default function IntelligenceReport({ analysis }: Props) {
   const failureModePayload = state.agents.failure_mode.payload as SatelliteFailureModeAnalysis | null;
   const classificationPayload = state.agents.orbital_classification.payload as ClassificationResult | null;
   const isComplete = state.analysisStatus === "complete" && insurancePayload;
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handleDownloadReport = useCallback(async () => {
+    const analysisId = (state.agents.orbital_classification.payload as Record<string, unknown>)?.analysis_id;
+    setPdfLoading(true);
+    try {
+      // Generate report HTML from current analysis data inline
+      const reportData = {
+        classification: state.agents.orbital_classification.payload || {},
+        vision: state.agents.satellite_vision.payload || {},
+        environment: state.agents.orbital_environment.payload || {},
+        failure_mode: state.agents.failure_mode.payload || {},
+        insurance_risk: state.agents.insurance_risk.payload || {},
+      };
+      // Open in new tab as printable HTML report
+      const blob = new Blob(
+        [`<html><head><title>Satellite Condition Report</title></head><body>
+          <h1>Satellite Condition Report</h1>
+          <p>Generated: ${new Date().toISOString()}</p>
+          <pre>${JSON.stringify(reportData, null, 2)}</pre>
+          <script>window.print()</script>
+        </body></html>`],
+        { type: "text/html" }
+      );
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch {
+      // Fallback: just print current page
+      window.print();
+    } finally {
+      setPdfLoading(false);
+    }
+  }, [state.agents]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -63,6 +99,27 @@ export default function IntelligenceReport({ analysis }: Props) {
               damages={((state.agents.satellite_vision.payload as Record<string, unknown>)?.damages as Array<{ type: string; severity: string }>) ?? []}
             />
           </Suspense>
+        )}
+
+        {/* Download Report Button */}
+        {isComplete && (
+          <button
+            onClick={handleDownloadReport}
+            disabled={pdfLoading}
+            className="w-full py-3 rounded-md font-mono-display text-xs tracking-[0.15em] transition-all flex items-center justify-center gap-2"
+            style={{
+              background: pdfLoading ? "rgba(255,255,255,0.03)" : "linear-gradient(135deg, #22c55e, #059669)",
+              color: pdfLoading ? "var(--text-tertiary)" : "#ffffff",
+              cursor: pdfLoading ? "wait" : "pointer",
+              boxShadow: pdfLoading ? "none" : "0 0 20px rgba(34,197,94,0.15)",
+              border: "1px solid rgba(34,197,94,0.2)",
+            }}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            {pdfLoading ? "GENERATING..." : "DOWNLOAD CONDITION REPORT"}
+          </button>
         )}
 
         {/* Idle state */}

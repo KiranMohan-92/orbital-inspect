@@ -3,6 +3,7 @@ import { useSSE } from "../../hooks/useSSE";
 import SatelliteInput from "./SatelliteInput";
 import VisualAnalysis from "./VisualAnalysis";
 import IntelligenceReport from "./IntelligenceReport";
+import ErrorBoundary from "../ErrorBoundary";
 
 export default function AnalysisMode() {
   const analysis = useAnalysisState();
@@ -23,16 +24,22 @@ export default function AnalysisMode() {
         {/* Panel A: Target Acquisition (300px) */}
         <div className="w-[300px] flex-shrink-0 flex flex-col glass-panel overflow-hidden"
           style={{ borderRight: "1px solid var(--bg-panel-border)" }}>
-          <SatelliteInput analysis={analysis} onAnalyze={handleAnalyze} onDemo={analyzeDemo} />
+          <ErrorBoundary panelName="Target Acquisition">
+            <SatelliteInput analysis={analysis} onAnalyze={handleAnalyze} onDemo={analyzeDemo} />
+          </ErrorBoundary>
         </div>
 
         {/* Panel B: Visual Analysis (flex-1) */}
-        <VisualAnalysis analysis={analysis} />
+        <ErrorBoundary panelName="Visual Analysis">
+          <VisualAnalysis analysis={analysis} />
+        </ErrorBoundary>
 
         {/* Panel C: Intelligence Report (380px) */}
         <div className="w-[380px] flex-shrink-0 flex flex-col glass-panel overflow-hidden"
           style={{ borderLeft: "1px solid var(--bg-panel-border)" }}>
-          <IntelligenceReport analysis={analysis} />
+          <ErrorBoundary panelName="Intelligence Report">
+            <IntelligenceReport analysis={analysis} />
+          </ErrorBoundary>
         </div>
       </div>
 

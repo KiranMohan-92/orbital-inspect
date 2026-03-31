@@ -207,3 +207,40 @@ async def get_report(
             }
     except ImportError:
         raise HTTPException(status_code=503, detail="Database not available")
+
+
+@router.post("/{analysis_id}/generate-pdf")
+async def generate_pdf(
+    analysis_id: str,
+    user: CurrentUser | None = Depends(get_current_user),
+):
+    """Generate a NASA-grade HTML Satellite Condition Report."""
+    try:
+        from db.base import async_session_factory
+        from db.repository import AnalysisRepository
+        from services.pdf_report_service import generate_html_report
+
+        async with async_session_factory() as session:
+            repo = AnalysisRepository(session)
+            analysis = await repo.get(analysis_id)
+            if not analysis:
+                raise HTTPException(status_code=404, detail="Analysis not found")
+            if analysis.status != "completed":
+                raise HTTPException(status_code=400, detail="Analysis not yet completed")
+
+            report_data = {
+                "classification": analysis.classification_result or {},
+                "vision": analysis.vision_result or {},
+                "environment": analysis.environment_result or {},
+                "failure_mode": analysis.failure_mode_result or {},
+                "insurance_risk": analysis.insurance_risk_result or {},
+                "evidence_gaps": analysis.evidence_gaps or [],
+                "report_completeness": analysis.report_completeness or "COMPLETE",
+            }
+
+            html = generate_html_report(report_data, report_id=analysis_id[:12])
+
+            from starlette.responses import HTMLResponse
+            return HTMLResponse(content=html, media_type="text/html")
+    except ImportError:
+        raise HTTPException(status_code=503, detail="PDF service not available")
