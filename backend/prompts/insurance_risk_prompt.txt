@@ -121,3 +121,55 @@ Respond with ONLY valid JSON:
 - Deployment failures (stuck arrays, antennas) are typically total-loss events. Do not underestimate.
 - Power margin below 15% at ANY point before EOL should trigger at minimum INSURABLE_ELEVATED_PREMIUM.
 - The composite score MUST equal severity × probability × consequence. Double-check arithmetic.
+
+## Data Provenance Requirements (Deutsch Layer)
+
+Every number you output must be traceable. For EACH financial metric, include a detail object:
+
+"replacement_cost_detail": {
+    "value_usd": <same as replacement_cost_usd>,
+    "source": "satellite_class_lookup" | "operator_reported" | "regression_model" | "precedent_analysis",
+    "confidence_range_low": <lower bound USD>,
+    "confidence_range_high": <upper bound USD>,
+    "comparable_precedents": ["<satellite name> ($<amount>)", ...],
+    "derivation": "<1-2 sentence explanation of how you arrived at this number>"
+}
+
+Provide the same structure for: depreciated_value_detail, revenue_at_risk_detail.
+
+For total_loss_probability, SHOW YOUR WORK:
+
+"loss_probability_derivation": {
+    "components": [
+        {
+            "mechanism": "<failure mechanism name>",
+            "base_rate": <historical frequency 0.0-1.0>,
+            "observed_evidence_factor": <multiplier based on observed damage, 1.0 = no adjustment>,
+            "adjusted_probability": <base_rate * factor>,
+            "source": "fleet_historical_data" | "physics_model" | "expert_elicitation"
+        }
+    ],
+    "aggregation_method": "independent_sum",
+    "total_loss_probability": <sum of adjusted probabilities, capped at 1.0>,
+    "derivation_narrative": "<2-3 sentences explaining the reasoning chain>"
+}
+
+For overall confidence calibration:
+
+"confidence_calibration": {
+    "evidence_sufficiency": <0.0-1.0: is there enough data?>,
+    "model_uncertainty": <0.0-1.0: how uncertain is the AI model?>,
+    "consensus_strength": <0.0-1.0: do multiple evidence sources agree?>,
+    "calibrated_confidence": <harmonic mean of the above three>,
+    "confidence_tier": "VERY_HIGH" | "HIGH" | "MODERATE" | "LOW" | "VERY_LOW",
+    "basis": "<1 sentence explaining what evidence this assessment is based on>"
+}
+
+Confidence tier mapping:
+- VERY_HIGH (>0.85): Telemetry + imagery + operator data + historical precedents
+- HIGH (0.70-0.85): Imagery + orbital data + relevant precedents
+- MODERATE (0.50-0.70): Single-epoch imagery + orbital data, no telemetry
+- LOW (0.30-0.50): Limited imagery, no orbital enrichment
+- VERY_LOW (<0.30): Degraded assessment, missing critical data
+
+These provenance fields are OPTIONAL but STRONGLY ENCOURAGED. If you cannot determine a source or derivation, omit the field rather than fabricating attribution.

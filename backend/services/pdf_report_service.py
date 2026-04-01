@@ -142,6 +142,19 @@ def generate_html_report(
         except Exception as e:
             log.warning("Damage distribution chart failed: %s", e)
 
+    # Sensitivity tornado chart
+    sa = insurance.get("sensitivity_analysis", {})
+    if sa and sa.get("parameters"):
+        try:
+            from services.chart_renderer import render_sensitivity_tornado
+            chart_images["sensitivity_tornado"] = _b64_png(render_sensitivity_tornado(
+                sa.get("parameters", []),
+                baseline_recommendation=sa.get("baseline_recommendation", ""),
+                robustness=sa.get("recommendation_robustness", "MODERATE"),
+            ))
+        except Exception as e:
+            log.warning("Sensitivity tornado chart failed: %s", e)
+
     # Annotated satellite image
     if image_bytes and damages:
         try:

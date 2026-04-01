@@ -636,6 +636,50 @@ td, th {
 .mb-8 { margin-bottom: 8px; }
 .mb-12 { margin-bottom: 12px; }
 .bold { font-weight: 700; }
+
+/* Provenance badges */
+.provenance-badge {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 7pt;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.provenance-measured { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+.provenance-reference { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+.provenance-inferred { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.provenance-estimated { background: #f3e8ff; color: #6b21a8; border: 1px solid #c4b5fd; }
+.provenance-reported { background: #e0e7ff; color: #3730a3; border: 1px solid #a5b4fc; }
+
+.confidence-tier-badge {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 3px;
+    letter-spacing: 0.08em;
+}
+.tier-very-high { background: #dcfce7; color: #166534; }
+.tier-high { background: #dbeafe; color: #1e40af; }
+.tier-moderate { background: #fef3c7; color: #92400e; }
+.tier-low { background: #fee2e2; color: #991b1b; }
+.tier-very-low { background: #fecaca; color: #7f1d1d; }
+
+.derivation-chain {
+    font-size: 8pt;
+    color: #6b7280;
+    font-style: italic;
+    margin-top: 4px;
+    padding-left: 12px;
+    border-left: 2px solid #e5e7eb;
+}
+
+.sensitivity-robust { color: #166534; font-weight: 700; }
+.sensitivity-marginal { color: #92400e; font-weight: 700; }
+.sensitivity-fragile { color: #991b1b; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -776,6 +820,23 @@ td, th {
       <div class="heading">Key Finding</div>
       <p>{{ insurance_risk.get('summary', 'No summary available.') }}</p>
     </div>
+
+    {% if insurance_risk.get('confidence_calibration') %}
+    {% set cal = insurance_risk.get('confidence_calibration', {}) %}
+    <div class="avoid-break" style="margin-top: 12px; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
+        <span style="font-family: 'Courier New', monospace; font-size: 8pt; color: #6b7280; letter-spacing: 0.08em;">ASSESSMENT CONFIDENCE</span>
+        {% set tier = cal.get('confidence_tier', 'MODERATE') %}
+        <span class="confidence-tier-badge tier-{{ tier|lower|replace('_','-') }}" style="margin-left: 8px;">{{ tier }}</span>
+        {% if cal.get('basis') %}
+        <p style="font-size: 8.5pt; color: #6b7280; margin-top: 6px;">{{ cal.get('basis') }}</p>
+        {% endif %}
+        <div style="display: flex; gap: 16px; margin-top: 6px; font-size: 8pt; color: #6b7280;">
+            <span>Evidence: {{ (cal.get('evidence_sufficiency', 0) * 100)|round(0) }}%</span>
+            <span>Model: {{ ((1 - cal.get('model_uncertainty', 0.5)) * 100)|round(0) }}%</span>
+            <span>Consensus: {{ (cal.get('consensus_strength', 0) * 100)|round(0) }}%</span>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Top damage findings -->
     {% set damages = vision.get('damages', []) %}
@@ -1280,6 +1341,54 @@ td, th {
     </div>
     {% endif %}
 
+    {% if insurance_risk.get('replacement_cost_detail') %}
+    {% set rcd = insurance_risk.get('replacement_cost_detail', {}) %}
+    <div class="derivation-chain">
+        Source: {{ rcd.get('source', 'N/A') | upper }}
+        {% if rcd.get('confidence_range_low') and rcd.get('confidence_range_high') %}
+        · Range: {{ rcd.get('confidence_range_low') | format_usd }}–{{ rcd.get('confidence_range_high') | format_usd }}
+        {% endif %}
+        {% if rcd.get('comparable_precedents') %}
+        · Comparables: {{ rcd.get('comparable_precedents', []) | join(', ') }}
+        {% endif %}
+        {% if rcd.get('derivation') %}
+        <br>{{ rcd.get('derivation') }}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if insurance_risk.get('depreciated_value_detail') %}
+    {% set dvd = insurance_risk.get('depreciated_value_detail', {}) %}
+    <div class="derivation-chain">
+        Source: {{ dvd.get('source', 'N/A') | upper }}
+        {% if dvd.get('confidence_range_low') and dvd.get('confidence_range_high') %}
+        · Range: {{ dvd.get('confidence_range_low') | format_usd }}–{{ dvd.get('confidence_range_high') | format_usd }}
+        {% endif %}
+        {% if dvd.get('comparable_precedents') %}
+        · Comparables: {{ dvd.get('comparable_precedents', []) | join(', ') }}
+        {% endif %}
+        {% if dvd.get('derivation') %}
+        <br>{{ dvd.get('derivation') }}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if insurance_risk.get('revenue_at_risk_detail') %}
+    {% set rrd = insurance_risk.get('revenue_at_risk_detail', {}) %}
+    <div class="derivation-chain">
+        Source: {{ rrd.get('source', 'N/A') | upper }}
+        {% if rrd.get('confidence_range_low') and rrd.get('confidence_range_high') %}
+        · Range: {{ rrd.get('confidence_range_low') | format_usd }}–{{ rrd.get('confidence_range_high') | format_usd }}
+        {% endif %}
+        {% if rrd.get('comparable_precedents') %}
+        · Comparables: {{ rrd.get('comparable_precedents', []) | join(', ') }}
+        {% endif %}
+        {% if rrd.get('derivation') %}
+        <br>{{ rrd.get('derivation') }}
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Recommendation rationale -->
     <div class="subsection-heading">5.3 &nbsp;Recommendation Rationale</div>
     <p>{{ insurance_risk.get('recommendation_rationale', 'N/A') }}</p>
@@ -1290,6 +1399,43 @@ td, th {
     <div class="exec-key-finding" style="border-left-color:#ef4444;background:#fef2f2;">
       <div class="heading" style="color:#ef4444;">Worst Case Projection</div>
       <p class="text-danger">{{ insurance_risk.get('worst_case_scenario') }}</p>
+    </div>
+    {% endif %}
+
+    {% if insurance_risk.get('loss_probability_derivation') %}
+    {% set lpd = insurance_risk.get('loss_probability_derivation', {}) %}
+    <div class="avoid-break" style="margin-top: 16px;">
+        <h3 style="font-size: 11pt; margin-bottom: 8px;">5.X &nbsp;Loss Probability Derivation</h3>
+
+        {% if lpd.get('components') %}
+        <table>
+            <thead>
+                <tr><th>Failure Mechanism</th><th>Base Rate</th><th>Evidence Factor</th><th>Adjusted P</th><th>Source</th></tr>
+            </thead>
+            <tbody>
+            {% for c in lpd.get('components', []) %}
+                <tr>
+                    <td>{{ c.get('mechanism', '') | replace('_', ' ') | title }}</td>
+                    <td>{{ '%.3f' % c.get('base_rate', 0) }}</td>
+                    <td>×{{ '%.1f' % c.get('observed_evidence_factor', 1.0) }}</td>
+                    <td style="font-weight: 600;">{{ '%.3f' % c.get('adjusted_probability', 0) }}</td>
+                    <td style="font-size: 8pt; color: #6b7280;">{{ c.get('source', '') }}</td>
+                </tr>
+            {% endfor %}
+                <tr style="border-top: 2px solid #111827; font-weight: 700;">
+                    <td colspan="3">Total Loss Probability ({{ lpd.get('aggregation_method', '') }})</td>
+                    <td>{{ '%.3f' % lpd.get('total_loss_probability', 0) }}</td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if lpd.get('derivation_narrative') %}
+        <p style="font-size: 9pt; color: #374151; margin-top: 8px; font-style: italic;">
+            {{ lpd.get('derivation_narrative') }}
+        </p>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -1406,6 +1552,39 @@ td, th {
       <li>Re-run Orbital Inspect assessment at each insurance renewal cycle.</li>
     {% endif %}
     </ul>
+
+    {% if insurance_risk.get('sensitivity_analysis') %}
+    {% set sa = insurance_risk.get('sensitivity_analysis', {}) %}
+    <div class="avoid-break" style="margin-top: 20px;">
+        <h3 style="font-size: 11pt; margin-bottom: 8px;">5.Y &nbsp;Sensitivity Analysis</h3>
+
+        <p style="font-size: 9pt; margin-bottom: 8px;">
+            Recommendation Robustness:
+            <span class="sensitivity-{{ sa.get('recommendation_robustness', 'moderate')|lower }}">
+                {{ sa.get('recommendation_robustness', 'N/A') }}
+            </span>
+        </p>
+
+        {% if charts.get('sensitivity_tornado') %}
+        <img src="{{ charts.get('sensitivity_tornado') }}" alt="Sensitivity Tornado" style="width: 100%; max-width: 600px; margin: 8px 0;" />
+        {% endif %}
+
+        {% if sa.get('critical_thresholds') %}
+        <p style="font-size: 9pt; font-weight: 600; margin-top: 8px;">Critical Thresholds:</p>
+        <ul style="font-size: 8.5pt; color: #991b1b; margin-left: 16px;">
+        {% for ct in sa.get('critical_thresholds', []) %}
+            <li>{{ ct }}</li>
+        {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if sa.get('key_drivers') %}
+        <p style="font-size: 9pt; margin-top: 8px;">
+            Key Drivers (ranked): {{ sa.get('key_drivers', []) | join(' → ') }}
+        </p>
+        {% endif %}
+    </div>
+    {% endif %}
 
   </div>
 </div>

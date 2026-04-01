@@ -409,3 +409,77 @@ def render_composite_gauge(composite: int, max_score: int = 125) -> bytes:
 
     fig.tight_layout(pad=0.5)
     return _save_figure(fig)
+
+
+# ---------------------------------------------------------------------------
+# 5. Sensitivity Tornado Diagram
+# ---------------------------------------------------------------------------
+
+def render_sensitivity_tornado(
+    parameters: list[dict],
+    baseline_recommendation: str = "",
+    robustness: str = "MODERATE",
+) -> bytes:
+    """
+    Render a tornado diagram showing parameter sensitivity.
+
+    Args:
+        parameters: list of dicts with keys: name, baseline_value,
+                   test_range_low, test_range_high, is_critical
+        baseline_recommendation: current recommendation string
+        robustness: ROBUST | MARGINAL | FRAGILE
+    """
+    fig, ax = plt.subplots(figsize=(8, max(3, len(parameters) * 0.8 + 1)))
+    fig.patch.set_facecolor(DARK_BG)
+    ax.set_facecolor(DARK_BG)
+
+    if not parameters:
+        ax.text(0.5, 0.5, "No sensitivity data", ha='center', va='center',
+                color=LIGHT_TEXT, fontsize=12, fontfamily='monospace')
+        return _save_figure(fig)
+
+    names = [p.get("name", "").upper() for p in parameters]
+    baselines = [p.get("baseline_value", 0) for p in parameters]
+    lows = [p.get("test_range_low", 0) for p in parameters]
+    highs = [p.get("test_range_high", 0) for p in parameters]
+    criticals = [p.get("is_critical", False) for p in parameters]
+
+    y_pos = range(len(names))
+
+    for i, (name, base, low, high, crit) in enumerate(zip(names, baselines, lows, highs, criticals)):
+        color_low = '#ef4444' if crit else '#4d7cff'
+        color_high = '#ef4444' if crit else '#4d7cff'
+
+        # Low bar (left of baseline)
+        ax.barh(i, base - low, left=low, height=0.5, color=color_low, alpha=0.7)
+        # High bar (right of baseline)
+        ax.barh(i, high - base, left=base, height=0.5, color=color_high, alpha=0.7)
+
+        # Labels
+        ax.text(low - 0.15, i, str(int(low)), ha='right', va='center',
+                color=DIM_TEXT, fontsize=9, fontfamily='monospace')
+        ax.text(high + 0.15, i, str(int(high)), ha='left', va='center',
+                color=DIM_TEXT, fontsize=9, fontfamily='monospace')
+
+    # Baseline line
+    if baselines:
+        ax.axvline(x=baselines[0], color=LIGHT_TEXT, linestyle='--', alpha=0.3, linewidth=0.8)
+
+    ax.set_yticks(list(y_pos))
+    ax.set_yticklabels(names, fontsize=10, fontfamily='monospace', color=LIGHT_TEXT)
+    ax.set_xlabel('Score (1-5)', fontsize=9, fontfamily='monospace', color=DIM_TEXT)
+
+    robustness_colors = {"ROBUST": "#22c55e", "MARGINAL": "#eab308", "FRAGILE": "#ef4444"}
+    rob_color = robustness_colors.get(robustness, DIM_TEXT)
+    ax.set_title(f'Sensitivity Analysis — {robustness}', fontsize=11,
+                 fontfamily='monospace', color=rob_color, pad=12)
+
+    ax.tick_params(colors=DIM_TEXT, labelsize=8)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_color(GRID_COLOR)
+    ax.spines['left'].set_color(GRID_COLOR)
+    ax.set_xlim(0, 6)
+
+    fig.tight_layout()
+    return _save_figure(fig)

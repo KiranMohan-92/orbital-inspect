@@ -15,6 +15,10 @@ from services.gemini_service import (
     parse_json_response,
 )
 from models.satellite import InsuranceRiskReport
+from models.provenance import (
+    ConfidenceCalibration, FinancialEstimate,
+    LossProbabilityDerivation, SensitivityAnalysis, FieldProvenance,
+)
 
 log = logging.getLogger(__name__)
 
@@ -87,6 +91,7 @@ async def assess_insurance_risk(
 
         # Server-side consistency enforcement
         report = _enforce_consistency(report)
+        report = _validate_provenance(report)
         return report
     except Exception as e:
         log.error("Insurance risk assessment failed", exc_info=True)
@@ -146,6 +151,49 @@ def _enforce_consistency(report: InsuranceRiskReport) -> InsuranceRiskReport:
         report.consistency_check.anomalies = anomalies
         if anomalies:
             report.consistency_check.confidence_adjustment = "Server-side corrections applied"
+
+    return report
+
+
+def _validate_provenance(report: InsuranceRiskReport) -> InsuranceRiskReport:
+    """
+    Ensure provenance fields have at least stub values when the LLM omits them.
+
+    This is the key safety mechanism — reports ALWAYS render, even if the agent
+    completely ignores the provenance prompt. Stubs are transparent: they say
+    'no attribution provided' rather than fabricating sources.
+    """
+    if report.confidence_calibration is None:
+        report.confidence_calibration = ConfidenceCalibration(
+            basis="No structured calibration provided by agent — treat all estimates as approximate",
+        )
+
+    if report.replacement_cost_usd and not report.replacement_cost_detail:
+        report.replacement_cost_detail = FinancialEstimate(
+            value_usd=report.replacement_cost_usd,
+            source="agent_estimate",
+            derivation="No structured attribution provided — verify with operator/broker",
+        )
+
+    if report.depreciated_value_usd and not report.depreciated_value_detail:
+        report.depreciated_value_detail = FinancialEstimate(
+            value_usd=report.depreciated_value_usd,
+            source="agent_estimate",
+            derivation="No structured attribution provided",
+        )
+
+    if report.revenue_at_risk_annual_usd and not report.revenue_at_risk_detail:
+        report.revenue_at_risk_detail = FinancialEstimate(
+            value_usd=report.revenue_at_risk_annual_usd,
+            source="agent_estimate",
+            derivation="No structured attribution provided",
+        )
+
+    if report.total_loss_probability and not report.loss_probability_derivation:
+        report.loss_probability_derivation = LossProbabilityDerivation(
+            total_loss_probability=report.total_loss_probability,
+            derivation_narrative="No structured derivation provided — probability is an agent estimate without explicit base rates",
+        )
 
     return report
 

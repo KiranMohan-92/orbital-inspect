@@ -4,6 +4,11 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime, timezone
 from enum import Enum
+from models.provenance import (
+    ConfidenceCalibration, FinancialEstimate,
+    LossProbabilityDerivation, SensitivityAnalysis, FieldProvenance,
+    ProbabilityComponent,
+)
 
 
 class OrbitalRegime(str, Enum):
@@ -152,6 +157,7 @@ class SatelliteFailureModeAnalysis(BaseModel):
     time_to_critical: str = ""
     historical_precedents: list[SatellitePrecedent] = []
     degraded: bool = False
+    probability_components: list[ProbabilityComponent] = []
 
 
 class RiskMatrixDimension(BaseModel):
@@ -203,6 +209,17 @@ class InsuranceRiskReport(BaseModel):
     degraded: bool = False
     evidence_gaps: list[str] = []
     report_completeness: str = "COMPLETE"
+
+    # Deutsch Layer: Provenance & Calibration (all Optional, backward compatible)
+    confidence_calibration: ConfidenceCalibration | None = None
+    replacement_cost_detail: FinancialEstimate | None = None
+    depreciated_value_detail: FinancialEstimate | None = None
+    revenue_at_risk_detail: FinancialEstimate | None = None
+    loss_probability_derivation: LossProbabilityDerivation | None = None
+    sensitivity_analysis: SensitivityAnalysis | None = None
+    remaining_life_provenance: FieldProvenance | None = None
+    power_margin_provenance: FieldProvenance | None = None
+    degradation_rate_provenance: FieldProvenance | None = None
 
 
 class SatelliteConditionReport(BaseModel):
