@@ -16,7 +16,7 @@ from services.gemini_service import (
 )
 from models.satellite import InsuranceRiskReport
 from models.provenance import (
-    ConfidenceCalibration, FinancialEstimate,
+    DataSourceType, ConfidenceCalibration, FinancialEstimate,
     LossProbabilityDerivation, SensitivityAnalysis, FieldProvenance,
 )
 
@@ -168,32 +168,45 @@ def _validate_provenance(report: InsuranceRiskReport) -> InsuranceRiskReport:
             basis="No structured calibration provided by agent — treat all estimates as approximate",
         )
 
-    if report.replacement_cost_usd and not report.replacement_cost_detail:
+    if report.replacement_cost_usd is not None and not report.replacement_cost_detail:
         report.replacement_cost_detail = FinancialEstimate(
             value_usd=report.replacement_cost_usd,
             source="agent_estimate",
             derivation="No structured attribution provided — verify with operator/broker",
         )
 
-    if report.depreciated_value_usd and not report.depreciated_value_detail:
+    if report.depreciated_value_usd is not None and not report.depreciated_value_detail:
         report.depreciated_value_detail = FinancialEstimate(
             value_usd=report.depreciated_value_usd,
             source="agent_estimate",
             derivation="No structured attribution provided",
         )
 
-    if report.revenue_at_risk_annual_usd and not report.revenue_at_risk_detail:
+    if report.revenue_at_risk_annual_usd is not None and not report.revenue_at_risk_detail:
         report.revenue_at_risk_detail = FinancialEstimate(
             value_usd=report.revenue_at_risk_annual_usd,
             source="agent_estimate",
             derivation="No structured attribution provided",
         )
 
-    if report.total_loss_probability and not report.loss_probability_derivation:
+    if report.total_loss_probability is not None and not report.loss_probability_derivation:
         report.loss_probability_derivation = LossProbabilityDerivation(
             total_loss_probability=report.total_loss_probability,
             derivation_narrative="No structured derivation provided — probability is an agent estimate without explicit base rates",
         )
+
+    # Stub FieldProvenance for key metrics
+    stub_prov = FieldProvenance(
+        source_type=DataSourceType.ESTIMATED,
+        primary_source="agent_inference",
+        caveats=["No structured provenance provided by agent"],
+    )
+    if report.estimated_remaining_life_years is not None and not report.remaining_life_provenance:
+        report.remaining_life_provenance = stub_prov.model_copy()
+    if report.power_margin_percentage is not None and not report.power_margin_provenance:
+        report.power_margin_provenance = stub_prov.model_copy()
+    if report.annual_degradation_rate_pct is not None and not report.degradation_rate_provenance:
+        report.degradation_rate_provenance = stub_prov.model_copy()
 
     return report
 

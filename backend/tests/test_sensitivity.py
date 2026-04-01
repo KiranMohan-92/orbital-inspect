@@ -50,8 +50,9 @@ def test_sensitivity_parameters_have_recommendations():
 
 
 def test_sensitivity_extreme_high():
+    """At (5,5,5) with ±2 sweep, dropping any dim to 3 changes tier → FRAGILE is correct."""
     sa = run_sensitivity_analysis(5, 5, 5, "UNINSURABLE")
-    assert sa.recommendation_robustness == "ROBUST"
+    assert sa.recommendation_robustness == "FRAGILE"
 
 
 def test_tornado_chart_renders():

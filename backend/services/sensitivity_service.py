@@ -56,8 +56,8 @@ def run_sensitivity_analysis(
         ("probability", probability, severity, consequence),
         ("consequence", consequence, severity, probability),
     ]:
-        low_val = max(1, baseline_val - 1)
-        high_val = min(5, baseline_val + 1)
+        low_val = max(1, baseline_val - 2)
+        high_val = min(5, baseline_val + 2)
 
         low_composite = low_val * other_a * other_b
         high_composite = high_val * other_a * other_b
