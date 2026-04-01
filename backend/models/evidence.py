@@ -16,6 +16,7 @@ class EvidenceSource(str, Enum):
     IMAGERY = "imagery"
     TELEMETRY = "telemetry"
     TLE_HISTORY = "tle_history"
+    CONJUNCTION_RISK = "conjunction_risk"
     OPERATOR_NOTES = "operator_notes"
     MAINTENANCE_RECORDS = "maintenance_records"
     PRIOR_ANALYSIS = "prior_analysis"

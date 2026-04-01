@@ -66,7 +66,8 @@ def test_evidence_source_enum_values():
     assert EvidenceSource.IMAGERY.value == "imagery"
     assert EvidenceSource.TELEMETRY.value == "telemetry"
     assert EvidenceSource.PRIOR_ANALYSIS.value == "prior_analysis"
-    assert len(EvidenceSource) == 8
+    assert EvidenceSource.CONJUNCTION_RISK.value == "conjunction_risk"
+    assert len(EvidenceSource) == 9
 
 
 def test_evidence_bundle_prior_risk_tiers():
