@@ -9,7 +9,7 @@ Move Orbital Inspect from a hardened demo platform into a trusted operational sy
 ## Milestones
 
 ### Milestone 1: Live Full-Stack E2E
-Status: In progress
+Status: Completed
 
 - Replace mocked browser E2E with deterministic live-backend runs.
 - Isolate E2E database and upload storage into ephemeral paths.
@@ -17,7 +17,7 @@ Status: In progress
 - Exit gate: `npm run test:e2e` exercises the real backend, worker, persistence, SSE stream, and portfolio flow.
 
 ### Milestone 2: Operational Observability
-Status: In progress
+Status: Completed
 
 - Add request correlation IDs and response headers.
 - Add in-process metrics for request volume, analysis terminal states, stage timing, and SSE stream behavior.
@@ -25,25 +25,32 @@ Status: In progress
 - Exit gate: every analysis can be traced from HTTP submission to worker completion with measurable timings.
 
 ### Milestone 3: Failure Injection and Resilience
-Status: Planned
+Status: Completed
 
 - Expand deterministic failure scenarios so full-stack tests cover `completed`, `completed_partial`, `failed`, and `rejected`.
 - Add assertions around terminal-state truthfulness, stream completion, and degraded evidence handling.
 - Exit gate: failure-path regressions are caught by backend and browser E2E before release.
 
 ### Milestone 4: Evidence Lineage Foundation
-Status: In progress
+Status: Completed
 
 - Persist inspection epoch, subsystem focus, request correlation, and richer evidence summary metadata.
 - Surface that lineage in the UI so operators can audit what was inspected and when.
 - Exit gate: analyses are traceable across epochs and subsystem-specific review workflows.
 
 ### Milestone 5: Release Verification
-Status: Planned
+Status: Completed
 
 - Run backend tests, frontend unit tests, production build, and live browser E2E as one release gate.
 - Document residual risks and next architecture moves.
 - Exit gate: one repeatable verification bundle for every candidate release.
+
+## Verification Completed
+
+- `pytest -q backend/tests/test_e2e.py backend/tests/test_auth_e2e.py` -> `20 passed`
+- `npm test` -> `12 passed`
+- `npm run build` -> passed
+- `npm run test:e2e` -> `4 passed`
 
 ## Next Architectural Moves After This Roadmap
 
