@@ -13,9 +13,10 @@ export type UnderwritingRecommendation = "INSURABLE_STANDARD" | "INSURABLE_ELEVA
 export type DamageSeverity = "MINOR" | "MODERATE" | "SEVERE" | "CRITICAL";
 export type ProgressionRate = "SLOW" | "MODERATE" | "RAPID" | "SUDDEN";
 export type StressorSeverity = "LOW" | "MEDIUM" | "HIGH";
+export type AssetType = "satellite" | "servicer" | "station_module" | "solar_array" | "radiator" | "power_node" | "compute_platform" | "other";
 export type AgentName = "orbital_classification" | "satellite_vision" | "orbital_environment" | "failure_mode" | "insurance_risk";
 export type AgentStatusType = "queued" | "thinking" | "complete" | "error";
-export type AnalysisStatus = "idle" | "analyzing" | "complete" | "error";
+export type AnalysisStatus = "idle" | "analyzing" | "completed" | "completed_partial" | "failed" | "rejected" | "error";
 
 export interface SatelliteTarget {
   id: string;

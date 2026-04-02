@@ -1,46 +1,43 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
-import { useAnalysisState } from '../useAnalysisState';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  AGENT_ORDER,
+  analysisStateReducer,
+  buildInitialAnalysisState,
+} from '../useAnalysisState';
 
-// Mock URL.createObjectURL and URL.revokeObjectURL (not available in jsdom)
-const mockCreateObjectURL = vi.fn(() => 'blob:mock-url');
 const mockRevokeObjectURL = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
-  global.URL.createObjectURL = mockCreateObjectURL;
   global.URL.revokeObjectURL = mockRevokeObjectURL;
 });
 
-const AGENT_NAMES = [
-  'orbital_classification',
-  'satellite_vision',
-  'orbital_environment',
-  'failure_mode',
-  'insurance_risk',
-] as const;
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
-// ─── Initial state ───────────────────────────────────────────────────────────
-
-describe('initial state', () => {
-  it('has correct shape', () => {
-    const { result } = renderHook(() => useAnalysisState());
-    const { state } = result.current;
+describe('buildInitialAnalysisState', () => {
+  it('has the expected default shape', () => {
+    const state = buildInitialAnalysisState();
 
     expect(state.image).toBeNull();
     expect(state.imagePreviewUrl).toBeNull();
     expect(state.noradId).toBe('');
+    expect(state.assetType).toBe('satellite');
+    expect(state.inspectionEpoch).toBe('');
+    expect(state.targetSubsystem).toBe('');
+    expect(state.additionalContext).toBe('');
     expect(state.analysisStatus).toBe('idle');
     expect(state.errorMessage).toBeNull();
+    expect(state.analysisId).toBeNull();
     expect(state.showAnnotations).toBe(true);
     expect(state.elapsedTime).toBe(0);
   });
 
-  it('initialises all agents as queued', () => {
-    const { result } = renderHook(() => useAnalysisState());
-    const { state } = result.current;
+  it('initializes all agents as queued', () => {
+    const state = buildInitialAnalysisState();
 
-    for (const name of AGENT_NAMES) {
+    for (const name of AGENT_ORDER) {
       expect(state.agents[name].status).toBe('queued');
       expect(state.agents[name].message).toBe('');
       expect(state.agents[name].payload).toBeNull();
@@ -49,281 +46,179 @@ describe('initial state', () => {
   });
 });
 
-// ─── SET_IMAGE ───────────────────────────────────────────────────────────────
+describe('analysisStateReducer', () => {
+  it('sets image and preserves context fields', () => {
+    const state = {
+      ...buildInitialAnalysisState(),
+      noradId: '25544',
+      assetType: 'compute_platform' as const,
+      inspectionEpoch: '2026-04-02T12:00Z',
+      targetSubsystem: 'solar_array',
+      additionalContext: 'On-orbit compute bus',
+    };
+    const file = { name: 'sat.jpg' } as File;
 
-describe('SET_IMAGE action', () => {
-  it('sets image and creates preview URL', () => {
-    const { result } = renderHook(() => useAnalysisState());
-    const file = new File(['img'], 'sat.jpg', { type: 'image/jpeg' });
-
-    act(() => {
-      result.current.setImage(file);
+    const next = analysisStateReducer(state, {
+      type: 'SET_IMAGE',
+      image: file,
+      previewUrl: 'blob:mock-url',
     });
 
-    expect(result.current.state.image).toBe(file);
-    expect(result.current.state.imagePreviewUrl).toBe('blob:mock-url');
-    expect(mockCreateObjectURL).toHaveBeenCalledWith(file);
+    expect(next.image).toBe(file);
+    expect(next.imagePreviewUrl).toBe('blob:mock-url');
+    expect(next.noradId).toBe('25544');
+    expect(next.assetType).toBe('compute_platform');
+    expect(next.inspectionEpoch).toBe('2026-04-02T12:00Z');
+    expect(next.targetSubsystem).toBe('solar_array');
+    expect(next.additionalContext).toBe('On-orbit compute bus');
   });
 
-  it('preserves noradId when setting image', () => {
-    const { result } = renderHook(() => useAnalysisState());
+  it('revokes the previous preview URL when replacing an image', () => {
+    const state = {
+      ...buildInitialAnalysisState(),
+      imagePreviewUrl: 'blob:old-url',
+    };
 
-    act(() => {
-      result.current.setNoradId('25544');
-    });
-    act(() => {
-      result.current.setImage(new File(['img'], 'sat.jpg'));
+    analysisStateReducer(state, {
+      type: 'SET_IMAGE',
+      image: { name: 'next.jpg' } as File,
+      previewUrl: 'blob:new-url',
     });
 
-    expect(result.current.state.noradId).toBe('25544');
+    expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:old-url');
   });
 
-  it('revokes previous preview URL when a new image is set', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.setImage(new File(['img1'], 'first.jpg'));
+  it('updates NORAD ID, asset type, evidence context, and analysis id', () => {
+    let state = buildInitialAnalysisState();
+    state = analysisStateReducer(state, { type: 'SET_NORAD_ID', noradId: '25544' });
+    state = analysisStateReducer(state, { type: 'SET_ASSET_TYPE', assetType: 'solar_array' });
+    state = analysisStateReducer(state, {
+      type: 'SET_INSPECTION_EPOCH',
+      inspectionEpoch: '2026-04-02T12:00Z',
     });
-    act(() => {
-      result.current.setImage(new File(['img2'], 'second.jpg'));
+    state = analysisStateReducer(state, {
+      type: 'SET_TARGET_SUBSYSTEM',
+      targetSubsystem: 'bus',
     });
-
-    expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
-  });
-});
-
-// ─── SET_NORAD_ID ────────────────────────────────────────────────────────────
-
-describe('SET_NORAD_ID action', () => {
-  it('updates noradId', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.setNoradId('25544');
+    state = analysisStateReducer(state, {
+      type: 'SET_ADDITIONAL_CONTEXT',
+      additionalContext: 'Deployed array inspection',
     });
+    state = analysisStateReducer(state, { type: 'SET_ANALYSIS_ID', analysisId: 'analysis-123' });
 
-    expect(result.current.state.noradId).toBe('25544');
-  });
-
-  it('updates noradId to empty string', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.setNoradId('25544');
-    });
-    act(() => {
-      result.current.setNoradId('');
-    });
-
-    expect(result.current.state.noradId).toBe('');
-  });
-});
-
-// ─── START_ANALYSIS ──────────────────────────────────────────────────────────
-
-describe('START_ANALYSIS action', () => {
-  it('sets analysisStatus to analyzing', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.startAnalysis();
-    });
-
-    expect(result.current.state.analysisStatus).toBe('analyzing');
+    expect(state.noradId).toBe('25544');
+    expect(state.assetType).toBe('solar_array');
+    expect(state.inspectionEpoch).toBe('2026-04-02T12:00Z');
+    expect(state.targetSubsystem).toBe('bus');
+    expect(state.additionalContext).toBe('Deployed array inspection');
+    expect(state.analysisId).toBe('analysis-123');
   });
 
-  it('resets agents to queued', () => {
-    const { result } = renderHook(() => useAnalysisState());
+  it('starts analysis and clears transient failure state', () => {
+    const state = {
+      ...buildInitialAnalysisState(),
+      analysisStatus: 'failed' as const,
+      errorMessage: 'old error',
+      analysisId: 'analysis-123',
+      elapsedTime: 17,
+      agents: {
+        ...buildInitialAnalysisState().agents,
+        orbital_classification: {
+          status: 'complete',
+          message: 'done',
+          payload: { ok: true },
+          timestamp: 123,
+        },
+      },
+    };
 
-    // First update an agent, then start analysis
-    act(() => {
-      result.current.updateAgent('orbital_classification', 'complete', 'Done');
-    });
-    act(() => {
-      result.current.startAnalysis();
-    });
+    const next = analysisStateReducer(state, { type: 'START_ANALYSIS' });
 
-    expect(result.current.state.agents['orbital_classification'].status).toBe('queued');
+    expect(next.analysisStatus).toBe('analyzing');
+    expect(next.errorMessage).toBeNull();
+    expect(next.analysisId).toBeNull();
+    expect(next.elapsedTime).toBe(0);
+    expect(next.agents.orbital_classification.status).toBe('queued');
   });
 
-  it('clears errorMessage', () => {
-    const { result } = renderHook(() => useAnalysisState());
+  it('updates agent state and preserves existing message or payload when omitted', () => {
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(12345);
+    const state = buildInitialAnalysisState();
 
-    act(() => {
-      result.current.errorAnalysis('previous error');
+    const first = analysisStateReducer(state, {
+      type: 'AGENT_UPDATE',
+      agent: 'orbital_classification',
+      status: 'thinking',
+      message: 'processing',
+      payload: { satellite_type: 'communications' },
     });
-    act(() => {
-      result.current.startAnalysis();
+    const second = analysisStateReducer(first, {
+      type: 'AGENT_UPDATE',
+      agent: 'orbital_classification',
+      status: 'complete',
     });
 
-    expect(result.current.state.errorMessage).toBeNull();
+    expect(first.agents.orbital_classification.status).toBe('thinking');
+    expect(first.agents.orbital_classification.message).toBe('processing');
+    expect(first.agents.orbital_classification.payload).toEqual({
+      satellite_type: 'communications',
+    });
+    expect(first.agents.orbital_classification.timestamp).toBe(12345);
+    expect(second.agents.orbital_classification.status).toBe('complete');
+    expect(second.agents.orbital_classification.message).toBe('processing');
+    expect(second.agents.orbital_classification.payload).toEqual({
+      satellite_type: 'communications',
+    });
+
+    nowSpy.mockRestore();
   });
 
-  it('resets elapsedTime to 0', () => {
-    const { result } = renderHook(() => useAnalysisState());
+  it('marks completed and completed_partial terminal states', () => {
+    let state = buildInitialAnalysisState();
 
-    act(() => {
-      result.current.startAnalysis();
+    state = analysisStateReducer(state, { type: 'ANALYSIS_COMPLETE', status: 'completed' });
+    expect(state.analysisStatus).toBe('completed');
+
+    state = analysisStateReducer(state, {
+      type: 'ANALYSIS_COMPLETE',
+      status: 'completed_partial',
     });
-
-    expect(result.current.state.elapsedTime).toBe(0);
-  });
-});
-
-// ─── AGENT_UPDATE ────────────────────────────────────────────────────────────
-
-describe('AGENT_UPDATE action', () => {
-  it('updates the specified agent status', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.updateAgent('satellite_vision', 'thinking');
-    });
-
-    expect(result.current.state.agents['satellite_vision'].status).toBe('thinking');
+    expect(state.analysisStatus).toBe('completed_partial');
   });
 
-  it('updates message when provided', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.updateAgent('orbital_classification', 'complete', 'Classification done');
+  it('marks failed state and stores the error message', () => {
+    const next = analysisStateReducer(buildInitialAnalysisState(), {
+      type: 'ANALYSIS_ERROR',
+      error: 'Connection timeout',
     });
 
-    expect(result.current.state.agents['orbital_classification'].message).toBe('Classification done');
+    expect(next.analysisStatus).toBe('failed');
+    expect(next.errorMessage).toBe('Connection timeout');
   });
 
-  it('uses ?? to preserve existing message when message is undefined', () => {
-    const { result } = renderHook(() => useAnalysisState());
+  it('toggles annotations and updates elapsed time', () => {
+    let state = buildInitialAnalysisState();
 
-    act(() => {
-      result.current.updateAgent('orbital_classification', 'thinking', 'initial message');
-    });
-    act(() => {
-      result.current.updateAgent('orbital_classification', 'complete');
-    });
+    state = analysisStateReducer(state, { type: 'TOGGLE_ANNOTATIONS' });
+    state = analysisStateReducer(state, { type: 'SET_ELAPSED', time: 42 });
 
-    // message should be preserved (??  operator)
-    expect(result.current.state.agents['orbital_classification'].message).toBe('initial message');
+    expect(state.showAnnotations).toBe(false);
+    expect(state.elapsedTime).toBe(42);
   });
 
-  it('updates payload when provided', () => {
-    const { result } = renderHook(() => useAnalysisState());
-    const payload = { satellite_type: 'communications' };
+  it('resets to a clean initial state and revokes the preview URL', () => {
+    const state = {
+      ...buildInitialAnalysisState(),
+      image: { name: 'sat.jpg' } as File,
+      imagePreviewUrl: 'blob:reset-url',
+      noradId: '25544',
+      analysisStatus: 'completed_partial' as const,
+      errorMessage: 'stale',
+    };
 
-    act(() => {
-      result.current.updateAgent('orbital_classification', 'complete', undefined, payload);
-    });
+    const next = analysisStateReducer(state, { type: 'RESET' });
 
-    expect(result.current.state.agents['orbital_classification'].payload).toEqual(payload);
-  });
-
-  it('uses ?? to preserve existing payload when payload is undefined', () => {
-    const { result } = renderHook(() => useAnalysisState());
-    const payload = { satellite_type: 'communications' };
-
-    act(() => {
-      result.current.updateAgent('orbital_classification', 'complete', undefined, payload);
-    });
-    act(() => {
-      result.current.updateAgent('orbital_classification', 'error');
-    });
-
-    expect(result.current.state.agents['orbital_classification'].payload).toEqual(payload);
-  });
-
-  it('sets timestamp on update', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.updateAgent('insurance_risk', 'thinking');
-    });
-
-    expect(result.current.state.agents['insurance_risk'].timestamp).not.toBeNull();
-  });
-
-  it('does not affect other agents', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.updateAgent('orbital_classification', 'complete');
-    });
-
-    expect(result.current.state.agents['satellite_vision'].status).toBe('queued');
-    expect(result.current.state.agents['insurance_risk'].status).toBe('queued');
-  });
-});
-
-// ─── ANALYSIS_COMPLETE ───────────────────────────────────────────────────────
-
-describe('ANALYSIS_COMPLETE action', () => {
-  it('sets analysisStatus to complete', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.startAnalysis();
-    });
-    act(() => {
-      result.current.completeAnalysis();
-    });
-
-    expect(result.current.state.analysisStatus).toBe('complete');
-  });
-});
-
-// ─── ANALYSIS_ERROR ──────────────────────────────────────────────────────────
-
-describe('ANALYSIS_ERROR action', () => {
-  it('sets analysisStatus to error', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.errorAnalysis('Connection timeout');
-    });
-
-    expect(result.current.state.analysisStatus).toBe('error');
-  });
-
-  it('stores the error message', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.errorAnalysis('Connection timeout');
-    });
-
-    expect(result.current.state.errorMessage).toBe('Connection timeout');
-  });
-});
-
-// ─── RESET ───────────────────────────────────────────────────────────────────
-
-describe('RESET action', () => {
-  it('resets state to initial', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.setNoradId('25544');
-      result.current.startAnalysis();
-    });
-    act(() => {
-      result.current.reset();
-    });
-
-    expect(result.current.state.analysisStatus).toBe('idle');
-    expect(result.current.state.noradId).toBe('');
-    expect(result.current.state.image).toBeNull();
-  });
-
-  it('revokes preview URL on reset', () => {
-    const { result } = renderHook(() => useAnalysisState());
-
-    act(() => {
-      result.current.setImage(new File(['img'], 'sat.jpg'));
-    });
-    act(() => {
-      result.current.reset();
-    });
-
-    expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+    expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:reset-url');
+    expect(next).toEqual(buildInitialAnalysisState());
   });
 });

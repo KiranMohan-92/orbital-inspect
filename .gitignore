@@ -27,6 +27,8 @@ yarn-error.log*
 
 # Build outputs
 frontend/dist/
+frontend/playwright-report/
+frontend/test-results/
 *.tsbuildinfo
 
 # IDE
@@ -61,6 +63,8 @@ htmlcov/
 # Runtime-generated image caches (binary blobs)
 backend/data/demo_cache/images/
 backend/data/demo_images/
+backend/data/uploads/
+backend/orbital_inspect_e2e*.db
 
 # Credentials and certificates
 *.pem

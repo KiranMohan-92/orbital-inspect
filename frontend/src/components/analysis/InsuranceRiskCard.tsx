@@ -43,7 +43,7 @@ export default function InsuranceRiskCard({ report }: Props) {
     <div className="flex flex-col gap-4 font-body">
 
       {/* Underwriting Recommendation — THE MONEY SHOT */}
-      <div className={`uw-badge text-center ${uwStyle.cls}`}>
+      <div data-testid="underwriting-badge" className={`uw-badge text-center ${uwStyle.cls}`}>
         {uwStyle.label}
       </div>
 
@@ -53,7 +53,7 @@ export default function InsuranceRiskCard({ report }: Props) {
           background: `${tierColor}0C`,
           border: `1px solid ${tierColor}30`,
         }}>
-        <p className="font-mono-display text-xl tracking-wider" style={{ color: tierColor }}>
+        <p data-testid="risk-tier" className="font-mono-display text-xl tracking-wider" style={{ color: tierColor }}>
           {report.risk_tier}
         </p>
         <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>

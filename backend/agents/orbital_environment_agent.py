@@ -128,6 +128,8 @@ async def analyze_orbital_environment(
         data = await run_adk_agent(
             agent, prompt
         ) if agent else await _fallback(prompt)
+        if "error" in data and "raw_text" in data:
+            raise ValueError("Agent response could not be parsed")
         return OrbitalEnvironmentAnalysis(**data)
     except Exception as e:
         log.error("Environment analysis failed", exc_info=True)

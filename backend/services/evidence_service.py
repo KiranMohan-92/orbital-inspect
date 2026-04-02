@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 async def build_evidence_bundle(
     satellite_id: str = "",
     norad_id: str | None = None,
+    org_id: str | None = None,
     include_tle: bool = True,
     include_prior_analyses: bool = True,
     include_weather: bool = True,
@@ -120,9 +121,12 @@ async def build_evidence_bundle(
 
             async with async_session_factory() as session:
                 repo = AnalysisRepository(session)
-                analyses, _total = await repo.list_analyses(limit=10)
+                analyses, _total = await repo.list_analyses(org_id=org_id, limit=25)
 
-                matching = [a for a in analyses if a.norad_id == norad_id and a.status == "completed"]
+                matching = [
+                    a for a in analyses
+                    if a.norad_id == norad_id and a.status in {"completed", "completed_partial"}
+                ]
                 bundle.prior_analyses_count = len(matching)
 
                 for analysis in matching[:5]:

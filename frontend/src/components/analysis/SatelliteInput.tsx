@@ -9,7 +9,16 @@ interface SatelliteInputProps {
 }
 
 export default function SatelliteInput({ analysis, onAnalyze, onDemo }: SatelliteInputProps) {
-  const { state, setImage, setNoradId, reset } = analysis;
+  const {
+    state,
+    setImage,
+    setNoradId,
+    setAssetType,
+    setInspectionEpoch,
+    setTargetSubsystem,
+    setAdditionalContext,
+    reset,
+  } = analysis;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -48,6 +57,7 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
         {/* Upload Zone */}
         {!hasImage ? (
           <div
+            data-testid="upload-zone"
             className={`rounded-lg p-8 flex flex-col items-center gap-4 cursor-pointer transition-all ${
               isDragOver ? "scale-[1.01]" : ""
             }`}
@@ -74,7 +84,7 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
                 NASA, ESA, HEO Inspect, or operator photos
               </p>
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
+            <input ref={fileInputRef} data-testid="upload-input" type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
           </div>
         ) : (
           <div className="rounded-lg overflow-hidden relative" style={{ border: "1px solid var(--bg-panel-border)" }}>
@@ -86,7 +96,7 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
               <p className="text-xs truncate font-mono-data" style={{ color: "var(--text-data)" }}>
                 {state.image!.name}
               </p>
-              <button onClick={reset} disabled={isAnalyzing}
+              <button onClick={reset} disabled={isAnalyzing} data-testid="clear-image-button"
                 className="text-xs px-2 py-0.5 rounded transition-colors"
                 style={{ color: "var(--text-tertiary)", background: "rgba(255,255,255,0.06)" }}>
                 CLR
@@ -97,8 +107,32 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
 
         {/* NORAD Catalog ID */}
         <div>
+          <label className="label-mono block mb-2">ASSET TYPE</label>
+          <select
+            data-testid="asset-type-select"
+            value={state.assetType}
+            onChange={(e) => setAssetType(e.target.value as typeof state.assetType)}
+            className="orbital-input w-full font-mono-data"
+            disabled={isAnalyzing}
+          >
+            <option value="satellite">Satellite</option>
+            <option value="servicer">Servicer</option>
+            <option value="station_module">Station Module</option>
+            <option value="solar_array">Solar Array</option>
+            <option value="radiator">Radiator</option>
+            <option value="power_node">Power Node</option>
+            <option value="compute_platform">Compute Platform</option>
+            <option value="other">Other Orbital Asset</option>
+          </select>
+          <p className="text-xs mt-1.5" style={{ color: "var(--text-tertiary)" }}>
+            Keeps the data model ready for orbital infrastructure and in-space builds.
+          </p>
+        </div>
+
+        <div>
           <label className="label-mono block mb-2">NORAD CATALOG ID</label>
           <input
+            data-testid="norad-input"
             type="text"
             value={state.noradId}
             onChange={(e) => setNoradId(e.target.value)}
@@ -109,6 +143,45 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
           <p className="text-xs mt-1.5" style={{ color: "var(--text-tertiary)" }}>
             Optional — enriches analysis with orbital parameters from CelesTrak
           </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label-mono block mb-2">INSPECTION EPOCH</label>
+            <input
+              data-testid="inspection-epoch-input"
+              type="text"
+              value={state.inspectionEpoch}
+              onChange={(e) => setInspectionEpoch(e.target.value)}
+              placeholder="e.g. 2026-04-02T12:00Z"
+              className="orbital-input w-full font-mono-data"
+              disabled={isAnalyzing}
+            />
+          </div>
+          <div>
+            <label className="label-mono block mb-2">TARGET SUBSYSTEM</label>
+            <input
+              data-testid="target-subsystem-input"
+              type="text"
+              value={state.targetSubsystem}
+              onChange={(e) => setTargetSubsystem(e.target.value)}
+              placeholder="solar_array / radiator / bus"
+              className="orbital-input w-full font-mono-data"
+              disabled={isAnalyzing}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="label-mono block mb-2">OPERATOR CONTEXT</label>
+          <textarea
+            data-testid="context-input"
+            value={state.additionalContext}
+            onChange={(e) => setAdditionalContext(e.target.value)}
+            placeholder="Inspection epoch, observed anomaly, subsystem notes, deployment phase, or operator context"
+            className="orbital-input w-full font-mono-data min-h-[92px] resize-none"
+            disabled={isAnalyzing}
+          />
         </div>
 
         {/* Divider */}
@@ -159,6 +232,7 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
       <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: "1px solid var(--bg-panel-border)" }}>
         <button
           onClick={onAnalyze}
+          data-testid="analyze-button"
           disabled={!hasImage || isAnalyzing}
           className="w-full py-3 rounded-md font-mono-display text-sm tracking-[0.2em] transition-all"
           style={{

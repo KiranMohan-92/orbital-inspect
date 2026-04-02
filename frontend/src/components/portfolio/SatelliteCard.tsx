@@ -33,6 +33,7 @@ export default function SatelliteCard({ satellite }: SatelliteCardProps) {
 
   return (
     <div
+      data-testid="portfolio-satellite-card"
       className="glass-panel rounded-lg p-4 transition-all hover:scale-[1.01] cursor-pointer"
       style={{ borderLeft: `3px solid ${color}` }}
     >

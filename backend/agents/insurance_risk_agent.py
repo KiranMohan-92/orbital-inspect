@@ -86,6 +86,8 @@ async def assess_insurance_risk(
         data = await run_adk_agent(
             agent, prompt
         ) if agent else await _fallback(prompt)
+        if "error" in data and "raw_text" in data:
+            raise ValueError("Agent response could not be parsed")
 
         report = InsuranceRiskReport(**data)
 

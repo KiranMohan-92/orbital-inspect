@@ -6,14 +6,23 @@
  */
 
 import { useRef, useCallback } from "react";
-import type { AgentName, AgentStatusType, AnalysisContext } from "../types";
+import type {
+  AgentName,
+  AgentStatusType,
+  AnalysisContext,
+  AnalysisSubmissionResponse,
+  AnalysisStatus,
+} from "../types";
 import type { UseAnalysisReturn } from "./useAnalysisState";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 const VALID_AGENTS = new Set<string>([
-  "orbital_classification", "satellite_vision", "orbital_environment",
-  "failure_mode", "insurance_risk",
+  "orbital_classification",
+  "satellite_vision",
+  "orbital_environment",
+  "failure_mode",
+  "insurance_risk",
 ]);
 
 interface SSEEventData {
@@ -28,18 +37,12 @@ interface SSEEventData {
   degraded: boolean;
 }
 
-// ── Shared SSE Stream Parser ────────────────────────────────────────────────
-
 interface SSEHandlers {
   onAgentEvent: (data: SSEEventData) => void;
-  onDone: () => void;
+  onDone: (status: string) => void;
   onError: (message: string) => void;
 }
 
-/**
- * Read an SSE stream from a fetch Response, parse events, and dispatch to handlers.
- * Properly releases the reader lock on completion, error, or abort.
- */
 async function consumeSSEStream(response: Response, handlers: SSEHandlers): Promise<void> {
   if (!response.body) {
     throw new Error("No response body — SSE streaming not supported");
@@ -52,17 +55,20 @@ async function consumeSSEStream(response: Response, handlers: SSEHandlers): Prom
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
-      buffer = buffer.replace(/\r\n/g, "\n"); // Normalize CRLF
+      buffer = buffer.replace(/\r\n/g, "\n");
 
-      // SSE events are delimited by double newlines
       const events = buffer.split("\n\n");
       buffer = events.pop() || "";
 
       for (const eventBlock of events) {
-        if (!eventBlock.trim()) continue;
+        if (!eventBlock.trim()) {
+          continue;
+        }
 
         const lines = eventBlock.split("\n");
         let eventType = "";
@@ -72,15 +78,21 @@ async function consumeSSEStream(response: Response, handlers: SSEHandlers): Prom
           if (line.startsWith("event:")) {
             eventType = line.slice(6).trim();
           } else if (line.startsWith("data:")) {
-            // Accumulate multi-line data fields per SSE spec
             eventData += (eventData ? "\n" : "") + line.slice(5).trim();
           }
         }
 
-        if (!eventData) continue;
+        if (!eventData) {
+          continue;
+        }
 
         if (eventType === "done") {
-          handlers.onDone();
+          try {
+            const done = JSON.parse(eventData) as { status?: string };
+            handlers.onDone(done.status || "completed");
+          } catch {
+            handlers.onDone("completed");
+          }
           return;
         }
 
@@ -97,28 +109,30 @@ async function consumeSSEStream(response: Response, handlers: SSEHandlers): Prom
         if (eventType === "agent_event") {
           try {
             const data = JSON.parse(eventData) as SSEEventData;
-            // Validate agent name before dispatching to prevent state corruption
             if (data.agent && data.status && VALID_AGENTS.has(data.agent)) {
               handlers.onAgentEvent(data);
             }
           } catch {
-            // Skip malformed events silently
+            // Ignore malformed events
           }
         }
       }
     }
 
-    // Stream ended without a done event
-    handlers.onDone();
+    handlers.onDone("completed");
   } finally {
     reader.releaseLock();
   }
 }
 
-// ── Hook ────────────────────────────────────────────────────────────────────
-
 export function useSSE(analysis: UseAnalysisReturn) {
-  const { updateAgent, startAnalysis, completeAnalysis, errorAnalysis } = analysis;
+  const {
+    updateAgent,
+    startAnalysis,
+    completeAnalysis,
+    errorAnalysis,
+    setAnalysisId,
+  } = analysis;
   const abortRef = useRef<AbortController | null>(null);
   const analysisIdRef = useRef<string>("");
   const lastSequenceRef = useRef<number>(-1);
@@ -132,11 +146,11 @@ export function useSSE(analysis: UseAnalysisReturn) {
     lastSequenceRef.current = -1;
   }, []);
 
-  /** Dispatch an SSE agent event to the analysis state. */
   const handleAgentEvent = useCallback(
     (data: SSEEventData) => {
       if (data.analysis_id && !analysisIdRef.current) {
         analysisIdRef.current = data.analysis_id;
+        setAnalysisId(data.analysis_id);
       }
       if (data.sequence > 0 && data.sequence !== lastSequenceRef.current + 1) {
         console.warn(`SSE sequence gap: expected ${lastSequenceRef.current + 1}, got ${data.sequence}`);
@@ -147,14 +161,14 @@ export function useSSE(analysis: UseAnalysisReturn) {
         data.status === "thinking"
           ? (typeof data.payload?.message === "string" ? data.payload.message : "Processing...")
           : data.status === "complete"
-          ? summarizePayload(data.agent, data.payload)
-          : data.status === "error"
-          ? (typeof data.payload?.reason === "string" ? data.payload.reason : "Failed")
-          : "";
+            ? summarizePayload(data.agent, data.payload)
+            : data.status === "error"
+              ? (typeof data.payload?.reason === "string" ? data.payload.reason : "Failed")
+              : "";
 
       updateAgent(data.agent, data.status, message, data.payload);
     },
-    [updateAgent]
+    [setAnalysisId, updateAgent]
   );
 
   const analyzeImage = useCallback(
@@ -170,6 +184,12 @@ export function useSSE(analysis: UseAnalysisReturn) {
       if (context) {
         if (context.noradId) formData.append("norad_id", context.noradId);
         if (context.additionalContext) formData.append("context", context.additionalContext);
+        if (context.assetType) formData.append("asset_type", context.assetType);
+        if (context.inspectionEpoch) formData.append("inspection_epoch", context.inspectionEpoch);
+        if (context.targetSubsystem) formData.append("target_subsystem", context.targetSubsystem);
+        if (context.captureMetadata) formData.append("capture_metadata", JSON.stringify(context.captureMetadata));
+        if (context.telemetrySummary) formData.append("telemetry_summary", JSON.stringify(context.telemetrySummary));
+        if (context.baselineReference) formData.append("baseline_reference", JSON.stringify(context.baselineReference));
       }
 
       analysisIdRef.current = "";
@@ -177,37 +197,54 @@ export function useSSE(analysis: UseAnalysisReturn) {
       startAnalysis();
 
       try {
-        const response = await fetch(`${API_BASE}/api/analyze`, {
+        const createResponse = await fetch(`${API_BASE}/api/analyses`, {
           method: "POST",
           body: formData,
           signal: controller.signal,
         });
 
+        if (!createResponse.ok) {
+          const errorData = await createResponse.json().catch(() => ({ detail: "Server error" }));
+          throw new Error(errorData.detail || `Server error ${createResponse.status}`);
+        }
+
+        const created = (await createResponse.json()) as AnalysisSubmissionResponse;
+        analysisIdRef.current = created.analysis_id;
+        setAnalysisId(created.analysis_id);
+
+        const streamUrl = created.events_url.startsWith("http")
+          ? created.events_url
+          : `${API_BASE}${created.events_url}`;
+        const response = await fetch(streamUrl, {
+          method: "GET",
+          signal: controller.signal,
+        });
+
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ detail: "Server error" }));
+          const errorData = await response.json().catch(() => ({ detail: "Stream unavailable" }));
           throw new Error(errorData.detail || `Server error ${response.status}`);
         }
 
         await consumeSSEStream(response, {
           onAgentEvent: handleAgentEvent,
-          onDone: completeAnalysis,
+          onDone: (status) => completeAnalysis(mapTerminalStatus(status)),
           onError: errorAnalysis,
         });
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
-          completeAnalysis();
+          completeAnalysis("idle");
           return;
         }
         const message =
           err instanceof TypeError
             ? "Cannot reach backend — is it running on http://localhost:8000?"
             : err instanceof Error
-            ? err.message
-            : String(err);
+              ? err.message
+              : String(err);
         errorAnalysis(message);
       }
     },
-    [startAnalysis, handleAgentEvent, completeAnalysis, errorAnalysis, cancel]
+    [cancel, completeAnalysis, errorAnalysis, handleAgentEvent, setAnalysisId, startAnalysis]
   );
 
   const analyzeDemo = useCallback(
@@ -232,26 +269,23 @@ export function useSSE(analysis: UseAnalysisReturn) {
 
         await consumeSSEStream(response, {
           onAgentEvent: handleAgentEvent,
-          onDone: completeAnalysis,
+          onDone: (status) => completeAnalysis(mapTerminalStatus(status)),
           onError: errorAnalysis,
         });
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
-          completeAnalysis();
+          completeAnalysis("idle");
           return;
         }
         errorAnalysis(err instanceof Error ? err.message : "Demo analysis failed");
       }
     },
-    [startAnalysis, handleAgentEvent, completeAnalysis, errorAnalysis, cancel]
+    [cancel, completeAnalysis, errorAnalysis, handleAgentEvent, startAnalysis]
   );
 
   return { analyzeImage, analyzeDemo, cancel };
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Generate a brief summary message for the agent feed when an agent completes. */
 function summarizePayload(agent: AgentName, payload: Record<string, unknown>): string {
   switch (agent) {
     case "orbital_classification": {
@@ -283,5 +317,20 @@ function summarizePayload(agent: AgentName, payload: Record<string, unknown>): s
     }
     default:
       return "Complete";
+  }
+}
+
+function mapTerminalStatus(status: string): AnalysisStatus {
+  switch (status) {
+    case "completed_partial":
+      return "completed_partial";
+    case "failed":
+      return "failed";
+    case "rejected":
+      return "rejected";
+    case "complete":
+    case "completed":
+    default:
+      return "completed";
   }
 }

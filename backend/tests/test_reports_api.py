@@ -20,6 +20,7 @@ from api.reports import (
     reject_report,
     submit_for_review,
 )
+from auth.dependencies import CurrentUser
 
 
 class _MockSessionContext:
@@ -70,6 +71,7 @@ async def test_create_report_success():
     analysis = _make_analysis()
     mock_report = _make_report()
     mock_session = _make_mock_session()
+    user = CurrentUser(user_id="u1", org_id="org-1", role="analyst")
 
     analysis_repo = AsyncMock()
     analysis_repo.get = AsyncMock(return_value=analysis)
@@ -81,10 +83,12 @@ async def test_create_report_success():
     with patch("db.base.async_session_factory", return_value=mock_session), \
          patch("db.repository.AnalysisRepository", return_value=analysis_repo), \
          patch("db.repository.ReportRepository", return_value=report_repo):
-        data = await create_report("a1", user=None)
+        data = await create_report("a1", user=user)
 
     assert data["id"] == "r1"
     assert data["status"] == "DRAFT"
+    analysis_repo.get.assert_awaited_once_with("a1", org_id="org-1")
+    report_repo.get_by_analysis.assert_awaited_once_with("a1", org_id="org-1")
 
 
 @pytest.mark.asyncio
@@ -143,6 +147,7 @@ async def test_create_report_already_exists():
 async def test_submit_draft_report():
     report = _make_report(status="DRAFT")
     mock_session = _make_mock_session()
+    user = CurrentUser(user_id="u1", org_id="org-1", role="analyst")
 
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=report)
@@ -150,9 +155,10 @@ async def test_submit_draft_report():
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
          patch("db.repository.ReportRepository", return_value=repo):
-        data = await submit_for_review("r1", SubmitReviewRequest(notes="ready"), user=None)
+        data = await submit_for_review("r1", SubmitReviewRequest(notes="ready"), user=user)
 
     assert data["status"] == "PENDING_REVIEW"
+    repo.get.assert_awaited_once_with("r1", org_id="org-1")
 
 
 @pytest.mark.asyncio
@@ -190,6 +196,7 @@ async def test_submit_report_not_found():
 async def test_approve_pending_review():
     report = _make_report(status="PENDING_REVIEW")
     mock_session = _make_mock_session()
+    user = CurrentUser(user_id="admin-1", org_id="org-1", role="admin")
 
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=report)
@@ -197,9 +204,10 @@ async def test_approve_pending_review():
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
          patch("db.repository.ReportRepository", return_value=repo):
-        data = await approve_report("r1", ApproveRequest(comments="LGTM"), user=None)
+        data = await approve_report("r1", ApproveRequest(comments="LGTM"), user=user)
 
     assert data["status"] == "APPROVED"
+    repo.get.assert_awaited_once_with("r1", org_id="org-1")
 
 
 @pytest.mark.asyncio
@@ -223,6 +231,7 @@ async def test_approve_wrong_status_fails():
 async def test_reject_pending_review():
     report = _make_report(status="PENDING_REVIEW")
     mock_session = _make_mock_session()
+    user = CurrentUser(user_id="admin-1", org_id="org-1", role="admin")
 
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=report)
@@ -230,10 +239,11 @@ async def test_reject_pending_review():
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
          patch("db.repository.ReportRepository", return_value=repo):
-        data = await reject_report("r1", RejectRequest(reason="Needs more detail"), user=None)
+        data = await reject_report("r1", RejectRequest(reason="Needs more detail"), user=user)
 
     assert data["status"] == "DRAFT"
     assert data["reason"] == "Needs more detail"
+    repo.get.assert_awaited_once_with("r1", org_id="org-1")
 
 
 @pytest.mark.asyncio
@@ -261,16 +271,18 @@ def test_reject_requires_reason():
 async def test_get_existing_report():
     report = _make_report(status="APPROVED")
     mock_session = _make_mock_session()
+    user = CurrentUser(user_id="viewer-1", org_id="org-1", role="viewer")
 
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=report)
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
          patch("db.repository.ReportRepository", return_value=repo):
-        data = await get_report("r1", user=None)
+        data = await get_report("r1", user=user)
 
     assert data["id"] == "r1"
     assert data["status"] == "APPROVED"
+    repo.get.assert_awaited_once_with("r1", org_id="org-1")
 
 
 @pytest.mark.asyncio

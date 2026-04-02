@@ -22,11 +22,11 @@ def format_sse_event(event: AgentEvent) -> dict:
     }
 
 
-def format_sse_done() -> dict:
+def format_sse_done(status: str = "complete") -> dict:
     """Format a terminal 'done' event to signal stream completion."""
     return {
         "event": "done",
-        "data": json.dumps({"status": "complete"}),
+        "data": json.dumps({"status": status}),
     }
 
 

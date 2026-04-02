@@ -77,6 +77,8 @@ async def analyze_failure_modes(
         data = await run_adk_agent(
             agent, prompt
         ) if agent else await _fallback(prompt)
+        if "error" in data and "raw_text" in data:
+            raise ValueError("Agent response could not be parsed")
         return SatelliteFailureModeAnalysis(**data)
     except Exception as e:
         log.error("Failure mode analysis failed", exc_info=True)

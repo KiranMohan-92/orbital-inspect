@@ -47,13 +47,20 @@ class Analysis(Base):
 
     id = Column(String(32), primary_key=True, default=_uuid)
     org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
-    status = Column(String(20), default="queued")  # queued | running | completed | failed
+    status = Column(String(32), default="queued")  # queued | running | completed | completed_partial | failed | rejected
 
     # Input
     image_hash = Column(String(64), nullable=True)  # SHA-256 of uploaded image
     image_path = Column(String(500), nullable=True)  # Local/S3 path to stored image
     norad_id = Column(String(9), nullable=True)
     additional_context = Column(Text, default="")
+    request_id = Column(String(64), nullable=True)
+    asset_type = Column(String(50), default="satellite")
+    inspection_epoch = Column(String(64), nullable=True)
+    target_subsystem = Column(String(100), nullable=True)
+    capture_metadata = Column(JSON, default=dict)
+    telemetry_summary = Column(JSON, default=dict)
+    baseline_reference = Column(JSON, default=dict)
 
     # Results (stored as JSON)
     classification_result = Column(JSON, nullable=True)
@@ -63,8 +70,12 @@ class Analysis(Base):
     insurance_risk_result = Column(JSON, nullable=True)
 
     # Metadata
+    degraded = Column(Boolean, default=False)
+    failure_reasons = Column(JSON, default=list)
     evidence_gaps = Column(JSON, default=list)  # List of failed agent names
     report_completeness = Column(String(20), default="COMPLETE")
+    evidence_completeness_pct = Column(Float, nullable=True)
+    evidence_bundle_summary = Column(JSON, default=dict)
     total_cost_usd = Column(Float, nullable=True)  # Gemini API cost
     total_tokens = Column(Integer, nullable=True)
 
@@ -128,3 +139,19 @@ class Report(Base):
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     analysis = relationship("Analysis", back_populates="report")
+
+
+class WebhookEndpoint(Base):
+    """Persisted webhook endpoint for one organization."""
+    __tablename__ = "webhook_endpoints"
+    __table_args__ = (
+        Index("ix_webhooks_org_active", "org_id", "active"),
+    )
+
+    id = Column(String(32), primary_key=True, default=_uuid)
+    org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
+    url = Column(String(500), nullable=False)
+    secret_hash = Column(String(128), default="")
+    events = Column(JSON, default=list)
+    active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

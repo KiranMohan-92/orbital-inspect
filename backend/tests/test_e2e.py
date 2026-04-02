@@ -16,6 +16,7 @@ from main import app
 from models.events import AgentEvent
 from services.conjunction_service import ConjunctionEvent, calculate_conjunction_risk
 from services.enhanced_weather_service import _extract_latest_bz, fetch_enhanced_space_weather
+from services.metrics_service import reset_metrics
 from services.space_weather_service import SpaceWeatherSnapshot
 from services.sse_service import format_sse_done, format_sse_event
 from services.tle_history_service import EARTH_MU_KM3_S2, EARTH_RADIUS_KM, analyze_tle_records
@@ -568,6 +569,7 @@ async def test_webhook_crud(client, reset_webhooks):
     listed = list_resp.json()["webhooks"]
     assert len(listed) == 1
     assert listed[0]["id"] == webhook_id
+    assert "secret_hash" not in listed[0]
 
     delete_resp = await client.delete(f"/api/webhooks/{webhook_id}")
     assert delete_resp.status_code == 200
@@ -576,6 +578,64 @@ async def test_webhook_crud(client, reset_webhooks):
     after_delete_resp = await client.get("/api/webhooks")
     assert after_delete_resp.status_code == 200
     assert after_delete_resp.json()["webhooks"] == []
+
+
+@pytest.mark.asyncio
+async def test_create_analysis_returns_durable_resource_urls(client, monkeypatch, sample_image_bytes):
+    async def fake_create_analysis_record(**kwargs):
+        return "analysis-queued-1"
+
+    monkeypatch.setattr(main, "_create_analysis_record", fake_create_analysis_record)
+
+    response = await client.post(
+        "/api/analyses",
+        files={"image": ("iss.jpg", sample_image_bytes, "image/jpeg")},
+        data={
+            "norad_id": "25544",
+            "asset_type": "compute_platform",
+            "context": "Orbital compute inspection",
+            "capture_metadata": json.dumps({"sensor": "eo"}),
+            "telemetry_summary": json.dumps({"power_w": 1800}),
+            "baseline_reference": json.dumps({"revision": "A"}),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["analysis_id"] == "analysis-queued-1"
+    assert payload["status"] == "queued"
+    assert payload["analysis_url"] == "/api/analyses/analysis-queued-1"
+    assert payload["events_url"] == "/api/analyses/analysis-queued-1/events/stream"
+    assert isinstance(payload["request_id"], str)
+    assert response.headers["x-request-id"] == payload["request_id"]
+
+
+@pytest.mark.asyncio
+async def test_create_analysis_rejects_invalid_asset_type(client, sample_image_bytes):
+    response = await client.post(
+        "/api/analyses",
+        files={"image": ("iss.jpg", sample_image_bytes, "image/jpeg")},
+        data={"asset_type": "orbital_castle"},
+    )
+
+    assert response.status_code == 400
+    assert "asset_type must be one of" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_metrics_endpoint_exposes_request_and_stream_counters(client):
+    reset_metrics()
+
+    health_response = await client.get("/api/health")
+    assert health_response.status_code == 200
+    assert "x-request-id" in health_response.headers
+
+    metrics_response = await client.get("/api/metrics")
+    assert metrics_response.status_code == 200
+    metrics = metrics_response.json()
+    assert metrics["requests"]["counts"]["GET|/api/health|200"] == 1
+    assert metrics["requests"]["latency_ms"]["GET|/api/health"]["count"] == 1
+    assert "streams" in metrics
 
 
 @pytest.mark.asyncio

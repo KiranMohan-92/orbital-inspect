@@ -9,6 +9,7 @@
 export * from "./generated-types";
 
 import type {
+  AssetType,
   AgentStatusType,
   AgentName,
   SatelliteTarget,
@@ -31,6 +32,12 @@ export interface AgentState {
 export interface AnalysisContext {
   noradId?: string;
   additionalContext?: string;
+  assetType?: AssetType;
+  inspectionEpoch?: string;
+  targetSubsystem?: string;
+  captureMetadata?: Record<string, unknown>;
+  telemetrySummary?: Record<string, unknown>;
+  baselineReference?: Record<string, unknown>;
 }
 
 export interface SSEEvent {
@@ -44,6 +51,14 @@ export interface SSEEvent {
   sequence: number;
   schema_version: string;
   degraded: boolean;
+}
+
+export interface AnalysisSubmissionResponse {
+  analysis_id: string;
+  status: string;
+  analysis_url: string;
+  events_url: string;
+  request_id?: string | null;
 }
 
 export interface SatelliteConditionReportFull {

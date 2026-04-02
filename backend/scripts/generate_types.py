@@ -124,9 +124,10 @@ def generate_all() -> str:
     output_lines.append('export type DamageSeverity = "MINOR" | "MODERATE" | "SEVERE" | "CRITICAL";')
     output_lines.append('export type ProgressionRate = "SLOW" | "MODERATE" | "RAPID" | "SUDDEN";')
     output_lines.append('export type StressorSeverity = "LOW" | "MEDIUM" | "HIGH";')
+    output_lines.append('export type AssetType = "satellite" | "servicer" | "station_module" | "solar_array" | "radiator" | "power_node" | "compute_platform" | "other";')
     output_lines.append('export type AgentName = "orbital_classification" | "satellite_vision" | "orbital_environment" | "failure_mode" | "insurance_risk";')
     output_lines.append('export type AgentStatusType = "queued" | "thinking" | "complete" | "error";')
-    output_lines.append('export type AnalysisStatus = "idle" | "analyzing" | "complete" | "error";')
+    output_lines.append('export type AnalysisStatus = "idle" | "analyzing" | "completed" | "completed_partial" | "failed" | "rejected" | "error";')
     output_lines.append("")
 
     # Generate interfaces from Pydantic models

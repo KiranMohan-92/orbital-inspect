@@ -16,7 +16,14 @@ export default function IntelligenceReport({ analysis }: Props) {
   const insurancePayload = state.agents.insurance_risk.payload as InsuranceRiskReport | null;
   const failureModePayload = state.agents.failure_mode.payload as SatelliteFailureModeAnalysis | null;
   const classificationPayload = state.agents.orbital_classification.payload as ClassificationResult | null;
-  const isComplete = state.analysisStatus === "complete" && insurancePayload;
+  const isComplete = (state.analysisStatus === "completed" || state.analysisStatus === "completed_partial") && insurancePayload;
+  const isPartial = state.analysisStatus === "completed_partial";
+  const derivedAgentFailure = AGENT_ORDER
+    .map((agentName) => state.agents[agentName])
+    .find((agent) => agent.status === "error");
+  const derivedFailureMessage =
+    state.errorMessage ||
+    (typeof derivedAgentFailure?.payload?.reason === "string" ? derivedAgentFailure.payload.reason : null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
   const handleDownloadReport = useCallback(async () => {
@@ -64,8 +71,48 @@ export default function IntelligenceReport({ analysis }: Props) {
           <AgentFeed agents={state.agents} agentOrder={AGENT_ORDER} />
         )}
 
+        {state.analysisStatus !== "idle" && (
+          <div className="data-card">
+            <div className="flex items-center justify-between gap-3">
+              <p className="label-mono">ANALYSIS TRACE</p>
+              {state.analysisId && (
+                <span className="font-mono-data text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                  {state.analysisId}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Asset Type</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>{state.assetType}</p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>NORAD</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>{state.noradId || "n/a"}</p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Inspection Epoch</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>{state.inspectionEpoch || "n/a"}</p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Subsystem</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>{state.targetSubsystem || "n/a"}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Divider */}
         {isComplete && <hr className="orbital-divider my-2" />}
+
+        {isPartial && (
+          <div data-testid="partial-assessment-banner" className="data-card" style={{ borderColor: "rgba(245,158,11,0.25)", background: "rgba(245,158,11,0.06)" }}>
+            <p className="label-mono mb-1" style={{ color: "#f59e0b" }}>PARTIAL ASSESSMENT</p>
+            <p className="text-xs" style={{ color: "var(--text-primary)" }}>
+              One or more evidence sources or pipeline stages degraded. Treat the underwriting result as triage only.
+            </p>
+          </div>
+        )}
 
         {/* Insurance Risk Report */}
         {isComplete && insurancePayload && (
@@ -100,6 +147,7 @@ export default function IntelligenceReport({ analysis }: Props) {
         {isComplete && (
           <button
             onClick={handleDownloadReport}
+            data-testid="download-report-button"
             disabled={pdfLoading}
             className="w-full py-3 rounded-md font-mono-display text-xs tracking-[0.15em] transition-all flex items-center justify-center gap-2"
             style={{
@@ -137,11 +185,20 @@ export default function IntelligenceReport({ analysis }: Props) {
         )}
 
         {/* Error state */}
-        {state.analysisStatus === "error" && (
-          <div className="data-card" style={{ borderColor: "rgba(239,68,68,0.2)", background: "rgba(239,68,68,0.05)" }}>
+        {state.analysisStatus === "failed" && (
+          <div data-testid="analysis-failed-banner" className="data-card" style={{ borderColor: "rgba(239,68,68,0.2)", background: "rgba(239,68,68,0.05)" }}>
             <p className="label-mono mb-1" style={{ color: "var(--severity-critical)" }}>ASSESSMENT FAILED</p>
             <p className="text-xs" style={{ color: "var(--text-primary)" }}>
-              {state.errorMessage || "An unexpected error occurred."}
+              {derivedFailureMessage || "An unexpected error occurred."}
+            </p>
+          </div>
+        )}
+
+        {state.analysisStatus === "rejected" && (
+          <div data-testid="analysis-rejected-banner" className="data-card" style={{ borderColor: "rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.05)" }}>
+            <p className="label-mono mb-1" style={{ color: "#f59e0b" }}>TARGET REJECTED</p>
+            <p className="text-xs" style={{ color: "var(--text-primary)" }}>
+              {derivedFailureMessage || "The uploaded imagery was rejected as non-satellite or unsupported."}
             </p>
           </div>
         )}

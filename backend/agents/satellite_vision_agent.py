@@ -79,6 +79,8 @@ async def analyze_satellite_image(
             image_bytes=image_bytes,
             image_mime=image_mime,
         ) if agent else await _fallback(prompt, image_bytes, image_mime)
+        if "error" in data and "raw_text" in data:
+            raise ValueError("Agent response could not be parsed")
         return SatelliteDamagesAssessment(**data)
     except Exception as e:
         log.error("Vision analysis failed", exc_info=True)

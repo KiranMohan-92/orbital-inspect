@@ -8,6 +8,7 @@ from auth.dependencies import get_current_user, CurrentUser
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
+_COMPLETED_STATUSES = {"completed", "completed_partial"}
 
 
 @router.get("")
@@ -19,7 +20,10 @@ async def get_portfolio(user: CurrentUser | None = Depends(get_current_user)):
 
         async with async_session_factory() as session:
             repo = AnalysisRepository(session)
-            analyses, total = await repo.list_analyses(limit=100)
+            analyses, total = await repo.list_analyses(
+                org_id=user.org_id if user else None,
+                limit=100,
+            )
 
             # Group by satellite (NORAD ID)
             satellites: dict[str, dict] = {}
@@ -34,10 +38,13 @@ async def get_portfolio(user: CurrentUser | None = Depends(get_current_user)):
                         "norad_id": a.norad_id,
                         "analysis_id": a.id,
                         "status": a.status,
+                        "asset_type": getattr(a, "asset_type", "satellite"),
+                        "degraded": getattr(a, "degraded", False),
                         "risk_tier": risk.get("risk_tier", "UNKNOWN"),
                         "underwriting": risk.get("underwriting_recommendation", "UNKNOWN"),
                         "composite_score": risk.get("risk_matrix", {}).get("composite"),
                         "report_completeness": a.report_completeness,
+                        "evidence_completeness_pct": getattr(a, "evidence_completeness_pct", None),
                         "classification": a.classification_result or {},
                         "created_at": a.created_at.isoformat() if a.created_at else None,
                         "completed_at": a.completed_at.isoformat() if a.completed_at else None,
@@ -60,13 +67,18 @@ async def get_portfolio_summary(user: CurrentUser | None = Depends(get_current_u
 
         async with async_session_factory() as session:
             repo = AnalysisRepository(session)
-            analyses, total = await repo.list_analyses(limit=100)
+            analyses, total = await repo.list_analyses(
+                org_id=user.org_id if user else None,
+                limit=100,
+            )
 
             tier_counts: dict[str, int] = {}
             uw_counts: dict[str, int] = {}
+            status_counts: dict[str, int] = {}
 
             for a in analyses:
-                if a.status == "completed":
+                status_counts[a.status] = status_counts.get(a.status, 0) + 1
+                if a.status in _COMPLETED_STATUSES:
                     risk = a.insurance_risk_result or {}
                     tier = risk.get("risk_tier", "UNKNOWN")
                     uw = risk.get("underwriting_recommendation", "UNKNOWN")
@@ -75,7 +87,8 @@ async def get_portfolio_summary(user: CurrentUser | None = Depends(get_current_u
 
             return {
                 "total_analyses": total,
-                "completed": sum(1 for a in analyses if a.status == "completed"),
+                "completed": sum(1 for a in analyses if a.status in _COMPLETED_STATUSES),
+                "status_distribution": status_counts,
                 "risk_distribution": tier_counts,
                 "underwriting_distribution": uw_counts,
             }

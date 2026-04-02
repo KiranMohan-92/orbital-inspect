@@ -14,6 +14,10 @@ export default function AnalysisMode() {
     if (!state.image) return;
     analyzeImage(state.image, {
       noradId: state.noradId || undefined,
+      additionalContext: state.additionalContext || undefined,
+      assetType: state.assetType,
+      inspectionEpoch: state.inspectionEpoch || undefined,
+      targetSubsystem: state.targetSubsystem || undefined,
     });
   };
 
@@ -59,13 +63,28 @@ export default function AnalysisMode() {
             ADK · Gemini Vision · 5 Agents · CelesTrak
           </span>
           {state.analysisStatus === "analyzing" && (
-            <span className="font-mono-display text-xs" style={{ color: "var(--accent-scan)" }}>
+            <span data-testid="analysis-status" className="font-mono-display text-xs" style={{ color: "var(--accent-scan)" }}>
               T+{state.elapsedTime}s
             </span>
           )}
-          {state.analysisStatus === "complete" && (
-            <span className="font-mono-display text-xs" style={{ color: "var(--severity-healthy)" }}>
+          {state.analysisStatus === "completed" && (
+            <span data-testid="analysis-status" className="font-mono-display text-xs" style={{ color: "var(--severity-healthy)" }}>
               ASSESSMENT COMPLETE
+            </span>
+          )}
+          {state.analysisStatus === "completed_partial" && (
+            <span data-testid="analysis-status" className="font-mono-display text-xs" style={{ color: "#f59e0b" }}>
+              PARTIAL ASSESSMENT
+            </span>
+          )}
+          {state.analysisStatus === "failed" && (
+            <span data-testid="analysis-status" className="font-mono-display text-xs" style={{ color: "var(--severity-critical)" }}>
+              ASSESSMENT FAILED
+            </span>
+          )}
+          {state.analysisStatus === "rejected" && (
+            <span data-testid="analysis-status" className="font-mono-display text-xs" style={{ color: "#f59e0b" }}>
+              TARGET REJECTED
             </span>
           )}
         </div>

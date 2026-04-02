@@ -45,6 +45,7 @@ async def run_satellite_pipeline(
     image_mime: str = "image/jpeg",
     norad_id: str | None = None,
     additional_context: str = "",
+    analysis_id: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Execute the full 5-agent satellite inspection pipeline.
@@ -53,8 +54,19 @@ async def run_satellite_pipeline(
     consumes these via EventSource to show real-time progress.
     """
     # Generate analysis_id and sequence counter for SSE v2
-    analysis_id = uuid.uuid4().hex
+    analysis_id = analysis_id or uuid.uuid4().hex
     seq = 0
+
+    if settings.E2E_TEST_MODE:
+        from services.e2e_stub_service import run_e2e_stub_pipeline
+
+        async for event in run_e2e_stub_pipeline(
+            analysis_id=analysis_id,
+            norad_id=norad_id,
+            additional_context=additional_context,
+        ):
+            yield event
+        return
 
     def _event(evt: AgentEvent) -> dict:
         nonlocal seq
@@ -68,6 +80,7 @@ async def run_satellite_pipeline(
         yield _event(AgentEvent.queued(agent_name))
 
     evidence_gaps: list[str] = []
+    degraded_agents: set[str] = set()
 
     # ── Stage 1: Orbital Classification ──────────────────────────────
     yield _event(AgentEvent.thinking(
@@ -88,25 +101,36 @@ async def run_satellite_pipeline(
             circuit_breaker=gemini_breaker,
         )
         classification_dict = classification.model_dump()
-        yield _event(AgentEvent.complete("orbital_classification", classification_dict))
+        if classification.degraded:
+            degraded_agents.add("orbital_classification")
+        yield _event(
+            AgentEvent.complete(
+                "orbital_classification",
+                classification_dict,
+                degraded=classification.degraded,
+            )
+        )
     except CircuitBreakerOpen:
         msg = _safe_error("orbital_classification", Exception("Service temporarily unavailable"))
-        yield _event(AgentEvent.error("orbital_classification", msg))
+        yield _event(AgentEvent.error("orbital_classification", msg, degraded=True))
         yield format_sse_error("Gemini API circuit breaker is open — service recovering")
+        yield format_sse_done("failed")
         return
     except Exception as e:
         msg = _safe_error("orbital_classification", e)
-        yield _event(AgentEvent.error("orbital_classification", msg))
+        yield _event(AgentEvent.error("orbital_classification", msg, degraded=True))
         yield format_sse_error("Pipeline failed at satellite classification")
+        yield format_sse_done("failed")
         return
 
     # Fail-closed: reject non-satellite imagery
     if not classification.valid:
         yield _event(AgentEvent.error(
             "orbital_classification",
-            classification.rejection_reason or "Image rejected: not a satellite"
+            classification.rejection_reason or "Image rejected: not a satellite",
+            degraded=True,
         ))
-        yield format_sse_error(classification.rejection_reason or "Image rejected")
+        yield format_sse_done("rejected")
         return
 
     # Build satellite context for downstream agents
@@ -135,10 +159,13 @@ async def run_satellite_pipeline(
             circuit_breaker=gemini_breaker,
         )
         vision_dict = vision.model_dump()
-        yield _event(AgentEvent.complete("satellite_vision", vision_dict))
+        if vision.degraded:
+            degraded_agents.add("satellite_vision")
+            evidence_gaps.append("satellite_vision")
+        yield _event(AgentEvent.complete("satellite_vision", vision_dict, degraded=vision.degraded))
     except Exception as e:
         msg = _safe_error("satellite_vision", e)
-        yield _event(AgentEvent.error("satellite_vision", msg))
+        yield _event(AgentEvent.error("satellite_vision", msg, degraded=True))
         vision = None
         vision_dict = {}
         evidence_gaps.append("satellite_vision")
@@ -177,10 +204,15 @@ async def run_satellite_pipeline(
             circuit_breaker=gemini_breaker,
         )
         environment_dict = environment.model_dump()
-        yield _event(AgentEvent.complete("orbital_environment", environment_dict))
+        if environment.degraded:
+            degraded_agents.add("orbital_environment")
+            evidence_gaps.append("orbital_environment")
+        yield _event(
+            AgentEvent.complete("orbital_environment", environment_dict, degraded=environment.degraded)
+        )
     except Exception as e:
         msg = _safe_error("orbital_environment", e)
-        yield _event(AgentEvent.error("orbital_environment", msg))
+        yield _event(AgentEvent.error("orbital_environment", msg, degraded=True))
         environment = None
         environment_dict = {}
         evidence_gaps.append("orbital_environment")
@@ -203,10 +235,13 @@ async def run_satellite_pipeline(
             circuit_breaker=gemini_breaker,
         )
         failure_mode_dict = failure_mode.model_dump()
-        yield _event(AgentEvent.complete("failure_mode", failure_mode_dict))
+        if failure_mode.degraded:
+            degraded_agents.add("failure_mode")
+            evidence_gaps.append("failure_mode")
+        yield _event(AgentEvent.complete("failure_mode", failure_mode_dict, degraded=failure_mode.degraded))
     except Exception as e:
         msg = _safe_error("failure_mode", e)
-        yield _event(AgentEvent.error("failure_mode", msg))
+        yield _event(AgentEvent.error("failure_mode", msg, degraded=True))
         failure_mode = None
         failure_mode_dict = {}
         evidence_gaps.append("failure_mode")
@@ -250,11 +285,22 @@ async def run_satellite_pipeline(
                     f"Incomplete evidence: {', '.join(evidence_gaps)} failed. "
                     + insurance_risk_dict.get("recommendation_rationale", "")
                 )
-
-        yield _event(AgentEvent.complete("insurance_risk", insurance_risk_dict))
+        if insurance_risk.degraded:
+            degraded_agents.add("insurance_risk")
+            insurance_risk_dict["report_completeness"] = "PARTIAL"
+        yield _event(
+            AgentEvent.complete(
+                "insurance_risk",
+                insurance_risk_dict,
+                degraded=insurance_risk.degraded or bool(evidence_gaps),
+            )
+        )
     except Exception as e:
         msg = _safe_error("insurance_risk", e)
-        yield _event(AgentEvent.error("insurance_risk", msg))
+        yield _event(AgentEvent.error("insurance_risk", msg, degraded=True))
+        yield format_sse_done("failed")
+        return
 
     # ── Pipeline Complete ────────────────────────────────────────────
-    yield format_sse_done()
+    terminal_status = "completed_partial" if evidence_gaps or degraded_agents else "completed"
+    yield format_sse_done(terminal_status)

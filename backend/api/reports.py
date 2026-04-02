@@ -14,6 +14,7 @@ from auth.dependencies import get_current_user, require_role, CurrentUser
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/reports", tags=["reports"])
+_REPORTABLE_ANALYSIS_STATUSES = {"completed", "completed_partial"}
 
 
 class SubmitReviewRequest(BaseModel):
@@ -31,7 +32,7 @@ class RejectRequest(BaseModel):
 @router.post("/{analysis_id}/create")
 async def create_report(
     analysis_id: str,
-    user: CurrentUser | None = Depends(get_current_user),
+    user: CurrentUser | None = Depends(require_role("analyst")),
 ):
     """Create a draft report from a completed analysis."""
     try:
@@ -40,14 +41,14 @@ async def create_report(
 
         async with async_session_factory() as session:
             analysis_repo = AnalysisRepository(session)
-            analysis = await analysis_repo.get(analysis_id)
+            analysis = await analysis_repo.get(analysis_id, org_id=user.org_id if user else None)
             if not analysis:
                 raise HTTPException(status_code=404, detail="Analysis not found")
-            if analysis.status != "completed":
+            if analysis.status not in _REPORTABLE_ANALYSIS_STATUSES:
                 raise HTTPException(status_code=400, detail="Analysis not yet completed")
 
             report_repo = ReportRepository(session)
-            existing = await report_repo.get_by_analysis(analysis_id)
+            existing = await report_repo.get_by_analysis(analysis_id, org_id=user.org_id if user else None)
             if existing:
                 return {"id": existing.id, "status": existing.status, "message": "Report already exists"}
 
@@ -79,7 +80,7 @@ async def submit_for_review(
 
         async with async_session_factory() as session:
             repo = ReportRepository(session)
-            report = await repo.get(report_id)
+            report = await repo.get(report_id, org_id=user.org_id if user else None)
             if not report:
                 raise HTTPException(status_code=404, detail="Report not found")
             if report.status != "DRAFT":
@@ -110,7 +111,7 @@ async def approve_report(
 
         async with async_session_factory() as session:
             repo = ReportRepository(session)
-            report = await repo.get(report_id)
+            report = await repo.get(report_id, org_id=user.org_id if user else None)
             if not report:
                 raise HTTPException(status_code=404, detail="Report not found")
             if report.status != "PENDING_REVIEW":
@@ -151,7 +152,7 @@ async def reject_report(
 
         async with async_session_factory() as session:
             repo = ReportRepository(session)
-            report = await repo.get(report_id)
+            report = await repo.get(report_id, org_id=user.org_id if user else None)
             if not report:
                 raise HTTPException(status_code=404, detail="Report not found")
             if report.status != "PENDING_REVIEW":
@@ -188,7 +189,7 @@ async def get_report(
 
         async with async_session_factory() as session:
             repo = ReportRepository(session)
-            report = await repo.get(report_id)
+            report = await repo.get(report_id, org_id=user.org_id if user else None)
             if not report:
                 raise HTTPException(status_code=404, detail="Report not found")
 
@@ -239,10 +240,10 @@ async def generate_pdf(
 
         async with async_session_factory() as session:
             repo = AnalysisRepository(session)
-            analysis = await repo.get(analysis_id)
+            analysis = await repo.get(analysis_id, org_id=user.org_id if user else None)
             if not analysis:
                 raise HTTPException(status_code=404, detail="Analysis not found")
-            if analysis.status != "completed":
+            if analysis.status not in _REPORTABLE_ANALYSIS_STATUSES:
                 raise HTTPException(status_code=400, detail="Analysis not yet completed")
 
             report_data = {

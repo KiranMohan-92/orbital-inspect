@@ -14,12 +14,16 @@ interface PortfolioData {
   satellites: Array<{
     norad_id: string | null;
     analysis_id: string;
+    status: string;
+    asset_type?: string;
+    degraded?: boolean;
     risk_tier: string;
     underwriting: string;
     composite_score: number | null;
     classification: Record<string, unknown>;
     completed_at: string | null;
     report_completeness: string;
+    evidence_completeness_pct?: number | null;
   }>;
   total: number;
 }
@@ -35,6 +39,8 @@ export default function PortfolioView() {
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [riskFilter, setRiskFilter] = useState("all");
 
   useEffect(() => {
     async function fetchData() {
@@ -67,10 +73,14 @@ export default function PortfolioView() {
     );
   }
 
-  const satellites = portfolio?.satellites ?? [];
+  const satellites = (portfolio?.satellites ?? []).filter((sat) => {
+    const statusMatch = statusFilter === "all" || sat.status === statusFilter;
+    const riskMatch = riskFilter === "all" || sat.risk_tier === riskFilter;
+    return statusMatch && riskMatch;
+  });
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div data-testid="portfolio-view" className="h-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="px-6 py-4 flex-shrink-0" style={{ borderBottom: "1px solid var(--bg-panel-border)" }}>
         <div className="flex items-center gap-2">
@@ -94,6 +104,36 @@ export default function PortfolioView() {
             underwritingDistribution={summary.underwriting_distribution}
           />
         )}
+
+        <div className="flex items-center gap-3">
+          <select
+            data-testid="portfolio-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="orbital-input font-mono-data text-xs"
+          >
+            <option value="all">All statuses</option>
+            <option value="completed">Completed</option>
+            <option value="completed_partial">Partial</option>
+            <option value="failed">Failed</option>
+            <option value="rejected">Rejected</option>
+            <option value="running">Running</option>
+          </select>
+          <select
+            data-testid="portfolio-risk-filter"
+            value={riskFilter}
+            onChange={(e) => setRiskFilter(e.target.value)}
+            className="orbital-input font-mono-data text-xs"
+          >
+            <option value="all">All risk tiers</option>
+            <option value="LOW">LOW</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="MEDIUM-HIGH">MEDIUM-HIGH</option>
+            <option value="HIGH">HIGH</option>
+            <option value="CRITICAL">CRITICAL</option>
+            <option value="UNKNOWN">UNKNOWN</option>
+          </select>
+        </div>
 
         {/* Risk Heatmap */}
         {satellites.length > 0 && <RiskHeatmap satellites={satellites} />}
