@@ -1,11 +1,39 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: orbital_inspect_test
+          POSTGRES_USER: orbital
+          POSTGRES_PASSWORD: orbital_dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orbital -d orbital_inspect_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     defaults:
       run:
         working-directory: backend
+    env:
+      GEMINI_API_KEY: test-dummy-key
+      DEMO_MODE: "false"
+      AUTH_ENABLED: "false"
+      DATABASE_AUTO_INIT: "true"
+      DATABASE_URL: postgresql+asyncpg://orbital:orbital_dev_password@127.0.0.1:5432/orbital_inspect_test
+      STORAGE_BACKEND: local
+      STORAGE_LOCAL_ROOT: ${{ github.workspace }}/backend/.ci-storage
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,7 +55,69 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run build
       - run: npm test
+
+  browser-e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: orbital_inspect_e2e
+          POSTGRES_USER: orbital
+          POSTGRES_PASSWORD: orbital_dev_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orbital -d orbital_inspect_e2e"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      GEMINI_API_KEY: test-dummy-key
+      ORBITAL_INSPECT_E2E_USE_POSTGRES: "1"
+      ORBITAL_INSPECT_E2E_DATABASE_URL: postgresql+asyncpg://orbital:orbital_dev_password@127.0.0.1:5432/orbital_inspect_e2e
+      ORBITAL_INSPECT_E2E_STORAGE_BACKEND: s3
+      ORBITAL_INSPECT_E2E_STORAGE_BUCKET: orbital-inspect-e2e
+      ORBITAL_INSPECT_E2E_STORAGE_REGION: us-east-1
+      ORBITAL_INSPECT_E2E_STORAGE_ENDPOINT_URL: http://127.0.0.1:9000
+      ORBITAL_INSPECT_E2E_STORAGE_ACCESS_KEY_ID: orbital
+      ORBITAL_INSPECT_E2E_STORAGE_SECRET_ACCESS_KEY: orbital_storage_password
+      ORBITAL_INSPECT_E2E_STORAGE_FORCE_PATH_STYLE: "true"
+      ORBITAL_INSPECT_E2E_STORAGE_CREATE_BUCKET: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -p 9001:9001 \
+            -e MINIO_ROOT_USER=orbital \
+            -e MINIO_ROOT_PASSWORD=orbital_storage_password \
+            minio/minio:RELEASE.2025-02-28T09-55-16Z \
+            server /data --console-address :9001
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:9000/minio/health/live && break
+            sleep 2
+          done
+      - run: pip install -r ../backend/requirements.txt
+        working-directory: backend
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

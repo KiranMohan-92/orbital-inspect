@@ -64,6 +64,8 @@ htmlcov/
 backend/data/demo_cache/images/
 backend/data/demo_images/
 backend/data/uploads/
+backend/data/storage/
+backend/.ci-storage/
 backend/orbital_inspect_e2e*.db
 
 # Credentials and certificates

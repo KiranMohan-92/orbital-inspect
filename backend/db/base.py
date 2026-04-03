@@ -4,6 +4,7 @@ Database engine and session factory.
 Supports async SQLAlchemy with both PostgreSQL (production) and SQLite (demo mode).
 """
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from config import settings
@@ -13,15 +14,33 @@ class Base(DeclarativeBase):
     pass
 
 
+def _normalized_database_url(raw_url: str) -> str:
+    if raw_url.startswith("postgres://"):
+        return raw_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    if raw_url.startswith("postgresql://") and "+asyncpg" not in raw_url:
+        return raw_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return raw_url
+
+
+DATABASE_URL = _normalized_database_url(settings.DATABASE_URL)
+
 engine_kwargs = {
     "echo": settings.LOG_LEVEL == "DEBUG",
     "pool_pre_ping": True,
 }
-if settings.DATABASE_URL.startswith("sqlite") and "uri=true" in settings.DATABASE_URL:
+if DATABASE_URL.startswith("sqlite") and "uri=true" in DATABASE_URL:
     engine_kwargs["connect_args"] = {"uri": True}
+elif not DATABASE_URL.startswith("sqlite"):
+    engine_kwargs.update(
+        {
+            "pool_size": 5,
+            "max_overflow": 10,
+            "pool_timeout": 30,
+        }
+    )
 
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     **engine_kwargs,
 )
 
@@ -39,14 +58,16 @@ async def get_session() -> AsyncSession:
 
 
 async def init_db():
-    """Create all tables. Used in DEMO_MODE with SQLite."""
+    """Create all tables for demo, E2E, or ephemeral service-backed environments."""
     # Import ORM models before create_all so metadata is fully registered.
     from db import models  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        if settings.DATABASE_URL.startswith("sqlite"):
+        if DATABASE_URL.startswith("sqlite"):
             await _ensure_sqlite_schema(conn)
+        else:
+            await conn.execute(text("SELECT 1"))
 
 
 async def _ensure_sqlite_schema(conn) -> None:

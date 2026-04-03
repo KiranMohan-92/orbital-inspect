@@ -15,7 +15,6 @@ import asyncio
 import json
 import re
 import logging
-import uuid
 from pathlib import Path
 from contextlib import asynccontextmanager
 from time import monotonic
@@ -36,6 +35,7 @@ from services.metrics_service import (
     record_stream_open,
     snapshot_metrics,
 )
+from services.storage_service import get_storage_backend
 from auth.dependencies import get_current_user, require_role, CurrentUser
 
 log = logging.getLogger(__name__)
@@ -51,12 +51,18 @@ async def lifespan(app):
     except ImportError:
         pass
 
-    # Initialize database in demo mode (SQLite, auto-create tables)
-    if settings.DEMO_MODE:
+    # Initialize database when running demo, E2E, or service-backed ephemeral environments.
+    if settings.DEMO_MODE or settings.DATABASE_AUTO_INIT or settings.E2E_TEST_MODE:
         try:
             from db.base import init_db
             await init_db()
-            log.info("Database initialized (DEMO_MODE)")
+            log.info(
+                "Database initialized",
+                extra={
+                    "demo_mode": settings.DEMO_MODE,
+                    "database_auto_init": settings.DATABASE_AUTO_INIT,
+                },
+            )
         except ImportError:
             log.info("Database module not available, running without persistence")
 
@@ -130,7 +136,6 @@ except ImportError:
 # ── Demo cache directory ─────────────────────────────────────────────
 DEMO_DIR = settings.demo_cache_dir_path
 DEMO_IMAGES_DIR = settings.demo_images_dir_path
-UPLOAD_DIR = settings.uploads_dir_path
 TERMINAL_ANALYSIS_STATUSES = {"completed", "completed_partial", "failed", "rejected"}
 VALID_ASSET_TYPES = {
     "satellite",
@@ -228,10 +233,18 @@ async def _create_analysis_record(
     from workers.analysis_worker import run_analysis_job
 
     primary_upload, primary_bytes, primary_mime = uploads[0]
-    suffix = Path(primary_upload.filename or "image.jpg").suffix or ".jpg"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    stored_path = UPLOAD_DIR / f"{uuid.uuid4().hex}{suffix}"
-    stored_path.write_bytes(primary_bytes)
+    storage = get_storage_backend()
+    stored_object = storage.store_bytes(
+        category="uploads",
+        filename=primary_upload.filename or "image.jpg",
+        data=primary_bytes,
+        content_type=primary_mime,
+        metadata={
+            "norad_id": norad or "",
+            "asset_type": asset_type,
+            "request_id": request_id or "",
+        },
+    )
 
     if settings.E2E_TEST_MODE:
         evidence_bundle_summary = {
@@ -265,7 +278,7 @@ async def _create_analysis_record(
                     "image_count": len(uploads),
                     "primary_filename": primary_upload.filename or "",
                 },
-                metadata={"stored_path": str(stored_path)},
+                metadata={"storage_uri": stored_object.uri},
             )
         )
         evidence_bundle_summary = {
@@ -286,7 +299,7 @@ async def _create_analysis_record(
         analysis = await repo.create(
             org_id=user.org_id if user else None,
             image_bytes=primary_bytes,
-            image_path=str(stored_path),
+            image_path=stored_object.uri,
             norad_id=norad,
             additional_context=context,
             request_id=request_id,
@@ -379,12 +392,15 @@ async def _stream_analysis_events_generator(
 @app.get("/api/health")
 async def health():
     from services.gemini_service import is_adk_available
+    database_backend = "postgresql" if "postgres" in settings.DATABASE_URL else "sqlite"
     return {
         "status": "ok",
         "service": "orbital-inspect",
         "version": "0.2.0",
         "adk_available": is_adk_available(),
         "demo_mode": settings.DEMO_MODE,
+        "database_backend": database_backend,
+        "storage_backend": settings.STORAGE_BACKEND,
     }
 
 
@@ -701,4 +717,5 @@ async def get_analysis_events(
 # ── Ensure data directories exist ────────────────────────────────────
 settings.demo_images_dir_path.mkdir(parents=True, exist_ok=True)
 settings.demo_cache_dir_path.mkdir(parents=True, exist_ok=True)
-settings.uploads_dir_path.mkdir(parents=True, exist_ok=True)
+if settings.STORAGE_BACKEND == "local":
+    settings.storage_local_root_path.mkdir(parents=True, exist_ok=True)

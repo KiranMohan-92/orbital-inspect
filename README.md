@@ -13,6 +13,7 @@ It combines a durable backend analysis pipeline, persisted event streaming, evid
 - streams real-time analysis events over SSE
 - generates risk-oriented inspection output and portfolio views
 - supports browser E2E validation against a live backend
+- supports local filesystem or S3-compatible object storage for uploaded inspection evidence
 
 ## Current Product Shape
 
@@ -35,6 +36,9 @@ The latest production hardening tranche added:
 - live full-stack browser E2E using deterministic backend fixtures
 - request correlation IDs and metrics
 - inspection epoch and subsystem lineage fields in the product surface
+- Postgres-ready runtime bootstrapping and service-backed E2E configuration
+- storage abstraction for local and S3-compatible backends
+- CI workflow with backend, frontend, and browser E2E release gates
 
 ## Architecture
 
@@ -42,10 +46,12 @@ The latest production hardening tranche added:
 
 - FastAPI API surface
 - SQLAlchemy async persistence
+- SQLite for demo/local paths and Postgres-ready async support for staging/CI
 - multi-stage analysis orchestration
 - persisted analysis events and reports
 - structlog-based request logging and correlation
 - lightweight metrics endpoint at `/api/metrics`
+- storage abstraction for uploaded evidence and future generated artifacts
 
 Key backend paths:
 
@@ -84,6 +90,12 @@ For local demo use:
 ```bash
 cd backend
 DEMO_MODE=true GEMINI_API_KEY=test-dummy-key python -m uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+For staging-parity local runs with Docker Compose:
+
+```bash
+docker compose --profile full up --build
 ```
 
 ### Frontend
@@ -133,6 +145,15 @@ npm run test:e2e
 
 The browser E2E suite runs against a live backend using deterministic backend-side fixtures. It exercises the real submission, worker, persistence, SSE, and portfolio paths.
 
+To force a Postgres-backed live run locally:
+
+```bash
+cd frontend
+npm run test:e2e:live
+```
+
+This expects a reachable Postgres instance and can be paired with the `docker compose --profile full up` stack.
+
 ## Key Endpoints
 
 - `POST /api/analyses`
@@ -147,7 +168,7 @@ The browser E2E suite runs against a live backend using deterministic backend-si
 
 Latest verified commands on the current shipped tranche:
 
-- backend integration/auth: `20 passed`
+- backend full suite: `149 passed`
 - frontend unit tests: `12 passed`
 - frontend browser E2E: `4 passed`
 - frontend production build: passed
@@ -162,7 +183,7 @@ Latest verified commands on the current shipped tranche:
 
 From a production architecture perspective, the next major upgrades should be:
 
-1. move live E2E from shared in-memory SQLite to ephemeral Postgres and object storage
-2. add queue durability, retries, and dead-letter handling for worker execution
-3. deepen evidence lineage with multi-epoch comparison and baseline drift analysis
+1. add queue durability, retries, and dead-letter handling for worker execution
+2. deepen evidence lineage with multi-epoch comparison and baseline drift analysis
+3. add storage-backed generated report artifacts and signed retrieval workflows
 4. improve operational dashboards and alerting on stream stalls, worker failures, and degraded assessments

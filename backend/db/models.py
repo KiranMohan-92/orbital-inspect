@@ -51,7 +51,7 @@ class Analysis(Base):
 
     # Input
     image_hash = Column(String(64), nullable=True)  # SHA-256 of uploaded image
-    image_path = Column(String(500), nullable=True)  # Local/S3 path to stored image
+    image_path = Column(String(500), nullable=True)  # Storage URI for uploaded image
     norad_id = Column(String(9), nullable=True)
     additional_context = Column(Text, default="")
     request_id = Column(String(64), nullable=True)
@@ -125,7 +125,7 @@ class Report(Base):
 
     # Content
     full_report_json = Column(JSON, nullable=True)  # Complete SatelliteConditionReport
-    pdf_path = Column(String(500), nullable=True)
+    pdf_path = Column(String(500), nullable=True)  # Storage URI for generated artifact
 
     # Approval chain
     submitted_by = Column(String(255), nullable=True)

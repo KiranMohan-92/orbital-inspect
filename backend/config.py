@@ -14,10 +14,21 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./orbital_inspect.db"
+    DATABASE_AUTO_INIT: bool = False
     DATA_DIR: str = "./data"
     UPLOADS_DIR: str | None = None
     DEMO_CACHE_DIR: str | None = None
     DEMO_IMAGES_DIR: str | None = None
+    STORAGE_BACKEND: str = "local"  # local | s3
+    STORAGE_LOCAL_ROOT: str | None = None
+    STORAGE_BUCKET: str | None = None
+    STORAGE_REGION: str = "us-east-1"
+    STORAGE_ENDPOINT_URL: str | None = None
+    STORAGE_ACCESS_KEY_ID: str | None = None
+    STORAGE_SECRET_ACCESS_KEY: str | None = None
+    STORAGE_PREFIX: str = "orbital-inspect"
+    STORAGE_FORCE_PATH_STYLE: bool = True
+    STORAGE_CREATE_BUCKET: bool = False
 
     # Auth
     AUTH_ENABLED: bool | None = None
@@ -28,11 +39,17 @@ class Settings(BaseSettings):
     def validate_jwt_secret(self):
         if self.AUTH_ENABLED is None:
             self.AUTH_ENABLED = not self.DEMO_MODE
+        if self.E2E_TEST_MODE:
+            self.DATABASE_AUTO_INIT = True
         if self.AUTH_ENABLED and self.JWT_SECRET == "dev-secret-change-in-production":
             raise ValueError(
                 "JWT_SECRET must be set to a strong random value when AUTH_ENABLED=true. "
                 "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
             )
+        if self.STORAGE_BACKEND not in {"local", "s3"}:
+            raise ValueError("STORAGE_BACKEND must be one of: local, s3")
+        if self.STORAGE_BACKEND == "s3" and not self.STORAGE_BUCKET:
+            raise ValueError("STORAGE_BUCKET must be set when STORAGE_BACKEND=s3")
         return self
 
     # Resilience
@@ -62,6 +79,11 @@ class Settings(BaseSettings):
     @property
     def uploads_dir_path(self) -> Path:
         base = self.UPLOADS_DIR or str(self.data_dir_path / "uploads")
+        return Path(base).expanduser().resolve()
+
+    @property
+    def storage_local_root_path(self) -> Path:
+        base = self.STORAGE_LOCAL_ROOT or self.UPLOADS_DIR or str(self.data_dir_path / "storage")
         return Path(base).expanduser().resolve()
 
     @property
