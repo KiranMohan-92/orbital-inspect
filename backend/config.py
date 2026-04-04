@@ -1,3 +1,5 @@
+import base64
+import hashlib
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -7,6 +9,7 @@ from pydantic import model_validator
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    APP_ENV: str = "development"  # development | staging | production | test
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-2.5-flash"
     REDIS_URL: str = "redis://localhost:6379"
@@ -29,11 +32,25 @@ class Settings(BaseSettings):
     STORAGE_PREFIX: str = "orbital-inspect"
     STORAGE_FORCE_PATH_STYLE: bool = True
     STORAGE_CREATE_BUCKET: bool = False
+    SIGNED_ARTIFACT_TTL_MINUTES: int = 30
+    REPORT_ARTIFACT_RETENTION_DAYS: int = 30
+
+    # Queueing
+    ANALYSIS_QUEUE_NAME: str = "arq:queue"
+    ANALYSIS_JOB_MAX_RETRIES: int = 3
+    ANALYSIS_RETRY_BACKOFF_BASE_SECONDS: int = 5
+    REDIS_REQUIRED: bool = False
 
     # Auth
     AUTH_ENABLED: bool | None = None
     JWT_SECRET: str = "dev-secret-change-in-production"
+    JWT_PREVIOUS_SECRETS: list[str] = []
     JWT_EXPIRY_MINUTES: int = 60
+    JWT_ISSUER: str = "orbital-inspect"
+    JWT_AUDIENCE: str = "orbital-inspect-api"
+    API_KEY_PREFIX: str = "oi"
+    WEBHOOK_SECRET_ENCRYPTION_KEY: str | None = None
+    WEBHOOK_SECRET_PREVIOUS_KEYS: list[str] = []
 
     @model_validator(mode="after")
     def validate_jwt_secret(self):
@@ -41,6 +58,12 @@ class Settings(BaseSettings):
             self.AUTH_ENABLED = not self.DEMO_MODE
         if self.E2E_TEST_MODE:
             self.DATABASE_AUTO_INIT = True
+        if self.APP_ENV in {"staging", "production"} and self.DEMO_MODE:
+            raise ValueError("DEMO_MODE must be false in staging and production environments")
+        if self.APP_ENV in {"staging", "production"} and not self.AUTH_ENABLED:
+            raise ValueError("AUTH_ENABLED must be true in staging and production environments")
+        if self.APP_ENV in {"staging", "production"} and not self.WEBHOOK_SECRET_ENCRYPTION_KEY:
+            raise ValueError("WEBHOOK_SECRET_ENCRYPTION_KEY must be set in staging and production environments")
         if self.AUTH_ENABLED and self.JWT_SECRET == "dev-secret-change-in-production":
             raise ValueError(
                 "JWT_SECRET must be set to a strong random value when AUTH_ENABLED=true. "
@@ -50,6 +73,8 @@ class Settings(BaseSettings):
             raise ValueError("STORAGE_BACKEND must be one of: local, s3")
         if self.STORAGE_BACKEND == "s3" and not self.STORAGE_BUCKET:
             raise ValueError("STORAGE_BUCKET must be set when STORAGE_BACKEND=s3")
+        if self.APP_ENV not in {"development", "staging", "production", "test"}:
+            raise ValueError("APP_ENV must be one of: development, staging, production, test")
         return self
 
     # Resilience
@@ -57,11 +82,31 @@ class Settings(BaseSettings):
     GEMINI_CIRCUIT_BREAKER_THRESHOLD: int = 5
     JOB_TIMEOUT_SECONDS: int = 300
     E2E_TEST_MODE: bool = False
+    MIN_EVIDENCE_COMPLETENESS_FOR_DECISION: float = 80.0
+    REQUIRE_HUMAN_REVIEW_FOR_DECISIONS: bool = True
+    GOVERNANCE_POLICY_VERSION: str = "2026-04-03"
 
     # Logging
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "json"  # "json" or "console"
     METRICS_ENABLED: bool = True
+    PROMETHEUS_METRICS_ENABLED: bool = True
+    OTEL_ENABLED: bool = False
+    OTEL_REQUIRED: bool = False
+    OTEL_SERVICE_NAME: str = "orbital-inspect"
+    OTEL_EXPORTER_OTLP_ENDPOINT: str | None = None
+    OTEL_EXPORTER_OTLP_HEADERS: str = ""
+    OTEL_RESOURCE_ATTRIBUTES: str = ""
+    OTEL_TRACES_SAMPLER_RATIO: float = 1.0
+    OTEL_CONSOLE_EXPORTER: bool = False
+    OBSERVABILITY_SHARED_TOKEN: str | None = None
+    OBSERVABILITY_PREVIOUS_TOKENS: list[str] = []
+
+    # Rate limiting
+    RATE_LIMIT_BACKEND: str = "memory"  # memory | redis
+    ANALYSIS_RATE_LIMIT_PER_HOUR: int = 20
+    REPORT_RATE_LIMIT_PER_HOUR: int = 60
+    RATE_LIMIT_FAIL_OPEN: bool = True
 
     # CORS
     ALLOWED_ORIGINS: list[str] = [
@@ -95,6 +140,22 @@ class Settings(BaseSettings):
     def demo_images_dir_path(self) -> Path:
         base = self.DEMO_IMAGES_DIR or str(self.data_dir_path / "demo_images")
         return Path(base).expanduser().resolve()
+
+    @property
+    def webhook_secret_encryption_keys(self) -> list[str]:
+        configured = [
+            key
+            for key in [self.WEBHOOK_SECRET_ENCRYPTION_KEY, *self.WEBHOOK_SECRET_PREVIOUS_KEYS]
+            if key
+        ]
+        if configured:
+            return configured
+        digest = hashlib.sha256(f"orbital-inspect-webhooks:{self.JWT_SECRET}".encode("utf-8")).digest()
+        return [base64.urlsafe_b64encode(digest).decode("ascii")]
+
+    @property
+    def observability_tokens(self) -> list[str]:
+        return [token for token in [self.OBSERVABILITY_SHARED_TOKEN, *self.OBSERVABILITY_PREVIOUS_TOKENS] if token]
 
 
 settings = Settings()

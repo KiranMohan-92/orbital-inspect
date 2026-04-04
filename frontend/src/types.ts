@@ -59,6 +59,8 @@ export interface AnalysisSubmissionResponse {
   analysis_url: string;
   events_url: string;
   request_id?: string | null;
+  dispatch_mode?: string;
+  queue_job_id?: string | null;
 }
 
 export interface SatelliteConditionReportFull {

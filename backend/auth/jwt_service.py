@@ -39,6 +39,8 @@ def create_access_token(
         "iat": now,
         "exp": now + timedelta(minutes=settings.JWT_EXPIRY_MINUTES),
         "type": "access",
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
     }
     if extra_claims:
         payload.update(extra_claims)
@@ -55,6 +57,31 @@ def create_refresh_token(user_id: str, org_id: str) -> str:
         "iat": now,
         "exp": now + timedelta(days=7),
         "type": "refresh",
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
+    }
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=ALGORITHM)
+
+
+def create_artifact_token(
+    *,
+    report_id: str,
+    org_id: str | None,
+    artifact_path: str,
+    artifact_content_type: str,
+    expires_minutes: int | None = None,
+) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": report_id,
+        "org_id": org_id,
+        "artifact_path": artifact_path,
+        "artifact_content_type": artifact_content_type,
+        "iat": now,
+        "exp": now + timedelta(minutes=expires_minutes or settings.SIGNED_ARTIFACT_TTL_MINUTES),
+        "type": "report_artifact",
+        "iss": settings.JWT_ISSUER,
+        "aud": settings.JWT_AUDIENCE,
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=ALGORITHM)
 
@@ -65,13 +92,24 @@ def decode_token(token: str) -> dict[str, Any]:
 
     Raises AuthError on invalid/expired tokens.
     """
-    try:
-        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[ALGORITHM])
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise AuthError("Token has expired")
-    except jwt.InvalidTokenError as e:
-        raise AuthError(f"Invalid token: {e}")
+    secrets = [settings.JWT_SECRET, *settings.JWT_PREVIOUS_SECRETS]
+    last_error: Exception | None = None
+    for secret in secrets:
+        try:
+            payload = jwt.decode(
+                token,
+                secret,
+                algorithms=[ALGORITHM],
+                issuer=settings.JWT_ISSUER,
+                audience=settings.JWT_AUDIENCE,
+            )
+            return payload
+        except jwt.ExpiredSignatureError:
+            raise AuthError("Token has expired")
+        except jwt.InvalidTokenError as e:
+            last_error = e
+            continue
+    raise AuthError(f"Invalid token: {last_error}")
 
 
 def verify_role(token_payload: dict, required_role: str) -> bool:

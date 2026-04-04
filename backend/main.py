@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response, PlainTextResponse
 
 from config import settings
 from agents.orchestrator import run_satellite_pipeline
@@ -35,8 +35,18 @@ from services.metrics_service import (
     record_stream_open,
     snapshot_metrics,
 )
+from services.governance_service import build_model_manifest
+from services.observability_service import setup_observability, shutdown_observability, telemetry_state
+from services.queue_service import enqueue_analysis_job, should_use_queue_dispatch
+from services.readiness_service import readiness_snapshot
 from services.storage_service import get_storage_backend
-from auth.dependencies import get_current_user, require_role, CurrentUser
+from auth.dependencies import (
+    get_current_user,
+    require_observability_access,
+    require_role,
+    require_rate_limit,
+    CurrentUser,
+)
 
 log = logging.getLogger(__name__)
 
@@ -50,6 +60,8 @@ async def lifespan(app):
         setup_logging(log_level=settings.LOG_LEVEL, log_format=settings.LOG_FORMAT)
     except ImportError:
         pass
+
+    setup_observability(app=app, service_version="0.2.0")
 
     # Initialize database when running demo, E2E, or service-backed ephemeral environments.
     if settings.DEMO_MODE or settings.DATABASE_AUTO_INIT or settings.E2E_TEST_MODE:
@@ -67,6 +79,7 @@ async def lifespan(app):
             log.info("Database module not available, running without persistence")
 
     yield
+    shutdown_observability()
 
 
 app = FastAPI(
@@ -129,6 +142,12 @@ except ImportError:
 try:
     from api.portfolio import router as portfolio_router
     app.include_router(portfolio_router)
+except ImportError:
+    pass
+
+try:
+    from api.admin import router as admin_router
+    app.include_router(admin_router)
 except ImportError:
     pass
 
@@ -211,6 +230,14 @@ def _compute_evidence_completeness(bundle_summary: dict[str, Any]) -> float | No
     return round((len(sources & required_sources) / len(required_sources)) * 100.0, 1)
 
 
+def _prom_escape(value: object) -> str:
+    return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def _prom_labels(**labels: object) -> str:
+    return ",".join(f'{key}="{_prom_escape(value)}"' for key, value in labels.items() if value is not None)
+
+
 async def _create_analysis_record(
     *,
     uploads: list[tuple[UploadFile, bytes, str]],
@@ -224,13 +251,13 @@ async def _create_analysis_record(
     baseline_reference: dict[str, Any],
     user: CurrentUser | None,
     request_id: str | None,
-) -> str:
+) -> dict[str, str]:
     from db.base import async_session_factory
     if settings.DEMO_MODE:
         from db.base import init_db
         await init_db()
     from db.repository import AnalysisRepository
-    from workers.analysis_worker import run_analysis_job
+    from db.repository import AuditLogRepository
 
     primary_upload, primary_bytes, primary_mime = uploads[0]
     storage = get_storage_backend()
@@ -296,6 +323,7 @@ async def _create_analysis_record(
 
     async with async_session_factory() as session:
         repo = AnalysisRepository(session)
+        audit_logs = AuditLogRepository(session)
         analysis = await repo.create(
             org_id=user.org_id if user else None,
             image_bytes=primary_bytes,
@@ -315,21 +343,118 @@ async def _create_analysis_record(
             baseline_reference=baseline_reference,
             evidence_bundle_summary=evidence_bundle_summary,
             evidence_completeness_pct=_compute_evidence_completeness(evidence_bundle_summary),
+            queue_name=settings.ANALYSIS_QUEUE_NAME,
+            dispatch_mode="arq" if should_use_queue_dispatch() else "inline",
+            max_retries=settings.ANALYSIS_JOB_MAX_RETRIES,
+            governance_policy_version=settings.GOVERNANCE_POLICY_VERSION,
+            model_manifest=build_model_manifest(),
+            human_review_required=settings.REQUIRE_HUMAN_REVIEW_FOR_DECISIONS,
         )
+        await audit_logs.create(
+            org_id=user.org_id if user else None,
+            actor_id=user.user_id if user else "anonymous",
+            action="analysis.created",
+            resource_type="analysis",
+            resource_id=analysis.id,
+            metadata_json={
+                "asset_type": asset_type,
+                "dispatch_mode": "arq" if should_use_queue_dispatch() else "inline",
+                "request_id": request_id,
+            },
+            analysis_id=analysis.id,
+        )
+
+    return {
+        "analysis_id": analysis.id,
+        "primary_mime": primary_mime,
+        "primary_filename": primary_upload.filename or "image.jpg",
+    }
+
+
+async def _dispatch_analysis(
+    *,
+    analysis_id: str,
+) -> dict[str, str]:
+    from db.base import async_session_factory
+    from db.repository import AnalysisRepository, AuditLogRepository
+
+    if should_use_queue_dispatch():
+        try:
+            queue_job_id = await enqueue_analysis_job(analysis_id)
+        except Exception as exc:
+            async with async_session_factory() as session:
+                repo = AnalysisRepository(session)
+                audit_logs = AuditLogRepository(session)
+                await repo.update_status(
+                    analysis_id,
+                    "failed",
+                    degraded=True,
+                    failure_reasons=[str(exc)],
+                    last_error=str(exc),
+                )
+                await audit_logs.create(
+                    org_id=None,
+                    actor_id="system:dispatcher",
+                    action="analysis.dispatch_failed",
+                    resource_type="analysis",
+                    resource_id=analysis_id,
+                    metadata_json={"error": str(exc)},
+                    analysis_id=analysis_id,
+                )
+            raise HTTPException(status_code=503, detail="Analysis queue unavailable") from exc
+
+        async with async_session_factory() as session:
+            repo = AnalysisRepository(session)
+            audit_logs = AuditLogRepository(session)
+            analysis = await repo.get(analysis_id)
+            await repo.mark_dispatched(
+                analysis_id,
+                queue_job_id=queue_job_id,
+                dispatch_mode="arq",
+                queue_name=settings.ANALYSIS_QUEUE_NAME,
+            )
+            await audit_logs.create(
+                org_id=analysis.org_id if analysis else None,
+                actor_id="system:dispatcher",
+                action="analysis.dispatched",
+                resource_type="analysis",
+                resource_id=analysis_id,
+                metadata_json={"queue_job_id": queue_job_id, "queue_name": settings.ANALYSIS_QUEUE_NAME},
+                analysis_id=analysis_id,
+            )
+        return {"dispatch_mode": "arq", "queue_job_id": queue_job_id}
+
+    from workers.analysis_worker import run_analysis_job
 
     task = asyncio.create_task(
         run_analysis_job(
             {},
-            analysis.id,
-            primary_bytes,
-            primary_mime,
-            norad,
-            context,
+            analysis_id,
         )
     )
     BACKGROUND_TASKS.add(task)
     task.add_done_callback(BACKGROUND_TASKS.discard)
-    return analysis.id
+
+    async with async_session_factory() as session:
+        repo = AnalysisRepository(session)
+        audit_logs = AuditLogRepository(session)
+        analysis = await repo.get(analysis_id)
+        await repo.mark_dispatched(
+            analysis_id,
+            queue_job_id=f"inline:{analysis_id}",
+            dispatch_mode="inline",
+            queue_name="inline",
+        )
+        await audit_logs.create(
+            org_id=analysis.org_id if analysis else None,
+            actor_id="system:inline-dispatcher",
+            action="analysis.dispatched",
+            resource_type="analysis",
+            resource_id=analysis_id,
+            metadata_json={"queue_job_id": f"inline:{analysis_id}", "queue_name": "inline"},
+            analysis_id=analysis_id,
+        )
+    return {"dispatch_mode": "inline", "queue_job_id": f"inline:{analysis_id}"}
 
 
 async def _stream_analysis_events_generator(
@@ -401,12 +526,75 @@ async def health():
         "demo_mode": settings.DEMO_MODE,
         "database_backend": database_backend,
         "storage_backend": settings.STORAGE_BACKEND,
+        "observability": telemetry_state(),
     }
 
 
+@app.get("/api/ready")
+async def ready(user: CurrentUser | None = Depends(require_observability_access())):
+    snapshot = await readiness_snapshot()
+    if not snapshot["ok"]:
+        raise HTTPException(status_code=503, detail=snapshot)
+    return snapshot
+
+
 @app.get("/api/metrics")
-async def metrics(user: CurrentUser | None = Depends(require_role("admin"))):
-    return snapshot_metrics()
+async def metrics(user: CurrentUser | None = Depends(require_observability_access())):
+    snapshot = snapshot_metrics()
+    snapshot["observability"] = telemetry_state()
+    return snapshot
+
+
+@app.get("/api/metrics/prometheus")
+async def prometheus_metrics(user: CurrentUser | None = Depends(require_observability_access())):
+    if not settings.PROMETHEUS_METRICS_ENABLED:
+        raise HTTPException(status_code=404, detail="Prometheus metrics disabled")
+    snapshot = snapshot_metrics()
+    observability = telemetry_state()
+    lines = []
+    for key, value in snapshot["requests"]["counts"].items():
+        lines.append(f'orbital_requests_total{{key="{_prom_escape(key)}"}} {value}')
+    for key, value in snapshot["requests"]["latency_ms"].items():
+        method, _, path = key.partition("|")
+        labels = _prom_labels(method=method, path=path)
+        lines.append(f"orbital_request_latency_avg_ms{{{labels}}} {value['avg']}")
+        lines.append(f"orbital_request_latency_max_ms{{{labels}}} {value['max']}")
+    for key, value in snapshot["analyses"]["created"].items():
+        _created, _, asset_type = key.partition("|")
+        lines.append(f'orbital_analysis_created_total{{asset_type="{_prom_escape(asset_type)}"}} {value}')
+    for key, value in snapshot["analyses"]["terminal"].items():
+        lines.append(f'orbital_analysis_terminal_total{{status="{_prom_escape(key)}"}} {value}')
+    for key, value in snapshot["analyses"]["retries"].items():
+        lines.append(f'orbital_analysis_retries_total{{status="{_prom_escape(key)}"}} {value}')
+    for key, value in snapshot["analyses"]["dead_letters"].items():
+        lines.append(f'orbital_analysis_dead_letters_total{{reason="{_prom_escape(key)}"}} {value}')
+    for key, value in snapshot["analyses"]["agent_events"].items():
+        agent, _, remainder = key.partition("|")
+        status, _, mode = remainder.partition("|")
+        labels = _prom_labels(agent=agent, status=status, mode=mode)
+        lines.append(f"orbital_agent_events_total{{{labels}}} {value}")
+    for key, value in snapshot["analyses"]["stage_latency_ms"].items():
+        labels = _prom_labels(agent=key)
+        lines.append(f"orbital_stage_latency_avg_ms{{{labels}}} {value['avg']}")
+        lines.append(f"orbital_stage_latency_max_ms{{{labels}}} {value['max']}")
+    for key, value in snapshot["artifacts"].items():
+        lines.append(f'orbital_report_artifacts_total{{kind="{_prom_escape(key)}"}} {value}')
+    for key, value in snapshot["rate_limits"].items():
+        lines.append(f'orbital_rate_limit_hits_total{{bucket="{_prom_escape(key)}"}} {value}')
+    lines.append(f'orbital_active_streams {snapshot["streams"]["active"]}')
+    for key, value in snapshot["streams"]["counts"].items():
+        lines.append(f'orbital_streams_total{{status="{_prom_escape(key)}"}} {value}')
+    lines.append(f'orbital_stream_duration_avg_ms {snapshot["streams"]["duration_ms"]["avg"]}')
+    lines.append(f'orbital_stream_duration_max_ms {snapshot["streams"]["duration_ms"]["max"]}')
+    lines.append(f'orbital_stream_events_avg {snapshot["streams"]["events_per_stream"]["avg"]}')
+    lines.append(f'orbital_stream_events_max {snapshot["streams"]["events_per_stream"]["max"]}')
+    lines.append(f'orbital_observability_enabled {1 if observability.get("enabled") else 0}')
+    lines.append(f'orbital_observability_instrumented {1 if observability.get("instrumented") else 0}')
+    lines.append(
+        f'orbital_observability_exporter_info{{service="{_prom_escape(observability.get("service_name"))}",'
+        f'exporter="{_prom_escape(observability.get("exporter"))}"}} 1'
+    )
+    return PlainTextResponse("\n".join(lines) + "\n")
 
 
 # ── Durable analysis submission ─────────────────────────────────────
@@ -424,6 +612,7 @@ async def create_analysis(
     telemetry_summary: str = Form(default=""),
     baseline_reference: str = Form(default=""),
     user: CurrentUser | None = Depends(require_role("analyst")),
+    _rate_limit = Depends(require_rate_limit("analysis")),
 ):
     """Create a persisted analysis job and return resource URLs."""
     uploads = await _collect_uploads(image, images)
@@ -433,7 +622,7 @@ async def create_analysis(
         raise HTTPException(status_code=400, detail="norad_id must be 1-9 digits")
     normalized_asset_type = _normalize_asset_type(asset_type)
 
-    analysis_id = await _create_analysis_record(
+    created = await _create_analysis_record(
         uploads=uploads,
         norad=norad,
         context=context,
@@ -446,14 +635,24 @@ async def create_analysis(
         user=user,
         request_id=getattr(request.state, "request_id", None),
     )
+    analysis_id = created["analysis_id"] if isinstance(created, dict) else str(created)
+    dispatch = (
+        await _dispatch_analysis(
+            analysis_id=analysis_id,
+        )
+        if isinstance(created, dict)
+        else {"dispatch_mode": "inline", "queue_job_id": None}
+    )
     record_analysis_created(normalized_asset_type)
 
     return {
         "analysis_id": analysis_id,
-        "status": "queued",
+        "status": "dispatched" if dispatch["dispatch_mode"] == "arq" else "queued",
         "analysis_url": f"/api/analyses/{analysis_id}",
         "events_url": f"/api/analyses/{analysis_id}/events/stream",
         "request_id": getattr(request.state, "request_id", None),
+        "dispatch_mode": dispatch["dispatch_mode"],
+        "queue_job_id": dispatch["queue_job_id"],
     }
 
 
@@ -606,6 +805,11 @@ async def list_analyses(
                         "request_id": getattr(a, "request_id", None),
                         "inspection_epoch": getattr(a, "inspection_epoch", None),
                         "target_subsystem": getattr(a, "target_subsystem", None),
+                        "queue_job_id": getattr(a, "queue_job_id", None),
+                        "dispatch_mode": getattr(a, "dispatch_mode", None),
+                        "retry_count": getattr(a, "retry_count", 0),
+                        "human_review_required": getattr(a, "human_review_required", True),
+                        "decision_blocked_reason": getattr(a, "decision_blocked_reason", None),
                         "norad_id": a.norad_id,
                         "degraded": getattr(a, "degraded", False),
                         "failure_reasons": getattr(a, "failure_reasons", []) or [],
@@ -647,6 +851,15 @@ async def get_analysis(
                 "request_id": getattr(analysis, "request_id", None),
                 "inspection_epoch": getattr(analysis, "inspection_epoch", None),
                 "target_subsystem": getattr(analysis, "target_subsystem", None),
+                "queue_job_id": getattr(analysis, "queue_job_id", None),
+                "dispatch_mode": getattr(analysis, "dispatch_mode", None),
+                "retry_count": getattr(analysis, "retry_count", 0),
+                "max_retries": getattr(analysis, "max_retries", 0),
+                "last_error": getattr(analysis, "last_error", None),
+                "governance_policy_version": getattr(analysis, "governance_policy_version", None),
+                "model_manifest": getattr(analysis, "model_manifest", {}) or {},
+                "human_review_required": getattr(analysis, "human_review_required", True),
+                "decision_blocked_reason": getattr(analysis, "decision_blocked_reason", None),
                 "norad_id": analysis.norad_id,
                 "additional_context": getattr(analysis, "additional_context", ""),
                 "capture_metadata": getattr(analysis, "capture_metadata", {}) or {},
@@ -665,6 +878,36 @@ async def get_analysis(
                 "insurance_risk": analysis.insurance_risk_result,
                 "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
                 "completed_at": analysis.completed_at.isoformat() if analysis.completed_at else None,
+            }
+    except ImportError:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+
+@app.get("/api/ops/dead-letters")
+async def list_dead_letters(
+    limit: int = 50,
+    user: CurrentUser | None = Depends(require_role("admin")),
+):
+    try:
+        from db.base import async_session_factory
+        from db.repository import AnalysisRepository
+
+        async with async_session_factory() as session:
+            repo = AnalysisRepository(session)
+            items = await repo.list_dead_letters(org_id=user.org_id if user else None, limit=limit)
+            return {
+                "items": [
+                    {
+                        "id": item.id,
+                        "analysis_id": item.analysis_id,
+                        "job_id": item.job_id,
+                        "queue_name": item.queue_name,
+                        "attempts": item.attempts,
+                        "error_message": item.error_message,
+                        "created_at": item.created_at.isoformat() if item.created_at else None,
+                    }
+                    for item in items
+                ]
             }
     except ImportError:
         raise HTTPException(status_code=503, detail="Database not available")

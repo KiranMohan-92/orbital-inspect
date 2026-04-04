@@ -7,8 +7,7 @@ import { useState, useEffect } from "react";
 import FleetSummary from "./FleetSummary";
 import SatelliteCard from "./SatelliteCard";
 import RiskHeatmap from "./RiskHeatmap";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { apiFetch } from "../../utils/api";
 
 interface PortfolioData {
   satellites: Array<{
@@ -46,8 +45,8 @@ export default function PortfolioView() {
     async function fetchData() {
       try {
         const [portfolioRes, summaryRes] = await Promise.all([
-          fetch(`${API_BASE}/api/portfolio`),
-          fetch(`${API_BASE}/api/portfolio/summary`),
+          apiFetch("/api/portfolio"),
+          apiFetch("/api/portfolio/summary"),
         ]);
 
         if (portfolioRes.ok) setPortfolio(await portfolioRes.json());

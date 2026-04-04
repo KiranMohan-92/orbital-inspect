@@ -2,15 +2,15 @@
 Webhook management API — register, list, delete webhook endpoints.
 """
 
-import hashlib
 import ipaddress
 import logging
 from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from auth.dependencies import get_current_user, require_role, CurrentUser
+from auth.dependencies import require_role, CurrentUser
 from config import settings
+from services.secret_service import encrypt_webhook_secret, hash_secret
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
@@ -91,7 +91,8 @@ async def create_webhook(
             "id": wh_id,
             "org_id": org_id,
             "url": body.url,
-            "secret_hash": hashlib.sha256(body.secret.encode()).hexdigest() if body.secret else "",
+            "secret_hash": hash_secret(body.secret) if body.secret else "",
+            "secret_ciphertext": encrypt_webhook_secret(body.secret) if body.secret else "",
             "events": body.events,
             "active": True,
         }
@@ -106,7 +107,8 @@ async def create_webhook(
                 webhook = await repo.create(
                     org_id=user.org_id if user else None,
                     url=body.url,
-                    secret_hash=hashlib.sha256(body.secret.encode()).hexdigest() if body.secret else "",
+                    secret_hash=hash_secret(body.secret) if body.secret else "",
+                    secret_ciphertext=encrypt_webhook_secret(body.secret) if body.secret else "",
                     events=body.events,
                 )
                 response = {

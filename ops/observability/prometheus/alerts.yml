@@ -1,0 +1,42 @@
+groups:
+  - name: orbital-inspect
+    rules:
+      - alert: OrbitalInspectApiUnavailable
+        expr: up{job="orbital-inspect-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: orbital-inspect-api
+        annotations:
+          summary: Orbital Inspect API is unavailable
+          description: The Prometheus scrape target for the API has been down for more than 2 minutes.
+
+      - alert: OrbitalInspectObservabilityDegraded
+        expr: orbital_observability_instrumented{job="orbital-inspect-api"} < 1
+        for: 5m
+        labels:
+          severity: warning
+          service: orbital-inspect-api
+        annotations:
+          summary: Orbital Inspect observability is degraded
+          description: The API is serving traffic without active OpenTelemetry instrumentation.
+
+      - alert: OrbitalInspectDeadLettersDetected
+        expr: increase(orbital_analysis_dead_letters_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: orbital-inspect-worker
+        annotations:
+          summary: Orbital Inspect dead letters detected
+          description: Background analysis jobs were dead-lettered during the last 15 minutes.
+
+      - alert: OrbitalInspectFailureBurst
+        expr: increase(orbital_analysis_terminal_total{status="failed"}[15m]) >= 3
+        for: 5m
+        labels:
+          severity: critical
+          service: orbital-inspect-worker
+        annotations:
+          summary: Orbital Inspect failure burst
+          description: Three or more analyses failed during the last 15 minutes.

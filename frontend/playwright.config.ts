@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@playwright/test';
@@ -19,6 +20,31 @@ const e2eDbUrl =
     ? 'postgresql+asyncpg://orbital:orbital_dev_password@127.0.0.1:5432/orbital_inspect_e2e'
     : 'sqlite+aiosqlite:///file:orbital_inspect_e2e?mode=memory&cache=shared&uri=true');
 const useMockBackend = process.env.ORBITAL_MOCK_E2E === '1';
+const e2eJwtSecret =
+  process.env.ORBITAL_INSPECT_E2E_JWT_SECRET || 'orbital-inspect-e2e-jwt-secret-2026';
+
+function createHs256Jwt(secret: string, payload: Record<string, unknown>): string {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const encode = (value: Record<string, unknown>) =>
+    Buffer.from(JSON.stringify(value)).toString('base64url');
+  const unsigned = `${encode(header)}.${encode(payload)}`;
+  const signature = crypto.createHmac('sha256', secret).update(unsigned).digest('base64url');
+  return `${unsigned}.${signature}`;
+}
+
+function buildE2eToken(role: 'analyst' | 'admin'): string {
+  const now = Math.floor(Date.now() / 1000);
+  return createHs256Jwt(e2eJwtSecret, {
+    sub: `${role}-e2e-user`,
+    org_id: 'org-e2e',
+    role,
+    iat: now,
+    exp: now + 3600,
+    type: 'access',
+    iss: 'orbital-inspect',
+    aud: 'orbital-inspect-api',
+  });
+}
 
 process.env.ORBITAL_INSPECT_E2E_ROOT = e2eRoot;
 process.env.ORBITAL_INSPECT_E2E_DB_PATH = e2eDbPath;
@@ -33,6 +59,9 @@ process.env.ORBITAL_INSPECT_E2E_STORAGE_BACKEND =
   process.env.STORAGE_BACKEND ||
   'local';
 process.env.ORBITAL_INSPECT_E2E_DATABASE_AUTO_INIT = 'true';
+process.env.ORBITAL_INSPECT_E2E_AUTH_ENABLED = 'true';
+process.env.ORBITAL_INSPECT_E2E_JWT_SECRET = e2eJwtSecret;
+process.env.VITE_API_BEARER_TOKEN = process.env.VITE_API_BEARER_TOKEN || buildE2eToken('analyst');
 
 const webServers = [
   {

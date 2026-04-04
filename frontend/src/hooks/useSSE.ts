@@ -14,8 +14,7 @@ import type {
   AnalysisStatus,
 } from "../types";
 import type { UseAnalysisReturn } from "./useAnalysisState";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { apiFetch, apiUrl } from "../utils/api";
 
 const VALID_AGENTS = new Set<string>([
   "orbital_classification",
@@ -197,7 +196,7 @@ export function useSSE(analysis: UseAnalysisReturn) {
       startAnalysis();
 
       try {
-        const createResponse = await fetch(`${API_BASE}/api/analyses`, {
+        const createResponse = await apiFetch("/api/analyses", {
           method: "POST",
           body: formData,
           signal: controller.signal,
@@ -212,10 +211,7 @@ export function useSSE(analysis: UseAnalysisReturn) {
         analysisIdRef.current = created.analysis_id;
         setAnalysisId(created.analysis_id);
 
-        const streamUrl = created.events_url.startsWith("http")
-          ? created.events_url
-          : `${API_BASE}${created.events_url}`;
-        const response = await fetch(streamUrl, {
+        const response = await apiFetch(apiUrl(created.events_url), {
           method: "GET",
           signal: controller.signal,
         });
@@ -237,7 +233,7 @@ export function useSSE(analysis: UseAnalysisReturn) {
         }
         const message =
           err instanceof TypeError
-            ? "Cannot reach backend — is it running on http://localhost:8000?"
+            ? `Cannot reach backend — is it running on ${apiUrl("")}?`
             : err instanceof Error
               ? err.message
               : String(err);
@@ -257,8 +253,8 @@ export function useSSE(analysis: UseAnalysisReturn) {
       startAnalysis();
 
       try {
-        const response = await fetch(
-          `${API_BASE}/api/demo/${encodeURIComponent(scenario)}`,
+        const response = await apiFetch(
+          `/api/demo/${encodeURIComponent(scenario)}`,
           { method: "POST", signal: controller.signal }
         );
 

@@ -66,6 +66,12 @@ def _make_analysis(analysis_id="a1", status="completed"):
     return analysis
 
 
+def _mock_audit_repo():
+    repo = AsyncMock()
+    repo.create = AsyncMock()
+    return repo
+
+
 @pytest.mark.asyncio
 async def test_create_report_success():
     analysis = _make_analysis()
@@ -79,10 +85,12 @@ async def test_create_report_success():
     report_repo = AsyncMock()
     report_repo.get_by_analysis = AsyncMock(return_value=None)
     report_repo.create = AsyncMock(return_value=mock_report)
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
          patch("db.repository.AnalysisRepository", return_value=analysis_repo), \
-         patch("db.repository.ReportRepository", return_value=report_repo):
+         patch("db.repository.ReportRepository", return_value=report_repo), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo):
         data = await create_report("a1", user=user)
 
     assert data["id"] == "r1"
@@ -96,10 +104,12 @@ async def test_create_report_analysis_not_found():
     mock_session = _make_mock_session()
     analysis_repo = AsyncMock()
     analysis_repo.get = AsyncMock(return_value=None)
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
          patch("db.repository.AnalysisRepository", return_value=analysis_repo), \
-         patch("db.repository.ReportRepository", return_value=AsyncMock()):
+         patch("db.repository.ReportRepository", return_value=AsyncMock()), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo):
         with pytest.raises(HTTPException) as exc:
             await create_report("missing", user=None)
 
@@ -112,10 +122,12 @@ async def test_create_report_analysis_not_completed():
     mock_session = _make_mock_session()
     analysis_repo = AsyncMock()
     analysis_repo.get = AsyncMock(return_value=analysis)
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
          patch("db.repository.AnalysisRepository", return_value=analysis_repo), \
-         patch("db.repository.ReportRepository", return_value=AsyncMock()):
+         patch("db.repository.ReportRepository", return_value=AsyncMock()), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo):
         with pytest.raises(HTTPException) as exc:
             await create_report("a1", user=None)
 
@@ -134,10 +146,12 @@ async def test_create_report_already_exists():
 
     report_repo = AsyncMock()
     report_repo.get_by_analysis = AsyncMock(return_value=existing)
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
          patch("db.repository.AnalysisRepository", return_value=analysis_repo), \
-         patch("db.repository.ReportRepository", return_value=report_repo):
+         patch("db.repository.ReportRepository", return_value=report_repo), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo):
         data = await create_report("a1", user=None)
 
     assert data["message"] == "Report already exists"
@@ -152,9 +166,11 @@ async def test_submit_draft_report():
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=report)
     repo.update_status = AsyncMock()
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
-         patch("db.repository.ReportRepository", return_value=repo):
+         patch("db.repository.ReportRepository", return_value=repo), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo):
         data = await submit_for_review("r1", SubmitReviewRequest(notes="ready"), user=user)
 
     assert data["status"] == "PENDING_REVIEW"
@@ -168,9 +184,11 @@ async def test_submit_non_draft_fails():
 
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=report)
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
-         patch("db.repository.ReportRepository", return_value=repo):
+         patch("db.repository.ReportRepository", return_value=repo), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo):
         with pytest.raises(HTTPException) as exc:
             await submit_for_review("r1", SubmitReviewRequest(notes=""), user=None)
 
@@ -183,9 +201,11 @@ async def test_submit_report_not_found():
     mock_session = _make_mock_session()
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=None)
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
-         patch("db.repository.ReportRepository", return_value=repo):
+         patch("db.repository.ReportRepository", return_value=repo), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo):
         with pytest.raises(HTTPException) as exc:
             await submit_for_review("missing", SubmitReviewRequest(notes=""), user=None)
 
@@ -201,9 +221,12 @@ async def test_approve_pending_review():
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=report)
     repo.update_status = AsyncMock()
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
-         patch("db.repository.ReportRepository", return_value=repo):
+         patch("db.repository.ReportRepository", return_value=repo), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo), \
+         patch("services.webhook_service.dispatch_registered_webhooks", AsyncMock()):
         data = await approve_report("r1", ApproveRequest(comments="LGTM"), user=user)
 
     assert data["status"] == "APPROVED"
@@ -217,9 +240,12 @@ async def test_approve_wrong_status_fails():
 
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=report)
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
-         patch("db.repository.ReportRepository", return_value=repo):
+         patch("db.repository.ReportRepository", return_value=repo), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo), \
+         patch("services.webhook_service.dispatch_registered_webhooks", AsyncMock()):
         with pytest.raises(HTTPException) as exc:
             await approve_report("r1", ApproveRequest(comments=""), user=None)
 
@@ -236,9 +262,11 @@ async def test_reject_pending_review():
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=report)
     repo.update_status = AsyncMock()
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
-         patch("db.repository.ReportRepository", return_value=repo):
+         patch("db.repository.ReportRepository", return_value=repo), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo):
         data = await reject_report("r1", RejectRequest(reason="Needs more detail"), user=user)
 
     assert data["status"] == "DRAFT"
@@ -253,9 +281,11 @@ async def test_reject_wrong_status_fails():
 
     repo = AsyncMock()
     repo.get = AsyncMock(return_value=report)
+    audit_repo = _mock_audit_repo()
 
     with patch("db.base.async_session_factory", return_value=mock_session), \
-         patch("db.repository.ReportRepository", return_value=repo):
+         patch("db.repository.ReportRepository", return_value=repo), \
+         patch("db.repository.AuditLogRepository", return_value=audit_repo):
         with pytest.raises(HTTPException) as exc:
             await reject_report("r1", RejectRequest(reason="bad"), user=None)
 

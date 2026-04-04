@@ -38,7 +38,20 @@ The latest production hardening tranche added:
 - inspection epoch and subsystem lineage fields in the product surface
 - Postgres-ready runtime bootstrapping and service-backed E2E configuration
 - storage abstraction for local and S3-compatible backends
-- CI workflow with backend, frontend, and browser E2E release gates
+- CI workflow with backend, observability, frontend, and browser E2E release gates
+- queue-backed worker dispatch through ARQ with retry and dead-letter persistence
+- Alembic migration scaffolding and migration test coverage
+- admin audit and API-key rotation endpoints
+- signed report artifact generation and download
+- governance-driven underwriting holds and mandatory human review flags
+- readiness checks and Prometheus-style metrics output
+- distributed rate-limit dependency with Redis-capable backend support
+- encrypted webhook secret storage with signed outbound delivery restoration
+- auth-enabled live browser E2E against the real backend path
+- optional OpenTelemetry wiring for FastAPI, HTTPX, and SQLAlchemy with readiness/health surfacing
+- collector-backed observability overlay with OpenTelemetry Collector, Prometheus, Tempo, Alertmanager, and Grafana
+- machine-token access path for metrics/readiness scraping without coupling collectors to user JWT flows
+- frontend bundle cleanup removing the unused 3D vendor payload from the shipped build
 
 ## Architecture
 
@@ -51,7 +64,13 @@ The latest production hardening tranche added:
 - persisted analysis events and reports
 - structlog-based request logging and correlation
 - lightweight metrics endpoint at `/api/metrics`
-- storage abstraction for uploaded evidence and future generated artifacts
+- Prometheus-style metrics endpoint at `/api/metrics/prometheus`
+- storage abstraction for uploaded evidence and generated report artifacts
+- Alembic-managed schema evolution for production databases
+- queue dispatch, retry tracking, and dead-letter visibility for worker execution
+- encrypted secret handling for registered webhooks
+- optional trace-aware observability hooks with `X-Trace-ID` response propagation when OTel is active
+- worker-side trace spans so collector-backed telemetry captures background execution and not only HTTP requests
 
 Key backend paths:
 
@@ -82,6 +101,7 @@ Key frontend paths:
 ```bash
 cd backend
 pip install -r requirements.txt
+alembic -c alembic.ini upgrade head
 GEMINI_API_KEY=your_key_here python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -97,6 +117,27 @@ For staging-parity local runs with Docker Compose:
 ```bash
 docker compose --profile full up --build
 ```
+
+For the full local observability stack:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.observability.yml --profile full up --build
+```
+
+This brings up:
+
+- Prometheus: `http://127.0.0.1:9090`
+- Grafana: `http://127.0.0.1:3001`
+- Tempo: `http://127.0.0.1:3200`
+- Alertmanager: `http://127.0.0.1:9093`
+
+Default local observability scrape token:
+
+```bash
+export OBSERVABILITY_SHARED_TOKEN=orbital-observability-dev-token
+```
+
+The Prometheus/Grafana stack uses that machine token to scrape `/api/metrics/prometheus` and `/api/ready` without relying on user-role JWTs.
 
 ### Frontend
 
@@ -119,7 +160,7 @@ Backend health:
 ### Backend
 
 ```bash
-pytest -q backend/tests/test_e2e.py backend/tests/test_auth_e2e.py
+pytest -q backend/tests
 ```
 
 ### Frontend Unit
@@ -144,6 +185,7 @@ npm run test:e2e
 ```
 
 The browser E2E suite runs against a live backend using deterministic backend-side fixtures. It exercises the real submission, worker, persistence, SSE, and portfolio paths.
+The default browser E2E path now runs with backend auth enabled and frontend API calls authenticated through the same header layer used in production-like environments.
 
 To force a Postgres-backed live run locally:
 
@@ -163,15 +205,28 @@ This expects a reachable Postgres instance and can be paired with the `docker co
 - `GET /api/portfolio`
 - `GET /api/portfolio/summary`
 - `GET /api/metrics`
+- `GET /api/metrics/prometheus`
+- `GET /api/ready`
+- `GET /api/ops/dead-letters`
+- `POST /api/admin/api-key/rotate`
+- `GET /api/admin/audit`
+- `POST /api/reports/{analysis_id}/generate-pdf`
+- `GET /api/reports/artifacts/{token}`
 
 ## Verification Snapshot
 
 Latest verified commands on the current shipped tranche:
 
-- backend full suite: `149 passed`
+- backend full suite: `169 passed`
 - frontend unit tests: `12 passed`
 - frontend browser E2E: `4 passed`
 - frontend production build: passed
+
+Current production build footprint:
+
+- main app bundle: `234.93 kB`
+- degradation timeline lazy chunk: `61.18 kB`
+- risk matrix lazy chunk: `7.56 kB`
 
 ## Docs
 
@@ -183,7 +238,7 @@ Latest verified commands on the current shipped tranche:
 
 From a production architecture perspective, the next major upgrades should be:
 
-1. add queue durability, retries, and dead-letter handling for worker execution
-2. deepen evidence lineage with multi-epoch comparison and baseline drift analysis
-3. add storage-backed generated report artifacts and signed retrieval workflows
-4. improve operational dashboards and alerting on stream stalls, worker failures, and degraded assessments
+1. deploy the new observability overlay into staging with real collector retention, dashboard ownership, alert routing, and SLO thresholds
+2. run auth-enabled browser E2E against fully live Postgres and object storage in CI and staging
+3. add replay-protected webhook verification guidance and webhook rotation workflows to the operator surface
+4. deepen evidence lineage with multi-epoch comparison, telemetry fusion, and baseline drift analysis

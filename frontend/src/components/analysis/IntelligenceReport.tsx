@@ -4,8 +4,7 @@ import InsuranceRiskCard from "./InsuranceRiskCard";
 import { RiskMatrixDrilldown, DegradationTimeline } from "../viz";
 import type { UseAnalysisReturn } from "../../hooks/useAnalysisState";
 import type { InsuranceRiskReport, SatelliteFailureModeAnalysis, ClassificationResult } from "../../types";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { apiFetch, apiUrl } from "../../utils/api";
 
 interface Props {
   analysis: UseAnalysisReturn;
@@ -29,30 +28,42 @@ export default function IntelligenceReport({ analysis }: Props) {
   const handleDownloadReport = useCallback(async () => {
     setPdfLoading(true);
     try {
-      // Call backend NASA-format report generator
-      const response = await fetch(`${API_BASE}/api/reports/inline/generate-pdf`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          classification: state.agents.orbital_classification.payload || {},
-          vision: state.agents.satellite_vision.payload || {},
-          environment: state.agents.orbital_environment.payload || {},
-          failure_mode: state.agents.failure_mode.payload || {},
-          insurance_risk: state.agents.insurance_risk.payload || {},
-        }),
-      });
-      if (!response.ok) throw new Error(`Report generation failed: ${response.status}`);
-      const html = await response.text();
-      const blob = new Blob([html], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      if (state.analysisId) {
+        const response = await apiFetch(`/api/reports/${state.analysisId}/generate-pdf`, {
+          method: "POST",
+        });
+        if (!response.ok) throw new Error(`Report generation failed: ${response.status}`);
+        const artifact = await response.json() as { artifact_download_url?: string };
+        if (!artifact.artifact_download_url) {
+          throw new Error("Report artifact URL missing");
+        }
+        const url = apiUrl(artifact.artifact_download_url);
+        window.open(url, "_blank");
+      } else {
+        const response = await apiFetch("/api/reports/inline/generate-pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            classification: state.agents.orbital_classification.payload || {},
+            vision: state.agents.satellite_vision.payload || {},
+            environment: state.agents.orbital_environment.payload || {},
+            failure_mode: state.agents.failure_mode.payload || {},
+            insurance_risk: state.agents.insurance_risk.payload || {},
+          }),
+        });
+        if (!response.ok) throw new Error(`Report generation failed: ${response.status}`);
+        const html = await response.text();
+        const blob = new Blob([html], { type: "text/html" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      }
     } catch {
       window.print();
     } finally {
       setPdfLoading(false);
     }
-  }, [state.agents]);
+  }, [state.agents, state.analysisId]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -99,6 +110,11 @@ export default function IntelligenceReport({ analysis }: Props) {
                 <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>{state.targetSubsystem || "n/a"}</p>
               </div>
             </div>
+            {state.analysisStatus !== "idle" && (
+              <div className="mt-3 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                Governance: human review required before operational decision use.
+              </div>
+            )}
           </div>
         )}
 

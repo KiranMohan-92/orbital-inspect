@@ -41,6 +41,7 @@ jobs:
           python-version: '3.13'
       - run: pip install -r requirements.txt
       - run: pip install pytest pytest-asyncio httpx
+      - run: alembic -c alembic.ini upgrade head
       - run: python -m py_compile main.py
       - run: python -m py_compile agents/orchestrator.py
       - run: pytest tests/ -v
@@ -61,6 +62,73 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run build
       - run: npm test
+
+  observability:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      GEMINI_API_KEY: test-dummy-key
+      APP_ENV: test
+      DEMO_MODE: "true"
+      AUTH_ENABLED: "true"
+      JWT_SECRET: observability-ci-secret
+      OBSERVABILITY_SHARED_TOKEN: orbital-observability-ci-token
+      OTEL_ENABLED: "true"
+      OTEL_REQUIRED: "true"
+      OTEL_SERVICE_NAME: orbital-inspect-api-ci
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4318/v1/traces
+      DATABASE_AUTO_INIT: "true"
+      DATABASE_URL: sqlite+aiosqlite:///file:orbital_observability_ci?mode=memory&cache=shared&uri=true
+      STORAGE_BACKEND: local
+      STORAGE_LOCAL_ROOT: ${{ github.workspace }}/backend/.ci-observability-storage
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r requirements.txt
+      - run: pytest tests/test_observability.py -v
+      - name: Start OTel collector
+        run: |
+          docker run -d --name otel-collector \
+            -p 4317:4317 \
+            -p 4318:4318 \
+            -p 8888:8888 \
+            -p 8889:8889 \
+            -p 13133:13133 \
+            -v "${{ github.workspace }}/ops/observability/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro" \
+            otel/opentelemetry-collector-contrib:0.121.0 \
+            --config=/etc/otelcol-contrib/config.yaml
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:13133/ >/dev/null && break
+            sleep 2
+          done
+      - name: Start backend with observability enabled
+        run: |
+          python -m uvicorn main:app --host 127.0.0.1 --port 8000 > /tmp/orbital-observability-backend.log 2>&1 &
+          echo $! > /tmp/orbital_backend.pid
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8000/api/health >/dev/null && break
+            sleep 2
+          done
+      - name: Verify collector-backed observability path
+        run: |
+          curl -fsS http://127.0.0.1:8000/api/health | python -c "import json,sys; data=json.load(sys.stdin); assert data['observability']['instrumented'] is True, data"
+          curl -fsS -H "Authorization: Bearer ${OBSERVABILITY_SHARED_TOKEN}" http://127.0.0.1:8000/api/ready | python -c "import json,sys; data=json.load(sys.stdin); assert data['ok'] is True, data"
+          curl -fsS -H "Authorization: Bearer ${OBSERVABILITY_SHARED_TOKEN}" http://127.0.0.1:8000/api/metrics/prometheus | tee /tmp/orbital-metrics.prom
+          grep -q "orbital_observability_instrumented 1" /tmp/orbital-metrics.prom
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8888/metrics | tee /tmp/otelcol.prom | grep -q "otelcol_receiver_accepted_spans"; then
+              break
+            fi
+            sleep 2
+          done
+          grep -q "otelcol_receiver_accepted_spans" /tmp/otelcol.prom
+      - name: Dump backend log on failure
+        if: failure()
+        run: cat /tmp/orbital-observability-backend.log || true
 
   browser-e2e:
     runs-on: ubuntu-latest

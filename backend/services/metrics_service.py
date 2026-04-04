@@ -44,6 +44,10 @@ _stage_latency: dict[str, MetricSummary] = defaultdict(MetricSummary)
 _stream_latency = MetricSummary()
 _stream_events = MetricSummary()
 _stream_counts: Counter[str] = Counter()
+_retry_counts: Counter[str] = Counter()
+_dead_letter_counts: Counter[str] = Counter()
+_artifact_counts: Counter[str] = Counter()
+_rate_limit_counts: Counter[str] = Counter()
 _active_streams = 0
 
 
@@ -67,6 +71,10 @@ def reset_metrics() -> None:
         _stream_events.total = 0.0
         _stream_events.max = 0.0
         _stream_counts.clear()
+        _retry_counts.clear()
+        _dead_letter_counts.clear()
+        _artifact_counts.clear()
+        _rate_limit_counts.clear()
         _active_streams = 0
 
 
@@ -99,6 +107,26 @@ def record_stage_latency(agent: str, duration_ms: float) -> None:
         _stage_latency[agent].add(duration_ms)
 
 
+def record_retry(status: str = "scheduled") -> None:
+    with _lock:
+        _retry_counts[status] += 1
+
+
+def record_dead_letter(reason: str) -> None:
+    with _lock:
+        _dead_letter_counts[reason] += 1
+
+
+def record_artifact_generated(kind: str) -> None:
+    with _lock:
+        _artifact_counts[kind] += 1
+
+
+def record_rate_limit(bucket: str) -> None:
+    with _lock:
+        _rate_limit_counts[bucket] += 1
+
+
 def record_stream_open() -> None:
     global _active_streams
     with _lock:
@@ -127,12 +155,16 @@ def snapshot_metrics() -> dict[str, object]:
             "analyses": {
                 "created": dict(_analysis_counts),
                 "terminal": dict(_analysis_terminal_counts),
+                "retries": dict(_retry_counts),
+                "dead_letters": dict(_dead_letter_counts),
                 "agent_events": dict(_agent_event_counts),
                 "stage_latency_ms": {
                     agent: summary.as_dict()
                     for agent, summary in _stage_latency.items()
                 },
             },
+            "artifacts": dict(_artifact_counts),
+            "rate_limits": dict(_rate_limit_counts),
             "streams": {
                 "active": _active_streams,
                 "counts": dict(_stream_counts),
