@@ -61,6 +61,7 @@ htmlcov/
 .nox/
 
 # Runtime-generated image caches (binary blobs)
+backend/orbital_inspect.db
 backend/data/demo_cache/images/
 backend/data/demo_images/
 backend/data/uploads/

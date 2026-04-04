@@ -82,6 +82,17 @@ def test_settings_require_auth_in_staging():
         )
 
 
+def test_default_local_database_path_uses_untracked_backend_data_dir():
+    local_settings = Settings(
+        GEMINI_API_KEY="test-key",
+        DEMO_MODE=True,
+        AUTH_ENABLED=False,
+    )
+
+    assert local_settings.DATABASE_URL.endswith("/backend/data/orbital_inspect.db")
+    assert local_settings.data_dir_path.as_posix().endswith("/backend/data")
+
+
 @pytest.mark.asyncio
 async def test_ready_endpoint_returns_snapshot_for_admin(client, auth_mode):
     expected = {

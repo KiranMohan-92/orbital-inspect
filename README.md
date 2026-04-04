@@ -112,6 +112,8 @@ cd backend
 DEMO_MODE=true GEMINI_API_KEY=test-dummy-key python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
+By default, local SQLite data now lives under `backend/data/orbital_inspect.db`, which is intentionally untracked so normal demo and dev runs do not dirty the repo.
+
 For staging-parity local runs with Docker Compose:
 
 ```bash

@@ -5,6 +5,10 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import model_validator
 
+BACKEND_DIR = Path(__file__).resolve().parent
+DEFAULT_DATA_DIR = BACKEND_DIR / "data"
+DEFAULT_DATABASE_PATH = DEFAULT_DATA_DIR / "orbital_inspect.db"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -16,9 +20,9 @@ class Settings(BaseSettings):
     DEMO_MODE: bool = True
 
     # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./orbital_inspect.db"
+    DATABASE_URL: str = f"sqlite+aiosqlite:///{DEFAULT_DATABASE_PATH.as_posix()}"
     DATABASE_AUTO_INIT: bool = False
-    DATA_DIR: str = "./data"
+    DATA_DIR: str = str(DEFAULT_DATA_DIR)
     UPLOADS_DIR: str | None = None
     DEMO_CACHE_DIR: str | None = None
     DEMO_IMAGES_DIR: str | None = None
