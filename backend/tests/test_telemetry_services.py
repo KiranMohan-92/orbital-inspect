@@ -15,7 +15,7 @@ from services.enhanced_weather_service import (
     _extract_latest_bz,
     fetch_enhanced_space_weather,
 )
-from services.space_weather_service import SpaceWeatherSnapshot
+from services.space_weather_service import SpaceWeatherSnapshot, _extract_latest_kp, fetch_space_weather
 from services.tle_history_service import EARTH_MU_KM3_S2, EARTH_RADIUS_KM, analyze_tle_records
 
 
@@ -96,6 +96,29 @@ async def test_extract_latest_bz_uses_latest_non_null_measurement():
 
     assert bz_nt == pytest.approx(-7.5)
     assert bt_nt == pytest.approx(8.4)
+
+
+def test_extract_latest_kp_supports_new_noaa_mapping_payload():
+    payload = [
+        {"time_tag": "2026-04-01T09:00:00Z", "Kp": "2.67"},
+        {"time_tag": "2026-04-01T12:00:00Z", "Kp": "4.33"},
+    ]
+
+    kp_value = _extract_latest_kp(payload)
+
+    assert kp_value == pytest.approx(4.33)
+
+
+def test_extract_latest_kp_supports_tabular_payload():
+    payload = [
+        ["time_tag", "kp_index"],
+        ["2026-04-01 09:00:00.000", "3.0"],
+        ["2026-04-01 12:00:00.000", "5.67"],
+    ]
+
+    kp_value = _extract_latest_kp(payload)
+
+    assert kp_value == pytest.approx(5.67)
 
 
 class _FakeResponse:
@@ -188,6 +211,42 @@ async def test_enhanced_weather_parses_bz_and_classifies_alerts(monkeypatch):
     assert snapshot.active_alerts[0]["level"] == "WARNING"
     assert len(snapshot.three_day_forecast) == 2
     assert len(snapshot.twenty_seven_day_outlook) == 2
+
+
+@pytest.mark.asyncio
+async def test_fetch_space_weather_supports_new_noaa_kp_mapping_payload(monkeypatch):
+    payloads = {
+        "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json": [
+            {"time_tag": "2026-04-01T09:00:00Z", "Kp": "2.67"},
+            {"time_tag": "2026-04-01T12:00:00Z", "Kp": "5.33"},
+        ],
+        "https://services.swpc.noaa.gov/products/solar-wind/plasma-7-day.json": [
+            ["time_tag", "density", "speed"],
+            ["2026-04-01 12:00:00.000", "6.1", "510.0"],
+        ],
+        "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json": [
+            {"time_tag": "2026-04-01T12:00:00Z", "flux": 1.2e-5},
+        ],
+        "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-6-hour.json": [
+            {"time_tag": "2026-04-01T12:00:00Z", "energy": ">=10 MeV", "flux": 12.5},
+        ],
+    }
+
+    monkeypatch.setattr(
+        "services.space_weather_service.httpx.AsyncClient",
+        lambda timeout: _FakeAsyncClient(payloads),
+    )
+
+    snapshot = await fetch_space_weather()
+
+    assert snapshot.kp_index == pytest.approx(5.33)
+    assert snapshot.kp_category == "ACTIVE"
+    assert snapshot.solar_wind_density_p_cm3 == pytest.approx(6.1)
+    assert snapshot.solar_wind_speed_km_s == pytest.approx(510.0)
+    assert snapshot.flare_class == "M"
+    assert snapshot.proton_flux_pfu == pytest.approx(12.5)
+    assert snapshot.storm_warning is True
+    assert "NOAA Planetary K-index" in snapshot.data_sources
 
 
 @pytest.mark.asyncio

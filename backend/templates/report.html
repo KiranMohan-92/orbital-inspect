@@ -50,11 +50,11 @@ body {
 
 /* ---- COVER PAGE ---- */
 .cover-page {
-  min-height: 267mm;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  min-height: 252mm;
+  display: block;
   padding: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .cover-classification-bar {
@@ -69,12 +69,9 @@ body {
 }
 
 .cover-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 30px;
+  display: block;
+  width: 100%;
+  padding: 26mm 30px 0;
   text-align: center;
 }
 
@@ -85,6 +82,9 @@ body {
   color: #6b7280;
   text-transform: uppercase;
   margin-bottom: 32px;
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .cover-separator {
@@ -103,6 +103,12 @@ body {
   line-height: 1.2;
   margin-bottom: 10px;
   text-transform: uppercase;
+  max-width: 520px;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .cover-subtitle {
@@ -111,6 +117,12 @@ body {
   color: #374151;
   margin-bottom: 36px;
   font-style: italic;
+  line-height: 1.45;
+  max-width: 520px;
+  overflow-wrap: break-word;
+  word-break: normal;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .cover-meta-box {
@@ -120,13 +132,15 @@ body {
   text-align: left;
   width: 100%;
   max-width: 440px;
-  margin-bottom: 36px;
+  margin: 0 auto 36px;
   background: #f9fafb;
 }
 
 .cover-meta-row {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
   margin-bottom: 6px;
   font-size: 9pt;
 }
@@ -137,6 +151,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 8pt;
+  flex: 0 0 130px;
   min-width: 130px;
 }
 
@@ -146,6 +161,11 @@ body {
   font-weight: 700;
   text-align: right;
   font-size: 9pt;
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .cover-dist-statement {
@@ -155,15 +175,17 @@ body {
   text-align: center;
   max-width: 480px;
   line-height: 1.4;
-  margin-bottom: 24px;
+  margin: 0 auto 24px;
+  overflow-wrap: break-word;
 }
 
 .cover-footer-bar {
   border-top: 2px solid #111827;
   padding-top: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  margin-top: 18mm;
   font-size: 8pt;
 }
 
@@ -173,12 +195,25 @@ body {
   letter-spacing: 0.15em;
   color: #111827;
   font-size: 9pt;
+  display: table-cell;
+  text-align: left;
+  vertical-align: middle;
 }
 
 .cover-footer-date {
   font-family: 'Courier New', Courier, monospace;
   color: #6b7280;
   font-size: 8pt;
+  overflow-wrap: break-word;
+  display: table-cell;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.cover-footer-bar .classification-badge {
+  display: table-cell;
+  text-align: right;
+  vertical-align: middle;
 }
 
 /* ---- SECTION RUNNING HEADER ---- */

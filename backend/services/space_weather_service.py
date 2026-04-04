@@ -14,6 +14,7 @@ All endpoints are free, no API key required.
 import httpx
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -86,10 +87,8 @@ async def fetch_space_weather() -> SpaceWeatherSnapshot:
         try:
             resp = await client.get(f"{SWPC_BASE}/products/noaa-planetary-k-index.json")
             if resp.status_code == 200:
-                data = resp.json()
-                if len(data) > 1:
-                    latest = data[-1]  # last entry is most recent
-                    kp_val = float(latest[1]) if latest[1] else 0.0
+                kp_val = _extract_latest_kp(resp.json())
+                if kp_val > 0.0:
                     snapshot.kp_index = kp_val
                     snapshot.kp_category = _classify_kp(kp_val)
                     snapshot.data_sources.append("NOAA Planetary K-index")
@@ -160,3 +159,64 @@ def format_weather_summary(weather: SpaceWeatherSnapshot) -> str:
         f"  Storm Warning: {'YES' if weather.storm_warning else 'No'}\n"
         f"  Geomagnetic Severity: {weather.geomag_severity}"
     )
+
+
+def _extract_latest_kp(payload: Any) -> float:
+    if isinstance(payload, list):
+        if not payload:
+            return 0.0
+
+        if all(isinstance(item, dict) for item in payload):
+            for record in reversed(payload):
+                kp_value = _kp_from_mapping(record)
+                if kp_value is not None:
+                    return kp_value
+            return 0.0
+
+        if isinstance(payload[0], list):
+            header = [str(value) for value in payload[0]]
+            for row in reversed(payload[1:]):
+                if not isinstance(row, list):
+                    continue
+                kp_value = _kp_from_mapping(dict(zip(header, row)))
+                if kp_value is not None:
+                    return kp_value
+            return 0.0
+
+        for record in reversed(payload):
+            if not isinstance(record, (list, tuple)) or len(record) < 2:
+                continue
+            kp_value = _coerce_float(record[1])
+            if kp_value is not None:
+                return kp_value
+        return 0.0
+
+    if isinstance(payload, dict):
+        kp_value = _kp_from_mapping(payload)
+        return kp_value if kp_value is not None else 0.0
+
+    return 0.0
+
+
+def _kp_from_mapping(record: dict[str, Any]) -> float | None:
+    for key in (
+        "kp_index",
+        "Kp",
+        "kp",
+        "planetary_k_index",
+        "estimated_kp",
+        "a_running_3_hr_kp",
+    ):
+        kp_value = _coerce_float(record.get(key))
+        if kp_value is not None:
+            return kp_value
+    return None
+
+
+def _coerce_float(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
