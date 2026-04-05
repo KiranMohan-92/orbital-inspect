@@ -31,7 +31,7 @@ def upgrade() -> None:
         sa.Column("org_id", sa.String(length=32), sa.ForeignKey("organizations.id"), nullable=True),
         sa.Column("alias_type", sa.String(length=32), nullable=False),
         sa.Column("alias_value", sa.String(length=255), nullable=False),
-        sa.Column("is_primary", sa.Boolean(), server_default=sa.text("0"), nullable=True),
+        sa.Column("is_primary", sa.Boolean(), server_default=sa.text("false"), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=True),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
     )

@@ -170,6 +170,11 @@ npm install
 npm run dev -- --host 127.0.0.1 --port 4173
 ```
 
+Validated frontend toolchain:
+
+- Node.js `24.x`
+- npm `11.x`
+
 Frontend URL:
 
 - `http://127.0.0.1:4173`
