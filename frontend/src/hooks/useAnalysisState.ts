@@ -21,6 +21,8 @@ export interface AnalysisFullState {
   image: File | null;
   imagePreviewUrl: string | null;
   noradId: string;
+  assetName: string;
+  externalAssetId: string;
   assetType: AssetType;
   inspectionEpoch: string;
   targetSubsystem: string;
@@ -38,6 +40,8 @@ export function buildInitialAnalysisState(): AnalysisFullState {
     image: null,
     imagePreviewUrl: null,
     noradId: "",
+    assetName: "",
+    externalAssetId: "",
     assetType: "satellite",
     inspectionEpoch: "",
     targetSubsystem: "",
@@ -56,6 +60,8 @@ const INITIAL_STATE = buildInitialAnalysisState();
 export type AnalysisAction =
   | { type: "SET_IMAGE"; image: File; previewUrl: string }
   | { type: "SET_NORAD_ID"; noradId: string }
+  | { type: "SET_ASSET_NAME"; assetName: string }
+  | { type: "SET_EXTERNAL_ASSET_ID"; externalAssetId: string }
   | { type: "SET_ASSET_TYPE"; assetType: AssetType }
   | { type: "SET_INSPECTION_EPOCH"; inspectionEpoch: string }
   | { type: "SET_TARGET_SUBSYSTEM"; targetSubsystem: string }
@@ -78,6 +84,8 @@ export function analysisStateReducer(state: AnalysisFullState, action: AnalysisA
         image: action.image,
         imagePreviewUrl: action.previewUrl,
         noradId: state.noradId,
+        assetName: state.assetName,
+        externalAssetId: state.externalAssetId,
         assetType: state.assetType,
         inspectionEpoch: state.inspectionEpoch,
         targetSubsystem: state.targetSubsystem,
@@ -85,6 +93,10 @@ export function analysisStateReducer(state: AnalysisFullState, action: AnalysisA
       };
     case "SET_NORAD_ID":
       return { ...state, noradId: action.noradId };
+    case "SET_ASSET_NAME":
+      return { ...state, assetName: action.assetName };
+    case "SET_EXTERNAL_ASSET_ID":
+      return { ...state, externalAssetId: action.externalAssetId };
     case "SET_ASSET_TYPE":
       return { ...state, assetType: action.assetType };
     case "SET_INSPECTION_EPOCH":
@@ -157,6 +169,8 @@ export function useAnalysisState() {
       dispatch({ type: "SET_IMAGE", image: file, previewUrl: URL.createObjectURL(file) });
     }, []),
     setNoradId: useCallback((id: string) => dispatch({ type: "SET_NORAD_ID", noradId: id }), []),
+    setAssetName: useCallback((assetName: string) => dispatch({ type: "SET_ASSET_NAME", assetName }), []),
+    setExternalAssetId: useCallback((externalAssetId: string) => dispatch({ type: "SET_EXTERNAL_ASSET_ID", externalAssetId }), []),
     setAssetType: useCallback((assetType: AssetType) => dispatch({ type: "SET_ASSET_TYPE", assetType }), []),
     setInspectionEpoch: useCallback((inspectionEpoch: string) => dispatch({ type: "SET_INSPECTION_EPOCH", inspectionEpoch }), []),
     setTargetSubsystem: useCallback((targetSubsystem: string) => dispatch({ type: "SET_TARGET_SUBSYSTEM", targetSubsystem }), []),

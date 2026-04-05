@@ -42,7 +42,62 @@ interface SSEHandlers {
   onError: (message: string) => void;
 }
 
-async function consumeSSEStream(response: Response, handlers: SSEHandlers): Promise<void> {
+function processSSEEventBlock(eventBlock: string, handlers: SSEHandlers): "done" | "error" | "continue" {
+  if (!eventBlock.trim()) {
+    return "continue";
+  }
+
+  const lines = eventBlock.split("\n");
+  let eventType = "";
+  let eventData = "";
+
+  for (const line of lines) {
+    if (line.startsWith("event:")) {
+      eventType = line.slice(6).trim();
+    } else if (line.startsWith("data:")) {
+      eventData += (eventData ? "\n" : "") + line.slice(5).trim();
+    }
+  }
+
+  if (!eventData) {
+    return "continue";
+  }
+
+  if (eventType === "done") {
+    try {
+      const done = JSON.parse(eventData) as { status?: string };
+      handlers.onDone(done.status || "completed");
+    } catch {
+      handlers.onDone("completed");
+    }
+    return "done";
+  }
+
+  if (eventType === "error") {
+    try {
+      const err = JSON.parse(eventData);
+      handlers.onError(err.error || "Unknown error");
+    } catch {
+      handlers.onError("Stream error");
+    }
+    return "error";
+  }
+
+  if (eventType === "agent_event") {
+    try {
+      const data = JSON.parse(eventData) as SSEEventData;
+      if (data.agent && data.status && VALID_AGENTS.has(data.agent)) {
+        handlers.onAgentEvent(data);
+      }
+    } catch {
+      // Ignore malformed events
+    }
+  }
+
+  return "continue";
+}
+
+export async function consumeSSEStream(response: Response, handlers: SSEHandlers): Promise<void> {
   if (!response.body) {
     throw new Error("No response body — SSE streaming not supported");
   }
@@ -50,6 +105,7 @@ async function consumeSSEStream(response: Response, handlers: SSEHandlers): Prom
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let terminalSeen = false;
 
   try {
     while (true) {
@@ -65,60 +121,25 @@ async function consumeSSEStream(response: Response, handlers: SSEHandlers): Prom
       buffer = events.pop() || "";
 
       for (const eventBlock of events) {
-        if (!eventBlock.trim()) {
-          continue;
-        }
-
-        const lines = eventBlock.split("\n");
-        let eventType = "";
-        let eventData = "";
-
-        for (const line of lines) {
-          if (line.startsWith("event:")) {
-            eventType = line.slice(6).trim();
-          } else if (line.startsWith("data:")) {
-            eventData += (eventData ? "\n" : "") + line.slice(5).trim();
-          }
-        }
-
-        if (!eventData) {
-          continue;
-        }
-
-        if (eventType === "done") {
-          try {
-            const done = JSON.parse(eventData) as { status?: string };
-            handlers.onDone(done.status || "completed");
-          } catch {
-            handlers.onDone("completed");
-          }
+        const outcome = processSSEEventBlock(eventBlock, handlers);
+        if (outcome === "done" || outcome === "error") {
+          terminalSeen = true;
           return;
-        }
-
-        if (eventType === "error") {
-          try {
-            const err = JSON.parse(eventData);
-            handlers.onError(err.error || "Unknown error");
-          } catch {
-            handlers.onError("Stream error");
-          }
-          return;
-        }
-
-        if (eventType === "agent_event") {
-          try {
-            const data = JSON.parse(eventData) as SSEEventData;
-            if (data.agent && data.status && VALID_AGENTS.has(data.agent)) {
-              handlers.onAgentEvent(data);
-            }
-          } catch {
-            // Ignore malformed events
-          }
         }
       }
     }
 
-    handlers.onDone("completed");
+    if (buffer.trim()) {
+      const outcome = processSSEEventBlock(buffer, handlers);
+      if (outcome === "done" || outcome === "error") {
+        terminalSeen = true;
+        return;
+      }
+    }
+
+    if (!terminalSeen) {
+      throw new Error("Analysis stream ended unexpectedly before terminal status");
+    }
   } finally {
     reader.releaseLock();
   }
@@ -182,6 +203,8 @@ export function useSSE(analysis: UseAnalysisReturn) {
 
       if (context) {
         if (context.noradId) formData.append("norad_id", context.noradId);
+        if (context.assetName) formData.append("asset_name", context.assetName);
+        if (context.externalAssetId) formData.append("external_asset_id", context.externalAssetId);
         if (context.additionalContext) formData.append("context", context.additionalContext);
         if (context.assetType) formData.append("asset_type", context.assetType);
         if (context.inspectionEpoch) formData.append("inspection_epoch", context.inspectionEpoch);

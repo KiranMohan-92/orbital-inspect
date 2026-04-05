@@ -13,6 +13,8 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
     state,
     setImage,
     setNoradId,
+    setAssetName,
+    setExternalAssetId,
     setAssetType,
     setInspectionEpoch,
     setTargetSubsystem,
@@ -126,6 +128,38 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
           </select>
           <p className="text-xs mt-1.5" style={{ color: "var(--text-tertiary)" }}>
             Keeps the data model ready for orbital infrastructure and in-space builds.
+          </p>
+        </div>
+
+        <div>
+          <label className="label-mono block mb-2">CANONICAL ASSET LABEL</label>
+          <input
+            data-testid="asset-name-input"
+            type="text"
+            value={state.assetName}
+            onChange={(e) => setAssetName(e.target.value)}
+            placeholder="e.g. Haven-1 Power Bus Alpha"
+            className="orbital-input w-full font-mono-data"
+            disabled={isAnalyzing}
+          />
+          <p className="text-xs mt-1.5" style={{ color: "var(--text-tertiary)" }}>
+            Used as the org-scoped canonical label when NORAD is absent or subsystem work is more specific than the object catalog.
+          </p>
+        </div>
+
+        <div>
+          <label className="label-mono block mb-2">OPERATOR ASSET ID</label>
+          <input
+            data-testid="external-asset-id-input"
+            type="text"
+            value={state.externalAssetId}
+            onChange={(e) => setExternalAssetId(e.target.value)}
+            placeholder="e.g. axiom-h1-pwr-a"
+            className="orbital-input w-full font-mono-data"
+            disabled={isAnalyzing}
+          />
+          <p className="text-xs mt-1.5" style={{ color: "var(--text-tertiary)" }}>
+            Strongest non-NORAD identity key for servicers, station modules, arrays, radiators, and compute platforms.
           </p>
         </div>
 
@@ -245,7 +279,7 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
             boxShadow: hasImage && !isAnalyzing ? "0 0 20px rgba(77,124,255,0.2)" : "none",
           }}
         >
-          {isAnalyzing ? "INSPECTING..." : "INSPECT SATELLITE"}
+          {isAnalyzing ? "INSPECTING..." : "INSPECT ASSET"}
         </button>
       </div>
     </div>

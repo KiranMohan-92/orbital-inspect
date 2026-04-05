@@ -67,12 +67,17 @@ async def lifespan(app):
     if settings.DEMO_MODE or settings.DATABASE_AUTO_INIT or settings.E2E_TEST_MODE:
         try:
             from db.base import init_db
+            from services.post_analysis_service import backfill_decisions
+            from db.base import async_session_factory
             await init_db()
+            async with async_session_factory() as session:
+                backfilled = await backfill_decisions(session=session, limit=5000)
             log.info(
                 "Database initialized",
                 extra={
                     "demo_mode": settings.DEMO_MODE,
                     "database_auto_init": settings.DATABASE_AUTO_INIT,
+                    "backfilled_decisions": backfilled,
                 },
             )
         except ImportError:
@@ -151,6 +156,12 @@ try:
 except ImportError:
     pass
 
+try:
+    from api.decisions import router as decisions_router
+    app.include_router(decisions_router)
+except ImportError:
+    pass
+
 
 # ── Demo cache directory ─────────────────────────────────────────────
 DEMO_DIR = settings.demo_cache_dir_path
@@ -167,6 +178,16 @@ VALID_ASSET_TYPES = {
     "other",
 }
 BACKGROUND_TASKS: set[asyncio.Task] = set()
+LEGACY_ANALYZE_SUNSET = "Tue, 30 Jun 2026 00:00:00 GMT"
+
+
+def _legacy_analyze_headers() -> dict[str, str]:
+    return {
+        "Deprecation": "true",
+        "Sunset": LEGACY_ANALYZE_SUNSET,
+        "Link": '</api/analyses>; rel="successor-version"',
+        "X-Orbital-Legacy-Endpoint": "true",
+    }
 
 
 def _safe_json_form(value: str, field_name: str) -> dict[str, Any]:
@@ -201,6 +222,12 @@ async def _collect_uploads(
 
     if not uploads:
         raise HTTPException(status_code=400, detail="At least one image is required")
+
+    if len(uploads) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Multiple images are not supported yet; submit one primary image per analysis",
+        )
 
     collected: list[tuple[UploadFile, bytes, str]] = []
     for upload in uploads:
@@ -244,6 +271,8 @@ async def _create_analysis_record(
     norad: str | None,
     context: str,
     asset_type: str,
+    asset_name: str,
+    external_asset_id: str,
     inspection_epoch: str,
     target_subsystem: str,
     capture_metadata: dict[str, Any],
@@ -261,6 +290,18 @@ async def _create_analysis_record(
 
     primary_upload, primary_bytes, primary_mime = uploads[0]
     storage = get_storage_backend()
+    asset_name = asset_name.strip()
+    external_asset_id = external_asset_id.strip()
+    enriched_capture_metadata = {
+        **capture_metadata,
+        "asset_name": asset_name or capture_metadata.get("asset_name") or "",
+        "external_asset_id": external_asset_id or capture_metadata.get("external_asset_id") or "",
+    }
+    enriched_baseline_reference = {
+        **baseline_reference,
+        "asset_name": asset_name or baseline_reference.get("asset_name") or "",
+        "external_asset_id": external_asset_id or baseline_reference.get("external_asset_id") or "",
+    }
     stored_object = storage.store_bytes(
         category="uploads",
         filename=primary_upload.filename or "image.jpg",
@@ -269,6 +310,8 @@ async def _create_analysis_record(
         metadata={
             "norad_id": norad or "",
             "asset_type": asset_type,
+            "asset_name": asset_name,
+            "external_asset_id": external_asset_id,
             "request_id": request_id or "",
         },
     )
@@ -322,10 +365,29 @@ async def _create_analysis_record(
         }
 
     async with async_session_factory() as session:
+        from db.repository import AssetRepository
+
         repo = AnalysisRepository(session)
+        assets = AssetRepository(session)
         audit_logs = AuditLogRepository(session)
+        asset = await assets.resolve_or_create(
+            org_id=user.org_id if user else None,
+            norad_id=norad,
+            external_asset_id=external_asset_id or None,
+            asset_type=asset_type,
+            name=asset_name or enriched_baseline_reference.get("asset_name"),
+            operator_name=(enriched_baseline_reference or {}).get("operator_name"),
+        )
+        subsystem = await assets.resolve_or_create_subsystem(
+            asset_id=asset.id,
+            org_id=user.org_id if user else None,
+            subsystem_key=target_subsystem or None,
+            display_name=target_subsystem or None,
+            subsystem_type=target_subsystem or None,
+        )
         analysis = await repo.create(
             org_id=user.org_id if user else None,
+            asset_id=asset.id,
             image_bytes=primary_bytes,
             image_path=stored_object.uri,
             norad_id=norad,
@@ -335,12 +397,12 @@ async def _create_analysis_record(
             inspection_epoch=inspection_epoch or None,
             target_subsystem=target_subsystem or None,
             capture_metadata={
-                **capture_metadata,
+                **enriched_capture_metadata,
                 "image_count": len(uploads),
                 "filenames": [upload.filename or "" for upload, _bytes, _mime in uploads],
             },
             telemetry_summary=telemetry_summary,
-            baseline_reference=baseline_reference,
+            baseline_reference=enriched_baseline_reference,
             evidence_bundle_summary=evidence_bundle_summary,
             evidence_completeness_pct=_compute_evidence_completeness(evidence_bundle_summary),
             queue_name=settings.ANALYSIS_QUEUE_NAME,
@@ -350,6 +412,8 @@ async def _create_analysis_record(
             model_manifest=build_model_manifest(),
             human_review_required=settings.REQUIRE_HUMAN_REVIEW_FOR_DECISIONS,
         )
+        if subsystem:
+            await repo.update_fields(analysis.id, subsystem_id=subsystem.id)
         await audit_logs.create(
             org_id=user.org_id if user else None,
             actor_id=user.user_id if user else "anonymous",
@@ -358,6 +422,9 @@ async def _create_analysis_record(
             resource_id=analysis.id,
             metadata_json={
                 "asset_type": asset_type,
+                "asset_id": asset.id,
+                "external_asset_id": external_asset_id or None,
+                "subsystem_id": subsystem.id if subsystem else None,
                 "dispatch_mode": "arq" if should_use_queue_dispatch() else "inline",
                 "request_id": request_id,
             },
@@ -606,6 +673,8 @@ async def create_analysis(
     norad_id: str = Form(default=""),
     context: str = Form(default=""),
     asset_type: str = Form(default="satellite"),
+    asset_name: str = Form(default=""),
+    external_asset_id: str = Form(default=""),
     inspection_epoch: str = Form(default=""),
     target_subsystem: str = Form(default=""),
     capture_metadata: str = Form(default=""),
@@ -627,6 +696,8 @@ async def create_analysis(
         norad=norad,
         context=context,
         asset_type=normalized_asset_type,
+        asset_name=asset_name,
+        external_asset_id=external_asset_id,
         inspection_epoch=inspection_epoch.strip(),
         target_subsystem=target_subsystem.strip(),
         capture_metadata=_safe_json_form(capture_metadata, "capture_metadata"),
@@ -663,6 +734,8 @@ async def analyze(
     norad_id: str = Form(default=""),
     context: str = Form(default=""),
     asset_type: str = Form(default="satellite"),
+    asset_name: str = Form(default=""),
+    external_asset_id: str = Form(default=""),
     inspection_epoch: str = Form(default=""),
     target_subsystem: str = Form(default=""),
     capture_metadata: str = Form(default=""),
@@ -673,11 +746,20 @@ async def analyze(
     """
     Legacy wrapper: preserve inline SSE behavior for one transition window.
     """
+    if not settings.DEMO_MODE:
+        raise HTTPException(
+            status_code=410,
+            detail="Legacy /api/analyze is retired for production use. Submit work via POST /api/analyses instead.",
+            headers=_legacy_analyze_headers(),
+        )
+
     uploads = await _collect_uploads(image, None)
     _safe_json_form(capture_metadata, "capture_metadata")
     _safe_json_form(telemetry_summary, "telemetry_summary")
     _safe_json_form(baseline_reference, "baseline_reference")
     _normalize_asset_type(asset_type)
+    asset_name.strip()
+    external_asset_id.strip()
     inspection_epoch.strip()
     target_subsystem.strip()
 
@@ -696,7 +778,7 @@ async def analyze(
         ):
             yield event
 
-    return EventSourceResponse(event_generator())
+    return EventSourceResponse(event_generator(), headers=_legacy_analyze_headers())
 
 
 # ── Demo endpoints ───────────────────────────────────────────────────
@@ -722,12 +804,16 @@ DEMO_CONFIGS = {
 @app.get("/api/demos")
 async def list_demos():
     """List available demo cases."""
+    if not settings.DEMO_MODE:
+        raise HTTPException(status_code=404, detail="Demo catalog unavailable outside demo mode")
     return {"demos": DEMO_CONFIGS}
 
 
 @app.post("/api/demo/{demo_name}")
 async def run_demo(demo_name: str):
     """Run a pre-configured demo analysis."""
+    if not settings.DEMO_MODE:
+        raise HTTPException(status_code=404, detail="Demo execution unavailable outside demo mode")
     if demo_name not in DEMO_CONFIGS:
         raise HTTPException(status_code=404, detail=f"Demo '{demo_name}' not found")
 
@@ -800,6 +886,12 @@ async def list_analyses(
                 "items": [
                     {
                         "id": a.id,
+                        "asset_id": getattr(a, "asset_id", None),
+                        "asset_name": getattr(getattr(a, "asset", None), "name", None),
+                        "asset_external_id": getattr(getattr(a, "asset", None), "external_asset_id", None),
+                        "asset_identity_source": getattr(getattr(a, "asset", None), "identity_source", None),
+                        "subsystem_id": getattr(a, "subsystem_id", None),
+                        "subsystem_key": getattr(getattr(a, "subsystem", None), "subsystem_key", None),
                         "status": a.status,
                         "asset_type": getattr(a, "asset_type", "satellite"),
                         "request_id": getattr(a, "request_id", None),
@@ -810,6 +902,15 @@ async def list_analyses(
                         "retry_count": getattr(a, "retry_count", 0),
                         "human_review_required": getattr(a, "human_review_required", True),
                         "decision_blocked_reason": getattr(a, "decision_blocked_reason", None),
+                        "decision_status": getattr(a, "decision_status", "pending_policy"),
+                        "decision_summary": getattr(a, "decision_summary", {}) or {},
+                        "decision_recommended_action": getattr(a, "decision_recommended_action", None),
+                        "decision_confidence": getattr(a, "decision_confidence", None),
+                        "decision_urgency": getattr(a, "decision_urgency", None),
+                        "triage_score": getattr(a, "triage_score", None),
+                        "triage_band": getattr(a, "triage_band", None),
+                        "triage_factors": getattr(a, "triage_factors", {}) or {},
+                        "recurrence_count": getattr(a, "recurrence_count", 0),
                         "norad_id": a.norad_id,
                         "degraded": getattr(a, "degraded", False),
                         "failure_reasons": getattr(a, "failure_reasons", []) or [],
@@ -846,6 +947,12 @@ async def get_analysis(
 
             return {
                 "id": analysis.id,
+                "asset_id": getattr(analysis, "asset_id", None),
+                "asset_name": getattr(getattr(analysis, "asset", None), "name", None),
+                "asset_external_id": getattr(getattr(analysis, "asset", None), "external_asset_id", None),
+                "asset_identity_source": getattr(getattr(analysis, "asset", None), "identity_source", None),
+                "subsystem_id": getattr(analysis, "subsystem_id", None),
+                "subsystem_key": getattr(getattr(analysis, "subsystem", None), "subsystem_key", None),
                 "status": analysis.status,
                 "asset_type": getattr(analysis, "asset_type", "satellite"),
                 "request_id": getattr(analysis, "request_id", None),
@@ -860,6 +967,27 @@ async def get_analysis(
                 "model_manifest": getattr(analysis, "model_manifest", {}) or {},
                 "human_review_required": getattr(analysis, "human_review_required", True),
                 "decision_blocked_reason": getattr(analysis, "decision_blocked_reason", None),
+                "decision_summary": getattr(analysis, "decision_summary", {}) or {},
+                "decision_status": getattr(analysis, "decision_status", "pending_policy"),
+                "decision_recommended_action": getattr(analysis, "decision_recommended_action", None),
+                "decision_confidence": getattr(analysis, "decision_confidence", None),
+                "decision_urgency": getattr(analysis, "decision_urgency", None),
+                "decision_approved_by": getattr(analysis, "decision_approved_by", None),
+                "decision_approved_at": (
+                    getattr(analysis, "decision_approved_at", None).isoformat()
+                    if getattr(analysis, "decision_approved_at", None)
+                    else None
+                ),
+                "decision_override_reason": getattr(analysis, "decision_override_reason", None),
+                "decision_last_evaluated_at": (
+                    getattr(analysis, "decision_last_evaluated_at", None).isoformat()
+                    if getattr(analysis, "decision_last_evaluated_at", None)
+                    else None
+                ),
+                "triage_score": getattr(analysis, "triage_score", None),
+                "triage_band": getattr(analysis, "triage_band", None),
+                "triage_factors": getattr(analysis, "triage_factors", {}) or {},
+                "recurrence_count": getattr(analysis, "recurrence_count", 0),
                 "norad_id": analysis.norad_id,
                 "additional_context": getattr(analysis, "additional_context", ""),
                 "capture_metadata": getattr(analysis, "capture_metadata", {}) or {},
@@ -876,6 +1004,10 @@ async def get_analysis(
                 "environment": analysis.environment_result,
                 "failure_mode": analysis.failure_mode_result,
                 "insurance_risk": analysis.insurance_risk_result,
+                "permissions": {
+                    "can_review_decision": (not settings.AUTH_ENABLED) or bool(user and user.role in {"analyst", "admin"}),
+                    "can_override_decision": (not settings.AUTH_ENABLED) or bool(user and user.role == "admin"),
+                },
                 "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
                 "completed_at": analysis.completed_at.isoformat() if analysis.completed_at else None,
             }

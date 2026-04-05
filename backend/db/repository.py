@@ -6,13 +6,17 @@ Isolates SQLAlchemy queries from business logic. All methods are async.
 
 import hashlib
 from datetime import datetime, timezone
-from sqlalchemy import select, update, func, delete
+from sqlalchemy import select, update, func, delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased, selectinload
 from db.models import (
     Analysis,
     AnalysisEvent,
     Report,
     Organization,
+    Asset,
+    AssetAlias,
+    AssetSubsystem,
     WebhookEndpoint,
     DeadLetterJob,
     WebhookDelivery,
@@ -29,6 +33,7 @@ class AnalysisRepository:
     async def create(
         self,
         org_id: str | None = None,
+        asset_id: str | None = None,
         image_bytes: bytes | None = None,
         image_path: str | None = None,
         norad_id: str | None = None,
@@ -54,6 +59,7 @@ class AnalysisRepository:
 
         analysis = Analysis(
             org_id=org_id,
+            asset_id=asset_id,
             image_hash=image_hash,
             image_path=image_path,
             norad_id=norad_id,
@@ -83,7 +89,11 @@ class AnalysisRepository:
 
     async def get(self, analysis_id: str, org_id: str | None = None) -> Analysis | None:
         """Get analysis by ID."""
-        query = select(Analysis).where(Analysis.id == analysis_id)
+        query = (
+            select(Analysis)
+            .options(selectinload(Analysis.asset), selectinload(Analysis.subsystem))
+            .where(Analysis.id == analysis_id)
+        )
         if org_id:
             query = query.where(Analysis.org_id == org_id)
         result = await self.session.execute(query)
@@ -118,6 +128,14 @@ class AnalysisRepository:
         )
         await self.session.commit()
 
+    async def update_fields(self, analysis_id: str, **values) -> None:
+        if not values:
+            return
+        await self.session.execute(
+            update(Analysis).where(Analysis.id == analysis_id).values(**values)
+        )
+        await self.session.commit()
+
     async def mark_dispatched(
         self,
         analysis_id: str,
@@ -147,6 +165,45 @@ class AnalysisRepository:
             retry_count=retry_count,
             last_error=error_message,
         )
+
+    async def update_decision_state(
+        self,
+        analysis_id: str,
+        *,
+        decision_summary: dict,
+        decision_status: str,
+        decision_recommended_action: str | None,
+        decision_confidence: str | None,
+        decision_urgency: str | None,
+        decision_blocked_reason: str | None,
+        triage_score: float | None,
+        triage_band: str | None,
+        triage_factors: dict,
+        recurrence_count: int,
+        decision_override_reason: str | None = None,
+        decision_approved_by: str | None = None,
+        decision_approved_at=None,
+    ) -> None:
+        values = {
+            "decision_summary": decision_summary,
+            "decision_status": decision_status,
+            "decision_recommended_action": decision_recommended_action,
+            "decision_confidence": decision_confidence,
+            "decision_urgency": decision_urgency,
+            "decision_blocked_reason": decision_blocked_reason,
+            "triage_score": triage_score,
+            "triage_band": triage_band,
+            "triage_factors": triage_factors,
+            "recurrence_count": recurrence_count,
+            "decision_override_reason": decision_override_reason,
+            "decision_approved_by": decision_approved_by,
+            "decision_approved_at": decision_approved_at,
+            "decision_last_evaluated_at": datetime.now(timezone.utc),
+        }
+        await self.session.execute(
+            update(Analysis).where(Analysis.id == analysis_id).values(**values)
+        )
+        await self.session.commit()
 
     async def store_agent_result(
         self,
@@ -209,7 +266,11 @@ class AnalysisRepository:
         offset: int = 0,
     ) -> tuple[list[Analysis], int]:
         """List analyses with pagination. Returns (items, total_count)."""
-        query = select(Analysis).order_by(Analysis.created_at.desc())
+        query = (
+            select(Analysis)
+            .options(selectinload(Analysis.asset), selectinload(Analysis.subsystem))
+            .order_by(Analysis.created_at.desc())
+        )
         count_query = select(func.count(Analysis.id))
 
         if org_id:
@@ -222,6 +283,154 @@ class AnalysisRepository:
 
         return items, total
 
+    async def list_for_decision_backfill(
+        self,
+        *,
+        org_id: str | None = None,
+        limit: int = 500,
+    ) -> list[Analysis]:
+        query = (
+            select(Analysis)
+            .where(Analysis.status.in_(("completed", "completed_partial", "failed", "rejected")))
+            .where(
+                (Analysis.decision_status.is_(None))
+                | (Analysis.decision_status == "")
+                | (Analysis.decision_status == "pending_policy")
+                | (Analysis.decision_summary.is_(None))
+            )
+            .order_by(Analysis.created_at.asc())
+            .limit(limit)
+        )
+        if org_id:
+            query = query.where(Analysis.org_id == org_id)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    def _current_asset_analysis_query(self, org_id: str | None = None):
+        query = (
+            select(Analysis, Asset)
+            .join(Asset, Asset.current_analysis_id == Analysis.id)
+        )
+        if org_id:
+            query = query.where(Asset.org_id == org_id)
+        return query
+
+    async def list_latest_asset_analyses(
+        self,
+        *,
+        org_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        status: str | None = None,
+        risk_tier: str | None = None,
+        decision_status: str | None = None,
+        recommended_action: str | None = None,
+        urgency: str | None = None,
+        degraded_only: bool = False,
+    ) -> tuple[list[tuple[Analysis, Asset | None]], int]:
+        base = self._current_asset_analysis_query(org_id).options(selectinload(Analysis.subsystem))
+        count_query = select(func.count()).select_from(Asset).where(Asset.current_analysis_id.is_not(None))
+        if org_id:
+            count_query = count_query.where(Asset.org_id == org_id)
+
+        filters = []
+        if status:
+            filters.append(Analysis.status == status)
+        if risk_tier:
+            filters.append(Analysis.insurance_risk_result["risk_tier"].as_string() == risk_tier)
+        if decision_status:
+            filters.append(Analysis.decision_status == decision_status)
+        if recommended_action:
+            filters.append(Analysis.decision_recommended_action == recommended_action)
+        if urgency:
+            filters.append(Analysis.decision_urgency == urgency)
+        if degraded_only:
+            filters.append(Analysis.degraded.is_(True))
+        if filters:
+            base = base.where(and_(*filters))
+            count_query = count_query.select_from(Asset).join(Analysis, Asset.current_analysis_id == Analysis.id).where(and_(*filters))
+            if org_id:
+                count_query = count_query.where(Asset.org_id == org_id)
+
+        total = (await self.session.execute(count_query)).scalar() or 0
+        base = base.order_by(
+            Analysis.triage_score.desc().nullslast(),
+            func.coalesce(Analysis.completed_at, Analysis.created_at).desc(),
+        ).limit(limit).offset(offset)
+        result = await self.session.execute(base)
+        return list(result.all()), total
+
+    async def get_asset_portfolio_summary(self, *, org_id: str | None = None) -> dict:
+        current_query = (
+            select(
+                Analysis.id.label("analysis_id"),
+                Analysis.status.label("status"),
+                Analysis.decision_status.label("decision_status"),
+                Analysis.decision_recommended_action.label("recommended_action"),
+                Analysis.decision_urgency.label("decision_urgency"),
+                Analysis.insurance_risk_result["risk_tier"].as_string().label("risk_tier"),
+                Analysis.insurance_risk_result["underwriting_recommendation"].as_string().label("underwriting"),
+            )
+            .join(Asset, Asset.current_analysis_id == Analysis.id)
+        )
+        if org_id:
+            current_query = current_query.where(Asset.org_id == org_id)
+        current_analyses = current_query.subquery()
+
+        async def _counts(column):
+            result = await self.session.execute(
+                select(column, func.count())
+                .select_from(current_analyses)
+                .where(column.is_not(None))
+                .group_by(column)
+            )
+            return {str(key): int(count) for key, count in result.all() if key is not None}
+
+        total_assets_query = select(func.count(Asset.id)).where(Asset.current_analysis_id.is_not(None))
+        if org_id:
+            total_assets_query = total_assets_query.where(Asset.org_id == org_id)
+        total_assets = (await self.session.execute(total_assets_query)).scalar() or 0
+
+        total_analyses_query = select(func.count(Analysis.id))
+        if org_id:
+            total_analyses_query = total_analyses_query.where(Analysis.org_id == org_id)
+        total_analyses = (await self.session.execute(total_analyses_query)).scalar() or 0
+        completed = (
+            await self.session.execute(
+                select(func.count())
+                .select_from(current_analyses)
+                .where(current_analyses.c.status.in_(("completed", "completed_partial")))
+            )
+        ).scalar() or 0
+
+        risk_distribution = await _counts(current_analyses.c.risk_tier)
+        underwriting_distribution = await _counts(current_analyses.c.underwriting)
+        decision_distribution = await _counts(current_analyses.c.decision_status)
+        recommended_action_distribution = await _counts(current_analyses.c.recommended_action)
+        urgency_distribution = await _counts(current_analyses.c.decision_urgency)
+        status_distribution = await _counts(current_analyses.c.status)
+        open_attention_queue = int(
+            decision_distribution.get("pending_human_review", 0)
+            + decision_distribution.get("blocked", 0)
+        )
+        urgent_assets = int(urgency_distribution.get("urgent", 0))
+        approved_assets = int(decision_distribution.get("approved_for_use", 0))
+
+        return {
+            "total_assets": int(total_assets),
+            "total_analyses": int(total_analyses),
+            "completed": int(completed),
+            "status_distribution": status_distribution,
+            "risk_distribution": risk_distribution,
+            "underwriting_distribution": underwriting_distribution,
+            "decision_distribution": decision_distribution,
+            "recommended_action_distribution": recommended_action_distribution,
+            "urgency_distribution": urgency_distribution,
+            "open_attention_queue": open_attention_queue,
+            "urgent_assets": urgent_assets,
+            "approved_assets": approved_assets,
+        }
+
     async def list_dead_letters(
         self,
         org_id: str | None = None,
@@ -232,6 +441,328 @@ class AnalysisRepository:
             query = query.join(Analysis).where(Analysis.org_id == org_id)
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+
+class AssetRepository:
+    """Persistence for stable asset identities."""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def get(self, asset_id: str, org_id: str | None = None) -> Asset | None:
+        query = select(Asset).where(Asset.id == asset_id)
+        if org_id:
+            query = query.where(Asset.org_id == org_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def resolve_or_create(
+        self,
+        *,
+        org_id: str | None,
+        norad_id: str | None,
+        external_asset_id: str | None = None,
+        asset_type: str,
+        name: str | None = None,
+        operator_name: str | None = None,
+    ) -> Asset:
+        asset = None
+        if external_asset_id:
+            result = await self.session.execute(
+                select(Asset)
+                .where(Asset.org_id == org_id)
+                .where(Asset.external_asset_id == external_asset_id)
+                .where(Asset.asset_type == asset_type)
+                .order_by(Asset.created_at.asc())
+                .limit(1)
+            )
+            asset = result.scalar_one_or_none()
+            if not asset:
+                asset = await self._find_by_alias(
+                    org_id=org_id,
+                    asset_type=asset_type,
+                    alias_type="external_id",
+                    alias_value=external_asset_id,
+                )
+
+        if not asset and norad_id:
+            result = await self.session.execute(
+                select(Asset)
+                .where(Asset.org_id == org_id)
+                .where(Asset.norad_id == norad_id)
+                .where(Asset.asset_type == asset_type)
+                .order_by(Asset.created_at.asc())
+                .limit(1)
+            )
+            asset = result.scalar_one_or_none()
+
+        if asset:
+            dirty = False
+            if external_asset_id and not asset.external_asset_id:
+                asset.external_asset_id = external_asset_id
+                asset.identity_source = asset.identity_source or "external_id"
+                dirty = True
+            if name and not asset.name:
+                asset.name = name
+                dirty = True
+            if operator_name and not asset.operator_name:
+                asset.operator_name = operator_name
+                dirty = True
+            if dirty:
+                await self.session.commit()
+                await self.session.refresh(asset)
+            await self._register_aliases(
+                asset=asset,
+                norad_id=norad_id,
+                external_asset_id=external_asset_id,
+                display_name=name,
+            )
+            return asset
+
+        asset = Asset(
+            org_id=org_id,
+            norad_id=norad_id,
+            external_asset_id=external_asset_id,
+            name=name,
+            asset_type=asset_type,
+            identity_source=(
+                "external_id"
+                if external_asset_id
+                else "norad"
+                if norad_id
+                else "label"
+                if name
+                else "ephemeral"
+            ),
+            operator_name=operator_name,
+            status="active",
+        )
+        self.session.add(asset)
+        await self.session.commit()
+        await self.session.refresh(asset)
+        await self._register_aliases(
+            asset=asset,
+            norad_id=norad_id,
+            external_asset_id=external_asset_id,
+            display_name=name,
+        )
+        return asset
+
+    async def update_metadata(
+        self,
+        asset_id: str,
+        *,
+        norad_id: str | None = None,
+        external_asset_id: str | None = None,
+        name: str | None = None,
+        operator_name: str | None = None,
+        status: str | None = None,
+        current_analysis_id: str | None = None,
+    ) -> None:
+        values = {}
+        if norad_id is not None:
+            values["norad_id"] = norad_id
+        if external_asset_id is not None:
+            values["external_asset_id"] = external_asset_id
+        if name is not None:
+            values["name"] = name
+        if operator_name is not None:
+            values["operator_name"] = operator_name
+        if status is not None:
+            values["status"] = status
+        if current_analysis_id is not None:
+            values["current_analysis_id"] = current_analysis_id
+        if not values:
+            return
+        values["updated_at"] = datetime.now(timezone.utc)
+        await self.session.execute(update(Asset).where(Asset.id == asset_id).values(**values))
+        await self.session.commit()
+
+    async def promote_current_analysis(
+        self,
+        *,
+        asset_id: str,
+        analysis: Analysis,
+    ) -> None:
+        asset = await self.get(asset_id)
+        if not asset:
+            return
+        if not asset.current_analysis_id:
+            await self.update_metadata(asset_id, current_analysis_id=analysis.id)
+            return
+        if asset.current_analysis_id == analysis.id:
+            return
+
+        result = await self.session.execute(
+            select(Analysis).where(Analysis.id == asset.current_analysis_id)
+        )
+        current = result.scalar_one_or_none()
+        current_ts = (
+            getattr(current, "completed_at", None)
+            or getattr(current, "created_at", None)
+            or datetime.min.replace(tzinfo=timezone.utc)
+        )
+        candidate_ts = (
+            getattr(analysis, "completed_at", None)
+            or getattr(analysis, "created_at", None)
+            or datetime.min.replace(tzinfo=timezone.utc)
+        )
+        if candidate_ts >= current_ts:
+            await self.update_metadata(asset_id, current_analysis_id=analysis.id)
+
+    async def resolve_or_create_subsystem(
+        self,
+        *,
+        asset_id: str,
+        org_id: str | None,
+        subsystem_key: str | None,
+        display_name: str | None = None,
+        subsystem_type: str | None = None,
+    ) -> AssetSubsystem | None:
+        key = (subsystem_key or "").strip().lower()
+        if not key:
+            return None
+        result = await self.session.execute(
+            select(AssetSubsystem)
+            .where(AssetSubsystem.asset_id == asset_id)
+            .where(AssetSubsystem.subsystem_key == key)
+            .order_by(AssetSubsystem.created_at.asc())
+            .limit(1)
+        )
+        subsystem = result.scalar_one_or_none()
+        if subsystem:
+            dirty = False
+            if display_name and not subsystem.display_name:
+                subsystem.display_name = display_name
+                dirty = True
+            if subsystem_type and not subsystem.subsystem_type:
+                subsystem.subsystem_type = subsystem_type
+                dirty = True
+            if dirty:
+                await self.session.commit()
+                await self.session.refresh(subsystem)
+            return subsystem
+
+        subsystem = AssetSubsystem(
+            asset_id=asset_id,
+            org_id=org_id,
+            subsystem_key=key,
+            display_name=display_name or subsystem_key,
+            subsystem_type=subsystem_type or key,
+            status="active",
+        )
+        self.session.add(subsystem)
+        await self.session.commit()
+        await self.session.refresh(subsystem)
+        return subsystem
+
+    async def count_prior_attentionworthy_analyses(
+        self,
+        *,
+        asset_id: str,
+        current_analysis_id: str,
+    ) -> int:
+        attentionworthy = (
+            select(func.count(Analysis.id))
+            .where(Analysis.asset_id == asset_id)
+            .where(Analysis.id != current_analysis_id)
+            .where(Analysis.status.in_(("completed", "completed_partial")))
+            .where(
+                (Analysis.decision_recommended_action.in_(("reimage", "maneuver_review", "servicing_candidate", "insurance_escalation", "disposal_review")))
+                | (Analysis.decision_status == "blocked")
+                | (Analysis.report_completeness == "PARTIAL")
+            )
+        )
+        result = await self.session.execute(attentionworthy)
+        return int(result.scalar() or 0)
+
+    async def _find_by_alias(
+        self,
+        *,
+        org_id: str | None,
+        asset_type: str,
+        alias_type: str,
+        alias_value: str,
+    ) -> Asset | None:
+        result = await self.session.execute(
+            select(Asset)
+            .join(AssetAlias, AssetAlias.asset_id == Asset.id)
+            .where(Asset.org_id == org_id)
+            .where(Asset.asset_type == asset_type)
+            .where(AssetAlias.alias_type == alias_type)
+            .where(AssetAlias.alias_value == alias_value)
+            .order_by(Asset.created_at.asc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def _register_aliases(
+        self,
+        *,
+        asset: Asset,
+        norad_id: str | None,
+        external_asset_id: str | None,
+        display_name: str | None,
+    ) -> None:
+        if norad_id:
+            await self.upsert_alias(
+                asset_id=asset.id,
+                org_id=asset.org_id,
+                alias_type="norad",
+                alias_value=norad_id,
+                is_primary=True,
+            )
+        if external_asset_id:
+            await self.upsert_alias(
+                asset_id=asset.id,
+                org_id=asset.org_id,
+                alias_type="external_id",
+                alias_value=external_asset_id,
+                is_primary=True,
+            )
+        if display_name:
+            await self.upsert_alias(
+                asset_id=asset.id,
+                org_id=asset.org_id,
+                alias_type="display_name",
+                alias_value=display_name.strip(),
+                is_primary=bool(asset.name and asset.name.strip() == display_name.strip()),
+            )
+
+    async def upsert_alias(
+        self,
+        *,
+        asset_id: str,
+        org_id: str | None,
+        alias_type: str,
+        alias_value: str,
+        is_primary: bool = False,
+    ) -> None:
+        value = alias_value.strip()
+        if not value:
+            return
+        result = await self.session.execute(
+            select(AssetAlias)
+            .where(AssetAlias.asset_id == asset_id)
+            .where(AssetAlias.alias_type == alias_type)
+            .where(AssetAlias.alias_value == value)
+            .limit(1)
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            if is_primary and not existing.is_primary:
+                existing.is_primary = True
+                await self.session.commit()
+            return
+        alias = AssetAlias(
+            asset_id=asset_id,
+            org_id=org_id,
+            alias_type=alias_type,
+            alias_value=value,
+            is_primary=is_primary,
+        )
+        self.session.add(alias)
+        await self.session.commit()
 
 
 class ReportRepository:

@@ -40,6 +40,22 @@ async function submitAnalysis(
   await page.getByTestId('analyze-button').click();
 }
 
+async function useRoleToken(page: Page, role: 'analyst' | 'admin') {
+  const token =
+    role === 'admin'
+      ? process.env.ORBITAL_INSPECT_E2E_ADMIN_TOKEN
+      : process.env.VITE_API_BEARER_TOKEN;
+  if (!token) {
+    throw new Error(`Missing E2E token for role: ${role}`);
+  }
+  await page.addInitScript(
+    ([storageKey, authToken]) => {
+      window.localStorage.setItem(storageKey, authToken);
+    },
+    ['orbitalInspectAuthToken', token],
+  );
+}
+
 test('completed durable analysis persists into portfolio', async ({ page }) => {
   await submitAnalysis(page, {
     noradId: '910001',
@@ -88,4 +104,51 @@ test('rejected terminal state is surfaced clearly', async ({ page }) => {
 
   await expect(page.getByTestId('analysis-status')).toHaveText('TARGET REJECTED');
   await expect(page.getByTestId('analysis-rejected-banner')).toBeVisible();
+});
+
+test('decision workflow supports approve, block, reimage, and override', async ({ page }) => {
+  await useRoleToken(page, 'admin');
+
+  await submitAnalysis(page, {
+    noradId: '910005',
+    assetType: 'compute_platform',
+    context: '[e2e:success] Decision approval workflow verification.',
+  });
+
+  await expect(page.getByTestId('decision-summary-panel')).toBeVisible();
+  await expect(page.getByTestId('decision-approve-button')).toBeVisible();
+  await page.getByTestId('decision-approve-button').click();
+  await expect(page.getByText(/Approved for use by/i)).toBeVisible();
+
+  await submitAnalysis(page, {
+    noradId: '910006',
+    assetType: 'compute_platform',
+    context: '[e2e:success] Decision block and reimage workflow verification.',
+  });
+
+  await expect(page.getByTestId('decision-block-button')).toBeVisible();
+  await page.getByTestId('decision-block-button').click();
+  await expect(page.getByTestId('decision-reset-button')).toBeVisible();
+  await expect(page.getByText(/Blocked:/i)).toBeVisible();
+  await page.getByTestId('decision-reset-button').click();
+  await expect(page.getByTestId('decision-reimage-button')).toBeVisible();
+  await page.getByTestId('decision-reimage-button').click();
+  await expect(page.getByText(/^Blocked: Re-image required before decision use$/)).toBeVisible();
+  await expect(page.getByText(/^REIMAGE$/).first()).toBeVisible();
+
+  await submitAnalysis(page, {
+    noradId: '910007',
+    assetType: 'compute_platform',
+    context: '[e2e:success] Decision override workflow verification.',
+  });
+
+  await expect(page.getByTestId('decision-override-button')).toBeDisabled();
+  await page.getByTestId('decision-override-comments-input').fill(
+    'Operational context has changed and the asset should stay under monitored operations.',
+  );
+  await expect(page.getByTestId('decision-override-button')).toBeEnabled();
+  await page.getByTestId('decision-override-action-select').selectOption('monitor');
+  await page.getByTestId('decision-override-button').click();
+  await expect(page.getByText(/Override active/i)).toBeVisible();
+  await expect(page.getByText(/Administrative override to monitor/i)).toBeVisible();
 });

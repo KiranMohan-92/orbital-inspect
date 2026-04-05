@@ -37,6 +37,8 @@ def _report_payload(analysis) -> dict:
         "environment": analysis.environment_result,
         "failure_mode": analysis.failure_mode_result,
         "insurance_risk": analysis.insurance_risk_result,
+        "decision_summary": getattr(analysis, "decision_summary", {}) or {},
+        "decision_status": getattr(analysis, "decision_status", None),
         "evidence_gaps": analysis.evidence_gaps,
         "report_completeness": analysis.report_completeness,
     }
@@ -48,6 +50,8 @@ def _governance_summary(analysis) -> dict:
         "model_manifest": getattr(analysis, "model_manifest", {}) or {},
         "human_review_required": getattr(analysis, "human_review_required", True),
         "decision_blocked_reason": getattr(analysis, "decision_blocked_reason", None),
+        "decision_summary": getattr(analysis, "decision_summary", {}) or {},
+        "decision_status": getattr(analysis, "decision_status", None),
     }
 
 
@@ -286,7 +290,7 @@ async def get_report(
 @router.post("/inline/generate-pdf")
 async def generate_inline_pdf(
     data: dict,
-    user: CurrentUser | None = Depends(get_current_user),
+    user: CurrentUser | None = Depends(require_role("analyst")),
     _rate_limit=Depends(require_rate_limit("report")),
 ):
     try:
@@ -302,7 +306,7 @@ async def generate_inline_pdf(
 @router.post("/{analysis_id}/generate-pdf")
 async def generate_pdf(
     analysis_id: str,
-    user: CurrentUser | None = Depends(get_current_user),
+    user: CurrentUser | None = Depends(require_role("analyst")),
     _rate_limit=Depends(require_rate_limit("report")),
 ):
     try:

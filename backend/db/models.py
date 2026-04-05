@@ -3,6 +3,9 @@ SQLAlchemy ORM models for persistent storage.
 
 Tables:
   - organizations: Multi-tenant org records
+  - assets: Stable orbital asset identities within an org
+  - asset_aliases: Canonical and external identifiers for assets
+  - asset_subsystems: Stable subsystem identities within an asset
   - analyses: Satellite inspection jobs
   - analysis_events: SSE events per analysis (audit trail)
   - reports: Finalized condition reports with approval workflow
@@ -35,6 +38,93 @@ class Organization(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     analyses = relationship("Analysis", back_populates="organization")
+    assets = relationship("Asset", back_populates="organization")
+
+
+class Asset(Base):
+    """Stable identity for an orbital asset inside one organization."""
+
+    __tablename__ = "assets"
+    __table_args__ = (
+        Index("ix_assets_org_norad_type", "org_id", "norad_id", "asset_type"),
+        Index("ix_assets_org_external_type", "org_id", "external_asset_id", "asset_type"),
+        Index("ix_assets_org_created", "org_id", "created_at"),
+    )
+
+    id = Column(String(32), primary_key=True, default=_uuid)
+    org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
+    norad_id = Column(String(9), nullable=True)
+    external_asset_id = Column(String(255), nullable=True)
+    name = Column(String(255), nullable=True)
+    asset_type = Column(String(50), default="satellite")
+    identity_source = Column(String(32), default="norad")  # norad | external_id | label | ephemeral
+    operator_name = Column(String(255), nullable=True)
+    status = Column(String(32), default="active")
+    current_analysis_id = Column(String(32), ForeignKey("analyses.id"), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    organization = relationship("Organization", back_populates="assets")
+    analyses = relationship("Analysis", back_populates="asset", foreign_keys="Analysis.asset_id")
+    aliases = relationship("AssetAlias", back_populates="asset", cascade="all, delete-orphan")
+    subsystems = relationship("AssetSubsystem", back_populates="asset", cascade="all, delete-orphan")
+    current_analysis = relationship("Analysis", foreign_keys=[current_analysis_id], post_update=True)
+
+
+class AssetAlias(Base):
+    """Alternate identifiers for canonical asset records."""
+
+    __tablename__ = "asset_aliases"
+    __table_args__ = (
+        Index("ix_asset_aliases_org_type_value", "org_id", "alias_type", "alias_value"),
+        Index("ix_asset_aliases_asset", "asset_id"),
+    )
+
+    id = Column(String(32), primary_key=True, default=_uuid)
+    asset_id = Column(String(32), ForeignKey("assets.id"), nullable=False)
+    org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
+    alias_type = Column(String(32), nullable=False)  # norad | external_id | display_name | operator_label
+    alias_value = Column(String(255), nullable=False)
+    is_primary = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    asset = relationship("Asset", back_populates="aliases")
+
+
+class AssetSubsystem(Base):
+    """Stable subsystem identity under a canonical asset."""
+
+    __tablename__ = "asset_subsystems"
+    __table_args__ = (
+        Index("ix_asset_subsystems_asset_key", "asset_id", "subsystem_key"),
+        Index("ix_asset_subsystems_org_asset", "org_id", "asset_id"),
+    )
+
+    id = Column(String(32), primary_key=True, default=_uuid)
+    asset_id = Column(String(32), ForeignKey("assets.id"), nullable=False)
+    org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
+    subsystem_key = Column(String(100), nullable=False)
+    display_name = Column(String(255), nullable=True)
+    subsystem_type = Column(String(100), nullable=True)
+    status = Column(String(32), default="active")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    asset = relationship("Asset", back_populates="subsystems")
+    analyses = relationship("Analysis", back_populates="subsystem")
 
 
 class Analysis(Base):
@@ -42,12 +132,16 @@ class Analysis(Base):
     __tablename__ = "analyses"
     __table_args__ = (
         Index("ix_analyses_org_status", "org_id", "status"),
+        Index("ix_analyses_asset_completed", "asset_id", "completed_at"),
+        Index("ix_analyses_asset_subsystem", "asset_id", "subsystem_id"),
         Index("ix_analyses_queue_job", "queue_job_id"),
         Index("ix_analyses_created", "created_at"),
     )
 
     id = Column(String(32), primary_key=True, default=_uuid)
     org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
+    asset_id = Column(String(32), ForeignKey("assets.id"), nullable=True)
+    subsystem_id = Column(String(32), ForeignKey("asset_subsystems.id"), nullable=True)
     status = Column(String(32), default="queued")  # queued | dispatched | running | retrying | completed | completed_partial | failed | rejected
 
     # Input
@@ -90,6 +184,19 @@ class Analysis(Base):
     model_manifest = Column(JSON, default=dict)
     human_review_required = Column(Boolean, default=True)
     decision_blocked_reason = Column(Text, nullable=True)
+    decision_summary = Column(JSON, default=dict)
+    decision_status = Column(String(32), default="pending_policy")
+    decision_recommended_action = Column(String(64), nullable=True)
+    decision_confidence = Column(String(32), nullable=True)
+    decision_urgency = Column(String(32), nullable=True)
+    decision_approved_by = Column(String(255), nullable=True)
+    decision_approved_at = Column(DateTime, nullable=True)
+    decision_override_reason = Column(Text, nullable=True)
+    decision_last_evaluated_at = Column(DateTime, nullable=True)
+    triage_score = Column(Float, nullable=True)
+    triage_band = Column(String(32), nullable=True)
+    triage_factors = Column(JSON, default=dict)
+    recurrence_count = Column(Integer, default=0)
 
     # Timestamps
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -99,6 +206,8 @@ class Analysis(Base):
 
     # Relationships
     organization = relationship("Organization", back_populates="analyses")
+    asset = relationship("Asset", back_populates="analyses", foreign_keys=[asset_id])
+    subsystem = relationship("AssetSubsystem", back_populates="analyses")
     events = relationship("AnalysisEvent", back_populates="analysis", order_by="AnalysisEvent.sequence")
     report = relationship("Report", back_populates="analysis", uselist=False)
     dead_letters = relationship("DeadLetterJob", back_populates="analysis")

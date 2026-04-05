@@ -31,6 +31,8 @@ export interface AgentState {
 
 export interface AnalysisContext {
   noradId?: string;
+  assetName?: string;
+  externalAssetId?: string;
   additionalContext?: string;
   assetType?: AssetType;
   inspectionEpoch?: string;

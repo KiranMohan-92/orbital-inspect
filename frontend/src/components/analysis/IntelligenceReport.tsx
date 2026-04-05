@@ -1,13 +1,49 @@
-import { Suspense, useCallback, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import AgentFeed from "./AgentFeed";
 import InsuranceRiskCard from "./InsuranceRiskCard";
 import { RiskMatrixDrilldown, DegradationTimeline } from "../viz";
 import type { UseAnalysisReturn } from "../../hooks/useAnalysisState";
 import type { InsuranceRiskReport, SatelliteFailureModeAnalysis, ClassificationResult } from "../../types";
-import { apiFetch, apiUrl } from "../../utils/api";
+import { apiFetch, apiUrl, readApiErrorMessage } from "../../utils/api";
 
 interface Props {
   analysis: UseAnalysisReturn;
+}
+
+interface DecisionSummary {
+  recommended_action?: string | null;
+  policy_recommended_action?: string | null;
+  decision_confidence?: string | null;
+  decision_rationale?: string | null;
+  required_human_review?: boolean;
+  blocked?: boolean;
+  blocked_reason?: string | null;
+  evidence_completeness_bucket?: string | null;
+  urgency?: string | null;
+  policy_version?: string | null;
+  override_active?: boolean;
+  override_reason_code?: string | null;
+  override_reason?: string | null;
+}
+
+interface PersistedAnalysisDetail {
+  asset_id?: string | null;
+  asset_name?: string | null;
+  asset_external_id?: string | null;
+  asset_identity_source?: string | null;
+  subsystem_id?: string | null;
+  subsystem_key?: string | null;
+  decision_summary?: DecisionSummary | null;
+  decision_status?: string | null;
+  decision_approved_by?: string | null;
+  decision_approved_at?: string | null;
+  decision_override_reason?: string | null;
+  triage_score?: number | null;
+  triage_band?: string | null;
+  permissions?: {
+    can_review_decision?: boolean;
+    can_override_decision?: boolean;
+  };
 }
 
 export default function IntelligenceReport({ analysis }: Props) {
@@ -24,6 +60,96 @@ export default function IntelligenceReport({ analysis }: Props) {
     state.errorMessage ||
     (typeof derivedAgentFailure?.payload?.reason === "string" ? derivedAgentFailure.payload.reason : null);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [persistedAnalysis, setPersistedAnalysis] = useState<PersistedAnalysisDetail | null>(null);
+  const [decisionBusy, setDecisionBusy] = useState(false);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionLoading, setDecisionLoading] = useState(false);
+  const [overrideAction, setOverrideAction] = useState("monitor");
+  const [overrideReasonCode, setOverrideReasonCode] = useState("new_evidence");
+  const [overrideComments, setOverrideComments] = useState("");
+
+  useEffect(() => {
+    if (!state.analysisId || !["completed", "completed_partial", "failed", "rejected"].includes(state.analysisStatus)) {
+      return;
+    }
+
+    let cancelled = false;
+    async function fetchDetail() {
+      setDecisionLoading(true);
+      try {
+        for (let attempt = 0; attempt < 6 && !cancelled; attempt += 1) {
+          const response = await apiFetch(`/api/analyses/${state.analysisId}`);
+          if (!response.ok) {
+            return;
+          }
+          const payload = (await response.json()) as PersistedAnalysisDetail;
+          if (cancelled) {
+            return;
+          }
+          setPersistedAnalysis(payload);
+
+          const ready =
+            Boolean(payload.decision_summary) &&
+            payload.decision_status !== "pending_policy";
+          if (ready) {
+            return;
+          }
+
+          await new Promise((resolve) => window.setTimeout(resolve, 600));
+        }
+      } finally {
+        if (!cancelled) {
+          setDecisionLoading(false);
+        }
+      }
+    }
+    void fetchDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.analysisId, state.analysisStatus]);
+
+  const handleDecisionReview = useCallback(async (
+    action: "approve" | "block" | "request_reimage" | "override_action" | "reset_review",
+    options?: { comments?: string; overrideAction?: string; reasonCode?: string }
+  ) => {
+    if (!state.analysisId) return;
+    setDecisionBusy(true);
+    setDecisionError(null);
+    try {
+      const response = await apiFetch(`/api/analyses/${state.analysisId}/decision/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          comments:
+            options?.comments ??
+            (action === "approve"
+              ? "Approved for operational use"
+              : action === "block"
+                ? "Blocked pending analyst review"
+                : action === "request_reimage"
+                  ? "Re-image required before decision use"
+                  : ""),
+          override_action: options?.overrideAction,
+          reason_code: options?.reasonCode,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await readApiErrorMessage(response, "Decision review failed"));
+      }
+      const payload = await response.json() as PersistedAnalysisDetail;
+      setPersistedAnalysis((current) => ({ ...(current ?? {}), ...payload }));
+      setOverrideComments("");
+    } catch (error) {
+      setDecisionError(error instanceof Error ? error.message : "Decision review failed");
+    } finally {
+      setDecisionBusy(false);
+    }
+  }, [state.analysisId]);
+
+  const canReviewDecision = persistedAnalysis?.permissions?.can_review_decision ?? false;
+  const canOverrideDecision = persistedAnalysis?.permissions?.can_override_decision ?? false;
 
   const handleDownloadReport = useCallback(async () => {
     setPdfLoading(true);
@@ -94,6 +220,12 @@ export default function IntelligenceReport({ analysis }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
               <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Asset Label</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                  {persistedAnalysis?.asset_name || state.assetName || "n/a"}
+                </p>
+              </div>
+              <div>
                 <p style={{ color: "var(--text-tertiary)" }}>Asset Type</p>
                 <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>{state.assetType}</p>
               </div>
@@ -102,12 +234,26 @@ export default function IntelligenceReport({ analysis }: Props) {
                 <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>{state.noradId || "n/a"}</p>
               </div>
               <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Operator Asset ID</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                  {persistedAnalysis?.asset_external_id || state.externalAssetId || "n/a"}
+                </p>
+              </div>
+              <div>
                 <p style={{ color: "var(--text-tertiary)" }}>Inspection Epoch</p>
                 <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>{state.inspectionEpoch || "n/a"}</p>
               </div>
               <div>
                 <p style={{ color: "var(--text-tertiary)" }}>Subsystem</p>
-                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>{state.targetSubsystem || "n/a"}</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                  {persistedAnalysis?.subsystem_key || state.targetSubsystem || "n/a"}
+                </p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Identity Source</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                  {(persistedAnalysis?.asset_identity_source || "unknown").replace(/_/g, " ")}
+                </p>
               </div>
             </div>
             {state.analysisStatus !== "idle" && (
@@ -133,6 +279,195 @@ export default function IntelligenceReport({ analysis }: Props) {
         {/* Insurance Risk Report */}
         {isComplete && insurancePayload && (
           <InsuranceRiskCard report={insurancePayload} />
+        )}
+
+        {persistedAnalysis?.decision_summary && (
+          <div className="data-card" data-testid="decision-summary-panel">
+            <div className="flex items-center justify-between gap-3">
+              <p className="label-mono">RECOMMENDED ACTION</p>
+              <span className="font-mono-data text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                {persistedAnalysis.decision_status || "pending_policy"}
+              </span>
+            </div>
+
+            {persistedAnalysis.decision_status === "pending_policy" && (
+              <div className="mt-3 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                Decision post-processing is still finalizing. Review controls will appear once the deterministic policy pass completes.
+              </div>
+            )}
+
+            {decisionLoading && persistedAnalysis?.decision_status === "pending_policy" && (
+              <div className="mt-2 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                Refreshing analysis detail…
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Action</p>
+                <p className="font-mono-display text-sm" style={{ color: "var(--text-primary)" }}>
+                  {(persistedAnalysis.decision_summary.recommended_action || "blocked").replace(/_/g, " ").toUpperCase()}
+                </p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Urgency</p>
+                <p className="font-mono-data text-sm" style={{ color: "var(--text-primary)" }}>
+                  {(persistedAnalysis.decision_summary.urgency || "routine").toUpperCase()}
+                </p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Confidence</p>
+                <p className="font-mono-data text-sm" style={{ color: "var(--text-primary)" }}>
+                  {(persistedAnalysis.decision_summary.decision_confidence || "low").toUpperCase()}
+                </p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Triage</p>
+                <p className="font-mono-data text-sm" style={{ color: "var(--text-primary)" }}>
+                  {persistedAnalysis.triage_band?.toUpperCase() || "ROUTINE"}
+                  {typeof persistedAnalysis.triage_score === "number" ? ` · ${persistedAnalysis.triage_score.toFixed(2)}` : ""}
+                </p>
+              </div>
+            </div>
+
+            {persistedAnalysis.decision_summary.policy_recommended_action && (
+              <div className="mt-3 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                Policy baseline: {persistedAnalysis.decision_summary.policy_recommended_action.replace(/_/g, " ")}
+              </div>
+            )}
+
+            <p className="text-xs leading-relaxed mt-3" style={{ color: "var(--text-primary)" }}>
+              {persistedAnalysis.decision_summary.decision_rationale || "Decision policy pending."}
+            </p>
+
+            {persistedAnalysis.decision_summary.blocked_reason && (
+              <div className="mt-3 text-xs" style={{ color: "var(--severity-critical)" }}>
+                Blocked: {persistedAnalysis.decision_summary.blocked_reason}
+              </div>
+            )}
+
+            {persistedAnalysis.decision_summary.override_active && (
+              <div className="mt-3 text-xs" style={{ color: "#f59e0b" }}>
+                Override active
+                {persistedAnalysis.decision_summary.override_reason_code ? ` · ${persistedAnalysis.decision_summary.override_reason_code}` : ""}
+                {persistedAnalysis.decision_summary.override_reason ? ` · ${persistedAnalysis.decision_summary.override_reason}` : ""}
+              </div>
+            )}
+
+            {decisionError && (
+              <div className="mt-3 text-xs" data-testid="decision-error-message" style={{ color: "var(--severity-critical)" }}>
+                {decisionError}
+              </div>
+            )}
+
+            {persistedAnalysis.decision_status === "pending_human_review" && canReviewDecision && (
+              <div className="flex gap-2 mt-4">
+                <button
+                  data-testid="decision-approve-button"
+                  disabled={decisionBusy}
+                  onClick={() => void handleDecisionReview("approve")}
+                  className="px-3 py-2 rounded-md text-xs font-mono-display"
+                  style={{ background: "rgba(34,197,94,0.12)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.24)" }}
+                >
+                  APPROVE
+                </button>
+                <button
+                  data-testid="decision-block-button"
+                  disabled={decisionBusy}
+                  onClick={() => void handleDecisionReview("block")}
+                  className="px-3 py-2 rounded-md text-xs font-mono-display"
+                  style={{ background: "rgba(239,68,68,0.08)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.18)" }}
+                >
+                  BLOCK
+                </button>
+                <button
+                  data-testid="decision-reimage-button"
+                  disabled={decisionBusy}
+                  onClick={() => void handleDecisionReview("request_reimage")}
+                  className="px-3 py-2 rounded-md text-xs font-mono-display"
+                  style={{ background: "rgba(245,158,11,0.08)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.18)" }}
+                >
+                  REQUEST REIMAGE
+                </button>
+              </div>
+            )}
+
+            {persistedAnalysis.decision_status === "blocked" && canReviewDecision && (
+              <div className="flex gap-2 mt-4">
+                <button
+                  data-testid="decision-reset-button"
+                  disabled={decisionBusy}
+                  onClick={() => void handleDecisionReview("reset_review", { comments: "Decision reset for renewed analyst review" })}
+                  className="px-3 py-2 rounded-md text-xs font-mono-display"
+                  style={{ background: "rgba(148,163,184,0.08)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.18)" }}
+                >
+                  RESET REVIEW
+                </button>
+              </div>
+            )}
+
+            {canOverrideDecision && persistedAnalysis.decision_status !== "blocked" && (
+              <div className="mt-4 rounded-md p-3" style={{ border: "1px solid rgba(245,158,11,0.18)", background: "rgba(245,158,11,0.04)" }}>
+                <p className="label-mono mb-2" style={{ color: "#f59e0b" }}>ADMIN OVERRIDE</p>
+                <p className="text-[11px] mb-3" style={{ color: "var(--text-tertiary)" }}>
+                  Exception workflow. Override requires a reason code, written rationale, and is auditable against the policy recommendation.
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <select
+                    data-testid="decision-override-action-select"
+                    value={overrideAction}
+                    onChange={(e) => setOverrideAction(e.target.value)}
+                    className="orbital-input font-mono-data text-xs"
+                  >
+                    {["continue_operations", "monitor", "reimage", "maneuver_review", "servicing_candidate", "insurance_escalation", "disposal_review"].map((action) => (
+                      <option key={action} value={action}>{action.replace(/_/g, " ")}</option>
+                    ))}
+                  </select>
+                  <select
+                    data-testid="decision-override-reason-code-select"
+                    value={overrideReasonCode}
+                    onChange={(e) => setOverrideReasonCode(e.target.value)}
+                    className="orbital-input font-mono-data text-xs"
+                  >
+                    {["new_evidence", "mission_priority", "customer_policy", "operator_context", "temporary_exception"].map((code) => (
+                      <option key={code} value={code}>{code.replace(/_/g, " ")}</option>
+                    ))}
+                  </select>
+                  <button
+                    data-testid="decision-override-button"
+                    disabled={decisionBusy || !overrideComments.trim()}
+                    onClick={() => void handleDecisionReview("override_action", {
+                      comments: overrideComments,
+                      overrideAction,
+                      reasonCode: overrideReasonCode,
+                    })}
+                    className="px-3 py-2 rounded-md text-xs font-mono-display"
+                    style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b", border: "1px solid rgba(245,158,11,0.24)" }}
+                  >
+                    APPLY OVERRIDE
+                  </button>
+                </div>
+                <textarea
+                  data-testid="decision-override-comments-input"
+                  value={overrideComments}
+                  onChange={(e) => setOverrideComments(e.target.value)}
+                  placeholder="State the operational reason, evidence delta, and why the policy recommendation is being superseded."
+                  className="orbital-input w-full font-mono-data min-h-[88px] resize-none mt-2"
+                />
+                {!overrideComments.trim() && (
+                  <div className="mt-2 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                    Enter a written rationale to enable override.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {persistedAnalysis.decision_status === "approved_for_use" && persistedAnalysis.decision_approved_at && (
+              <div className="mt-3 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                Approved for use by {persistedAnalysis.decision_approved_by || "reviewer"} at {new Date(persistedAnalysis.decision_approved_at).toLocaleString()}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Risk Matrix Drilldown */}

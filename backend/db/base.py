@@ -73,7 +73,14 @@ async def init_db():
 async def _ensure_sqlite_schema(conn) -> None:
     """Best-effort additive schema updates for the demo SQLite database."""
     desired_columns = {
+        "assets": {
+            "external_asset_id": "ALTER TABLE assets ADD COLUMN external_asset_id VARCHAR(255)",
+            "identity_source": "ALTER TABLE assets ADD COLUMN identity_source VARCHAR(32) DEFAULT 'norad'",
+            "current_analysis_id": "ALTER TABLE assets ADD COLUMN current_analysis_id VARCHAR(32)",
+        },
         "analyses": {
+            "asset_id": "ALTER TABLE analyses ADD COLUMN asset_id VARCHAR(32)",
+            "subsystem_id": "ALTER TABLE analyses ADD COLUMN subsystem_id VARCHAR(32)",
             "request_id": "ALTER TABLE analyses ADD COLUMN request_id VARCHAR(64)",
             "asset_type": "ALTER TABLE analyses ADD COLUMN asset_type VARCHAR(50) DEFAULT 'satellite'",
             "inspection_epoch": "ALTER TABLE analyses ADD COLUMN inspection_epoch VARCHAR(64)",
@@ -96,6 +103,19 @@ async def _ensure_sqlite_schema(conn) -> None:
             "model_manifest": "ALTER TABLE analyses ADD COLUMN model_manifest JSON DEFAULT '{}'",
             "human_review_required": "ALTER TABLE analyses ADD COLUMN human_review_required BOOLEAN DEFAULT 1",
             "decision_blocked_reason": "ALTER TABLE analyses ADD COLUMN decision_blocked_reason TEXT",
+            "decision_summary": "ALTER TABLE analyses ADD COLUMN decision_summary JSON DEFAULT '{}'",
+            "decision_status": "ALTER TABLE analyses ADD COLUMN decision_status VARCHAR(32) DEFAULT 'pending_policy'",
+            "decision_recommended_action": "ALTER TABLE analyses ADD COLUMN decision_recommended_action VARCHAR(64)",
+            "decision_confidence": "ALTER TABLE analyses ADD COLUMN decision_confidence VARCHAR(32)",
+            "decision_urgency": "ALTER TABLE analyses ADD COLUMN decision_urgency VARCHAR(32)",
+            "decision_approved_by": "ALTER TABLE analyses ADD COLUMN decision_approved_by VARCHAR(255)",
+            "decision_approved_at": "ALTER TABLE analyses ADD COLUMN decision_approved_at DATETIME",
+            "decision_override_reason": "ALTER TABLE analyses ADD COLUMN decision_override_reason TEXT",
+            "decision_last_evaluated_at": "ALTER TABLE analyses ADD COLUMN decision_last_evaluated_at DATETIME",
+            "triage_score": "ALTER TABLE analyses ADD COLUMN triage_score FLOAT",
+            "triage_band": "ALTER TABLE analyses ADD COLUMN triage_band VARCHAR(32)",
+            "triage_factors": "ALTER TABLE analyses ADD COLUMN triage_factors JSON DEFAULT '{}'",
+            "recurrence_count": "ALTER TABLE analyses ADD COLUMN recurrence_count INTEGER DEFAULT 0",
             "queued_at": "ALTER TABLE analyses ADD COLUMN queued_at DATETIME",
         },
         "reports": {

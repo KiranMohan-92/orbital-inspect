@@ -62,6 +62,8 @@ process.env.ORBITAL_INSPECT_E2E_DATABASE_AUTO_INIT = 'true';
 process.env.ORBITAL_INSPECT_E2E_AUTH_ENABLED = 'true';
 process.env.ORBITAL_INSPECT_E2E_JWT_SECRET = e2eJwtSecret;
 process.env.VITE_API_BEARER_TOKEN = process.env.VITE_API_BEARER_TOKEN || buildE2eToken('analyst');
+process.env.ORBITAL_INSPECT_E2E_ADMIN_TOKEN =
+  process.env.ORBITAL_INSPECT_E2E_ADMIN_TOKEN || buildE2eToken('admin');
 
 const webServers = [
   {

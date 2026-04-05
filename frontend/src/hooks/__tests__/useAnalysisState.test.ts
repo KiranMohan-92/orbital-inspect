@@ -23,6 +23,8 @@ describe('buildInitialAnalysisState', () => {
     expect(state.image).toBeNull();
     expect(state.imagePreviewUrl).toBeNull();
     expect(state.noradId).toBe('');
+    expect(state.assetName).toBe('');
+    expect(state.externalAssetId).toBe('');
     expect(state.assetType).toBe('satellite');
     expect(state.inspectionEpoch).toBe('');
     expect(state.targetSubsystem).toBe('');
@@ -51,6 +53,8 @@ describe('analysisStateReducer', () => {
     const state = {
       ...buildInitialAnalysisState(),
       noradId: '25544',
+      assetName: 'ISS Power Channel 2B',
+      externalAssetId: 'nasa-iss-2b',
       assetType: 'compute_platform' as const,
       inspectionEpoch: '2026-04-02T12:00Z',
       targetSubsystem: 'solar_array',
@@ -67,6 +71,8 @@ describe('analysisStateReducer', () => {
     expect(next.image).toBe(file);
     expect(next.imagePreviewUrl).toBe('blob:mock-url');
     expect(next.noradId).toBe('25544');
+    expect(next.assetName).toBe('ISS Power Channel 2B');
+    expect(next.externalAssetId).toBe('nasa-iss-2b');
     expect(next.assetType).toBe('compute_platform');
     expect(next.inspectionEpoch).toBe('2026-04-02T12:00Z');
     expect(next.targetSubsystem).toBe('solar_array');
@@ -88,9 +94,11 @@ describe('analysisStateReducer', () => {
     expect(mockRevokeObjectURL).toHaveBeenCalledWith('blob:old-url');
   });
 
-  it('updates NORAD ID, asset type, evidence context, and analysis id', () => {
+  it('updates identity fields, evidence context, and analysis id', () => {
     let state = buildInitialAnalysisState();
     state = analysisStateReducer(state, { type: 'SET_NORAD_ID', noradId: '25544' });
+    state = analysisStateReducer(state, { type: 'SET_ASSET_NAME', assetName: 'Haven-1 Power Bus Alpha' });
+    state = analysisStateReducer(state, { type: 'SET_EXTERNAL_ASSET_ID', externalAssetId: 'vast-h1-bus-a' });
     state = analysisStateReducer(state, { type: 'SET_ASSET_TYPE', assetType: 'solar_array' });
     state = analysisStateReducer(state, {
       type: 'SET_INSPECTION_EPOCH',
@@ -107,6 +115,8 @@ describe('analysisStateReducer', () => {
     state = analysisStateReducer(state, { type: 'SET_ANALYSIS_ID', analysisId: 'analysis-123' });
 
     expect(state.noradId).toBe('25544');
+    expect(state.assetName).toBe('Haven-1 Power Bus Alpha');
+    expect(state.externalAssetId).toBe('vast-h1-bus-a');
     expect(state.assetType).toBe('solar_array');
     expect(state.inspectionEpoch).toBe('2026-04-02T12:00Z');
     expect(state.targetSubsystem).toBe('bus');

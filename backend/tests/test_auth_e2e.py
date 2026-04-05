@@ -76,6 +76,8 @@ async def test_create_analysis_accepts_analyst_role_and_passes_user_context(
             files={"image": ("secure.jpg", sample_image_bytes, "image/jpeg")},
             data={
                 "asset_type": "compute_platform",
+                "asset_name": "Orbital Compute Rack Alpha",
+                "external_asset_id": "rack-alpha",
                 "norad_id": "25544",
                 "context": "Secure analyst submission",
             },
@@ -88,6 +90,8 @@ async def test_create_analysis_accepts_analyst_role_and_passes_user_context(
     called_user = create_record.await_args.kwargs["user"]
     assert called_user.org_id == "org-analyst"
     assert called_user.role == "analyst"
+    assert create_record.await_args.kwargs["asset_name"] == "Orbital Compute Rack Alpha"
+    assert create_record.await_args.kwargs["external_asset_id"] == "rack-alpha"
     assert isinstance(create_record.await_args.kwargs["request_id"], str)
 
 
@@ -123,3 +127,37 @@ async def test_webhook_list_requires_admin_role_when_auth_enabled(client, auth_m
     response = await client.get("/api/webhooks", headers=_auth_headers("analyst"))
 
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_generate_pdf_rejects_viewer_role_when_auth_enabled(client, auth_mode):
+    response = await client.post(
+        "/api/reports/analysis-secure-1/generate-pdf",
+        headers=_auth_headers("viewer"),
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_decision_review_rejects_viewer_role_when_auth_enabled(client, auth_mode):
+    response = await client.post(
+        "/api/analyses/analysis-secure-1/decision/review",
+        json={"action": "approve", "comments": "LGTM"},
+        headers=_auth_headers("viewer"),
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_legacy_analyze_is_gone_when_demo_mode_disabled(client, auth_mode, sample_image_bytes):
+    response = await client.post(
+        "/api/analyze",
+        files={"image": ("secure.jpg", sample_image_bytes, "image/jpeg")},
+        data={"norad_id": "25544"},
+        headers=_auth_headers("analyst"),
+    )
+
+    assert response.status_code == 410
+    assert response.headers["deprecation"] == "true"

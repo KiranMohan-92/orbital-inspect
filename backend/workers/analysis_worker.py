@@ -38,6 +38,7 @@ async def run_analysis_job(
     from agents.orchestrator import run_satellite_pipeline
     from config import settings
     from services.governance_service import apply_decision_governance
+    from services.post_analysis_service import post_analysis_complete
     from services.storage_service import get_storage_backend
     from services.webhook_service import dispatch_registered_webhooks
 
@@ -175,6 +176,11 @@ async def run_analysis_job(
                     last_error=None,
                     human_review_required=governance.get("human_review_required", True),
                     decision_blocked_reason=governance.get("decision_blocked_reason"),
+                )
+                await post_analysis_complete(
+                    analysis_id=analysis_id,
+                    session=session,
+                    actor_id="system:worker",
                 )
                 await audit_logs.create(
                     org_id=analysis.org_id,

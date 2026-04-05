@@ -14,6 +14,8 @@ export default function AnalysisMode() {
     if (!state.image) return;
     analyzeImage(state.image, {
       noradId: state.noradId || undefined,
+      assetName: state.assetName || undefined,
+      externalAssetId: state.externalAssetId || undefined,
       additionalContext: state.additionalContext || undefined,
       assetType: state.assetType,
       inspectionEpoch: state.inspectionEpoch || undefined,

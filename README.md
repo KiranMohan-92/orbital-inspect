@@ -12,6 +12,10 @@ It combines a durable backend analysis pipeline, persisted event streaming, evid
 - persists stage outputs, audit events, and final status
 - streams real-time analysis events over SSE
 - generates risk-oriented inspection output and portfolio views
+- derives deterministic action recommendations and triage ranking from persisted analysis state
+- supports analyst review of decision recommendations separate from report approval
+- enforces admin-only exception overrides with explicit reason code and rationale
+- maintains org-scoped asset registry state with aliases, subsystems, and current-analysis projection
 - supports browser E2E validation against a live backend
 - supports local filesystem or S3-compatible object storage for uploaded inspection evidence
 
@@ -52,6 +56,15 @@ The latest production hardening tranche added:
 - collector-backed observability overlay with OpenTelemetry Collector, Prometheus, Tempo, Alertmanager, and Grafana
 - machine-token access path for metrics/readiness scraping without coupling collectors to user JWT flows
 - frontend bundle cleanup removing the unused 3D vendor payload from the shipped build
+- stable asset identity for portfolio and recurrence tracking
+- alias-backed asset registry for non-NORAD and operator-owned infrastructure assets
+- subsystem registration for repeated subsystem-focused inspections
+- persisted asset current-state projection for fast triage and summary reads
+- deterministic decision policy with explicit review states
+- asset-backed fleet triage scoring and ranked portfolio queue
+- decision review endpoint separate from report approval
+- demo-only legacy `/api/analyze` path with deprecation headers and production shutdown
+- startup and script-based backfill for historical decisions in demo and ephemeral environments
 
 ## Architecture
 
@@ -68,6 +81,8 @@ The latest production hardening tranche added:
 - storage abstraction for uploaded evidence and generated report artifacts
 - Alembic-managed schema evolution for production databases
 - queue dispatch, retry tracking, and dead-letter visibility for worker execution
+- asset-backed triage and decision persistence on completed analyses
+- asset registry aliases, subsystem identities, and current-analysis projection on the canonical asset
 - encrypted secret handling for registered webhooks
 - optional trace-aware observability hooks with `X-Trace-ID` response propagation when OTel is active
 - worker-side trace spans so collector-backed telemetry captures background execution and not only HTTP requests
@@ -78,6 +93,8 @@ Key backend paths:
 - [`backend/agents/orchestrator.py`](/mnt/c/Users/kiran/myprojects/orbital-inspect/backend/agents/orchestrator.py)
 - [`backend/workers/analysis_worker.py`](/mnt/c/Users/kiran/myprojects/orbital-inspect/backend/workers/analysis_worker.py)
 - [`backend/db/models.py`](/mnt/c/Users/kiran/myprojects/orbital-inspect/backend/db/models.py)
+- [`backend/services/decision_policy_service.py`](/mnt/c/Users/kiran/myprojects/orbital-inspect/backend/services/decision_policy_service.py)
+- [`backend/services/post_analysis_service.py`](/mnt/c/Users/kiran/myprojects/orbital-inspect/backend/services/post_analysis_service.py)
 
 ### Frontend
 
@@ -85,6 +102,10 @@ Key backend paths:
 - durable submission flow via `/api/analyses`
 - SSE-driven analysis state updates
 - portfolio monitoring view
+- decision recommendation panel with analyst review actions
+- admin override exception workflow with policy-vs-override context
+- operator triage queue with review-state, action, urgency, and degraded-only filtering
+- manual portfolio refresh and surfaced approval/override metadata for operator workflows
 - Playwright browser E2E and Vitest unit coverage
 
 Key frontend paths:
@@ -198,6 +219,33 @@ npm run test:e2e:live
 
 This expects a reachable Postgres instance and can be paired with the `docker compose --profile full up` stack.
 
+## Decision Workflow
+
+The `Recommended Action` panel is an operator review surface, not an autonomous command layer.
+
+- `Approve` marks the current deterministic recommendation as approved for operational use.
+- `Block` marks the recommendation as unusable pending further review.
+- `Request Reimage` blocks operational use and changes the recommended action to `reimage`.
+- `Override` is an admin-only exception path that requires a reason code plus written rationale.
+
+In normal operation the panel transitions through:
+
+1. `pending_policy`
+2. `pending_human_review`
+3. `approved_for_use` or `blocked`
+
+The frontend now waits briefly for deterministic post-processing after analysis completion so the review controls appear once the persisted decision is ready.
+
+## Operator Workflow
+
+The portfolio surface is intended to be used as an operational triage queue rather than a passive history page.
+
+- sort and ranking come from persisted triage score
+- filters support status, risk tier, decision state, recommended action, urgency, and degraded-only mode
+- the header summary highlights open attention items, urgent assets, approved assets, and pending review count
+- cards surface approval, block, and override context so operators can understand review state without opening the full analysis
+- the manual `REFRESH` control is the intended operator sync path after reviews or new analyses
+
 ## Key Endpoints
 
 - `POST /api/analyses`
@@ -206,6 +254,8 @@ This expects a reachable Postgres instance and can be paired with the `docker co
 - `GET /api/analyses/{id}/events/stream`
 - `GET /api/portfolio`
 - `GET /api/portfolio/summary`
+- `POST /api/analyses/{id}/decision/review`
+- `POST /api/analyze` (demo-only legacy endpoint; not authoritative for production flows)
 - `GET /api/metrics`
 - `GET /api/metrics/prometheus`
 - `GET /api/ready`
@@ -219,14 +269,14 @@ This expects a reachable Postgres instance and can be paired with the `docker co
 
 Latest verified commands on the current shipped tranche:
 
-- backend full suite: `169 passed`
-- frontend unit tests: `12 passed`
-- frontend browser E2E: `4 passed`
+- backend full suite: `188 passed`
+- frontend unit tests: `16 passed`
+- frontend browser E2E: `5 passed`
 - frontend production build: passed
 
 Current production build footprint:
 
-- main app bundle: `234.93 kB`
+- main app bundle: `252.61 kB`
 - degradation timeline lazy chunk: `61.18 kB`
 - risk matrix lazy chunk: `7.56 kB`
 
@@ -244,3 +294,4 @@ From a production architecture perspective, the next major upgrades should be:
 2. run auth-enabled browser E2E against fully live Postgres and object storage in CI and staging
 3. add replay-protected webhook verification guidance and webhook rotation workflows to the operator surface
 4. deepen evidence lineage with multi-epoch comparison, telemetry fusion, and baseline drift analysis
+5. add operator-facing asset registry management for alias merges, explicit asset reassignment, and subsystem lifecycle workflows

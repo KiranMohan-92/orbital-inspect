@@ -204,6 +204,21 @@ async def _collect_sse_events(response: httpx.Response) -> list[dict]:
     return parsed_events
 
 
+@pytest.mark.asyncio
+async def test_create_analysis_rejects_multiple_images(client, sample_image_bytes):
+    response = await client.post(
+        "/api/analyses",
+        files=[
+            ("images", ("primary.jpg", sample_image_bytes, "image/jpeg")),
+            ("images", ("secondary.jpg", sample_image_bytes, "image/jpeg")),
+        ],
+        data={"asset_type": "satellite"},
+    )
+
+    assert response.status_code == 400
+    assert "Multiple images are not supported yet" in response.json()["detail"]
+
+
 def _build_completed_analysis(sample_classification_result, sample_vision_result, sample_insurance_risk_result):
     now = datetime.now(timezone.utc)
     environment = {
@@ -235,8 +250,32 @@ def _build_completed_analysis(sample_classification_result, sample_vision_result
     }
     return SimpleNamespace(
         id="analysis-e2e-record",
+        asset_id="asset-e2e-record",
         status="completed",
         norad_id="25544",
+        asset_type="satellite",
+        decision_status="pending_human_review",
+        decision_summary={
+            "recommended_action": "continue_operations",
+            "decision_confidence": "high",
+            "decision_rationale": "Low composite with sufficient evidence.",
+            "required_human_review": True,
+            "blocked": False,
+            "blocked_reason": None,
+            "evidence_completeness_bucket": "sufficient",
+            "urgency": "routine",
+            "policy_version": "2026-04-03",
+        },
+        decision_recommended_action="continue_operations",
+        decision_confidence="high",
+        decision_urgency="routine",
+        triage_score=0.18,
+        triage_band="routine",
+        triage_factors={},
+        recurrence_count=0,
+        degraded=False,
+        failure_reasons=[],
+        evidence_completeness_pct=100.0,
         report_completeness="COMPLETE",
         created_at=now - timedelta(minutes=3),
         completed_at=now,
@@ -267,6 +306,69 @@ def _install_analysis_repository(monkeypatch, analyses):
         async def list_analyses(self, org_id=None, limit=20, offset=0):
             sliced = analyses[offset:offset + limit]
             return sliced, len(analyses)
+
+        async def list_latest_asset_analyses(
+            self,
+            *,
+            org_id=None,
+            limit=50,
+            offset=0,
+            status=None,
+            risk_tier=None,
+            decision_status=None,
+            recommended_action=None,
+            urgency=None,
+            degraded_only=False,
+        ):
+            filtered = analyses
+            if status:
+                filtered = [item for item in filtered if item.status == status]
+            if decision_status:
+                filtered = [item for item in filtered if getattr(item, "decision_status", None) == decision_status]
+            if recommended_action:
+                filtered = [item for item in filtered if getattr(item, "decision_recommended_action", None) == recommended_action]
+            if urgency:
+                filtered = [item for item in filtered if getattr(item, "decision_urgency", None) == urgency]
+            if degraded_only:
+                filtered = [item for item in filtered if getattr(item, "degraded", False)]
+            if risk_tier:
+                filtered = [item for item in filtered if (item.insurance_risk_result or {}).get("risk_tier") == risk_tier]
+            filtered = filtered[offset:offset + limit]
+            return [(item, SimpleNamespace(id=item.asset_id, name="ISS", operator_name="NASA")) for item in filtered], len(analyses)
+
+        async def get_asset_portfolio_summary(self, *, org_id=None):
+            risk_distribution: dict[str, int] = {}
+            underwriting_distribution: dict[str, int] = {}
+            decision_distribution: dict[str, int] = {}
+            recommended_action_distribution: dict[str, int] = {}
+            urgency_distribution: dict[str, int] = {}
+            status_distribution: dict[str, int] = {}
+            for item in analyses:
+                status_distribution[item.status] = status_distribution.get(item.status, 0) + 1
+                risk = (item.insurance_risk_result or {}).get("risk_tier", "UNKNOWN")
+                uw = (item.insurance_risk_result or {}).get("underwriting_recommendation", "UNKNOWN")
+                risk_distribution[risk] = risk_distribution.get(risk, 0) + 1
+                underwriting_distribution[uw] = underwriting_distribution.get(uw, 0) + 1
+                decision_distribution[item.decision_status] = decision_distribution.get(item.decision_status, 0) + 1
+                if getattr(item, "decision_recommended_action", None):
+                    recommended_action_distribution[item.decision_recommended_action] = (
+                        recommended_action_distribution.get(item.decision_recommended_action, 0) + 1
+                    )
+                urgency_distribution[item.decision_urgency] = urgency_distribution.get(item.decision_urgency, 0) + 1
+            return {
+                "total_assets": len(analyses),
+                "total_analyses": len(analyses),
+                "completed": len(analyses),
+                "risk_distribution": risk_distribution,
+                "underwriting_distribution": underwriting_distribution,
+                "decision_distribution": decision_distribution,
+                "recommended_action_distribution": recommended_action_distribution,
+                "urgency_distribution": urgency_distribution,
+                "status_distribution": status_distribution,
+                "open_attention_queue": decision_distribution.get("pending_human_review", 0) + decision_distribution.get("blocked", 0),
+                "urgent_assets": urgency_distribution.get("urgent", 0),
+                "approved_assets": decision_distribution.get("approved_for_use", 0),
+            }
 
     monkeypatch.setattr(db.base, "async_session_factory", lambda: _FakeSessionContext())
     monkeypatch.setattr(db.repository, "AnalysisRepository", _FakeAnalysisRepository)
@@ -539,12 +641,19 @@ async def test_portfolio_endpoints_return_satellite_list_and_risk_distribution(
     assert portfolio["total"] >= 1
     assert portfolio["satellites"]
     assert any(sat["norad_id"] == "25544" for sat in portfolio["satellites"])
+    assert portfolio["satellites"][0]["decision_status"] == "pending_human_review"
+    assert portfolio["satellites"][0]["recommended_action"] == "continue_operations"
+    assert portfolio["satellites"][0]["triage_band"] == "routine"
 
     assert summary_resp.status_code == 200
     summary = summary_resp.json()
+    assert summary["total_assets"] >= 1
     assert summary["total_analyses"] >= 1
     assert summary["completed"] >= 1
     assert summary["risk_distribution"]["LOW"] >= 1
+    assert summary["decision_distribution"]["pending_human_review"] >= 1
+    assert summary["recommended_action_distribution"]["continue_operations"] >= 1
+    assert summary["open_attention_queue"] >= 1
 
 
 @pytest.mark.asyncio

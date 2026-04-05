@@ -34,3 +34,31 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
     headers: buildApiHeaders(init?.headers),
   });
 }
+
+export async function readApiErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const contentType = response.headers.get('Content-Type') || '';
+    if (contentType.includes('application/json')) {
+      const payload = (await response.json()) as Record<string, unknown>;
+      const message =
+        payload.detail ||
+        payload.message ||
+        payload.error;
+      if (typeof message === 'string' && message.trim()) {
+        return message.trim();
+      }
+    } else {
+      const text = await response.text();
+      if (text.trim()) {
+        return text.trim();
+      }
+    }
+  } catch {
+    // Fall through to the generic fallback below.
+  }
+
+  return `${fallback} (${response.status})`;
+}
