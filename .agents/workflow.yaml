@@ -1,0 +1,82 @@
+# Multi-Model Engineering Workflow — Orbital Inspect
+# This file declares the structured AI agent collaboration pipeline.
+# It is read by humans and can be referenced by any agent's project instructions.
+
+workflow: orbital-inspect-multi-model
+version: "1.0"
+created: "2026-03-29"
+updated: "2026-04-06"
+
+# ─── Model Registry ───────────────────────────────────────────────
+models:
+  builder:
+    name: "Claude Opus 4.6"
+    tool: "claude-code"
+    config_file: "CLAUDE.md"
+    co_author_tag: 'Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>'
+    strengths:
+      - "Full-stack feature implementation"
+      - "Large refactors across many files"
+      - "Test writing and CI/CD"
+      - "Documentation"
+    sessions_to_date: 14
+
+  auditor:
+    name: "GPT 5.4"
+    tool: "codex-cli"
+    config_file: ".codex"
+    co_author_tag: 'Co-Authored-By: Codex GPT 5.4 <noreply@openai.com>'
+    strengths:
+      - "Architecture audits with scored dimensions"
+      - "Security review"
+      - "Root cause analysis"
+      - "Targeted feature builds (telemetry, evidence fusion)"
+    sessions_to_date: 4
+
+  verifier:
+    name: "Gemini 3.1 Pro"
+    tool: "gemini-cli"
+    config_file: ".gemini"
+    co_author_tag: 'Co-Authored-By: Gemini 3.1 Pro <noreply@google.com>'
+    strengths:
+      - "Independent cross-verification"
+      - "Domain-specific validation (space physics, orbital mechanics)"
+      - "Tie-breaking when builder and auditor disagree"
+      - "Web-grounded fact checking"
+    sessions_to_date: 1
+
+# ─── Workflow Phases ──────────────────────────────────────────────
+phases:
+  build:
+    owner: builder
+    description: "Implement features, fix bugs, write tests"
+    output: "Code changes with passing tests"
+    attribution: required
+
+  audit:
+    owner: auditor
+    description: "Review architecture, security, correctness"
+    trigger:
+      - "Post-feature (>200 lines changed)"
+      - "New agent or pipeline change"
+      - "Security-sensitive change"
+      - "Pre-release"
+    output: "Structured audit report with scored dimensions and numbered recommendations"
+    attribution: required
+
+  verify:
+    owner: verifier
+    description: "Independent validation of claims and implementations"
+    trigger:
+      - "Disputed finding between builder and auditor"
+      - "Pre-release three-model sign-off"
+      - "Domain-specific physics/orbital claims"
+    output: "Verification report with confirmed/challenged/unverifiable verdicts"
+    attribution: required
+
+  remediate:
+    owner: builder
+    description: "Implement fixes from audit/verify findings"
+    input: "Audit report or verification findings"
+    output: "Fix commits referencing specific findings"
+    attribution: "required — must reference source finding"
