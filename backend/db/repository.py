@@ -17,6 +17,11 @@ from db.models import (
     Asset,
     AssetAlias,
     AssetSubsystem,
+    AssetReferenceProfile,
+    EvidenceRecord,
+    AnalysisEvidenceLink,
+    IngestRun,
+    DatasetRegistry,
     WebhookEndpoint,
     DeadLetterJob,
     WebhookDelivery,
@@ -456,6 +461,51 @@ class AssetRepository:
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
+    async def get_detail(self, asset_id: str, org_id: str | None = None) -> Asset | None:
+        query = (
+            select(Asset)
+            .options(
+                selectinload(Asset.aliases),
+                selectinload(Asset.reference_profile),
+                selectinload(Asset.current_analysis),
+            )
+            .where(Asset.id == asset_id)
+        )
+        if org_id:
+            query = query.where(Asset.org_id == org_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def list_aliases(self, asset_id: str) -> list[AssetAlias]:
+        result = await self.session.execute(
+            select(AssetAlias)
+            .where(AssetAlias.asset_id == asset_id)
+            .order_by(AssetAlias.is_primary.desc(), AssetAlias.alias_type.asc(), AssetAlias.alias_value.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_analysis_timeline(
+        self,
+        *,
+        asset_id: str,
+        org_id: str | None = None,
+        limit: int = 20,
+    ) -> list[Analysis]:
+        query = (
+            select(Analysis)
+            .options(selectinload(Analysis.subsystem))
+            .where(Analysis.asset_id == asset_id)
+            .order_by(
+                func.coalesce(Analysis.completed_at, Analysis.created_at).desc(),
+                Analysis.created_at.desc(),
+            )
+            .limit(limit)
+        )
+        if org_id:
+            query = query.where(Analysis.org_id == org_id)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
     async def resolve_or_create(
         self,
         *,
@@ -465,7 +515,13 @@ class AssetRepository:
         asset_type: str,
         name: str | None = None,
         operator_name: str | None = None,
+        alias_candidates: dict[str, str | None] | None = None,
     ) -> Asset:
+        normalized_alias_candidates = {
+            alias_type: str(value).strip()
+            for alias_type, value in (alias_candidates or {}).items()
+            if str(value or "").strip()
+        }
         asset = None
         if external_asset_id:
             result = await self.session.execute(
@@ -496,6 +552,20 @@ class AssetRepository:
             )
             asset = result.scalar_one_or_none()
 
+        if not asset:
+            for alias_type in ("operator_asset_id", "cospar", "satcat"):
+                alias_value = normalized_alias_candidates.get(alias_type)
+                if not alias_value:
+                    continue
+                asset = await self._find_by_alias(
+                    org_id=org_id,
+                    asset_type=asset_type,
+                    alias_type=alias_type,
+                    alias_value=alias_value,
+                )
+                if asset:
+                    break
+
         if asset:
             dirty = False
             if external_asset_id and not asset.external_asset_id:
@@ -516,6 +586,7 @@ class AssetRepository:
                 norad_id=norad_id,
                 external_asset_id=external_asset_id,
                 display_name=name,
+                alias_candidates=normalized_alias_candidates,
             )
             return asset
 
@@ -530,6 +601,10 @@ class AssetRepository:
                 if external_asset_id
                 else "norad"
                 if norad_id
+                else "operator_asset_id"
+                if normalized_alias_candidates.get("operator_asset_id")
+                else "cospar"
+                if normalized_alias_candidates.get("cospar")
                 else "label"
                 if name
                 else "ephemeral"
@@ -545,6 +620,7 @@ class AssetRepository:
             norad_id=norad_id,
             external_asset_id=external_asset_id,
             display_name=name,
+            alias_candidates=normalized_alias_candidates,
         )
         return asset
 
@@ -703,6 +779,7 @@ class AssetRepository:
         norad_id: str | None,
         external_asset_id: str | None,
         display_name: str | None,
+        alias_candidates: dict[str, str] | None = None,
     ) -> None:
         if norad_id:
             await self.upsert_alias(
@@ -727,6 +804,19 @@ class AssetRepository:
                 alias_type="display_name",
                 alias_value=display_name.strip(),
                 is_primary=bool(asset.name and asset.name.strip() == display_name.strip()),
+            )
+        for alias_type, alias_value in (alias_candidates or {}).items():
+            if alias_type in {"norad", "external_id", "display_name"}:
+                continue
+            await self.upsert_alias(
+                asset_id=asset.id,
+                org_id=asset.org_id,
+                alias_type=alias_type,
+                alias_value=alias_value,
+                is_primary=(
+                    alias_type == "operator_asset_id"
+                    and ((external_asset_id and alias_value == external_asset_id) or not external_asset_id)
+                ),
             )
 
     async def upsert_alias(
@@ -763,6 +853,370 @@ class AssetRepository:
         )
         self.session.add(alias)
         await self.session.commit()
+
+
+class EvidenceRepository:
+    """Persistence for reusable evidence, reference profiles, and ingest metadata."""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create_record(
+        self,
+        *,
+        org_id: str | None,
+        asset_id: str | None,
+        subsystem_id: str | None = None,
+        source_type: str,
+        evidence_role: str = "runtime",
+        provider: str | None = None,
+        external_ref: str | None = None,
+        captured_at=None,
+        payload_json: dict | None = None,
+        artifact_uri: str | None = None,
+        source_url: str | None = None,
+        license: str | None = None,
+        redistribution_policy: str | None = None,
+        confidence: float | None = None,
+        geometry_metadata: dict | None = None,
+        tags: list | None = None,
+    ) -> EvidenceRecord:
+        record = EvidenceRecord(
+            org_id=org_id,
+            asset_id=asset_id,
+            subsystem_id=subsystem_id,
+            source_type=source_type,
+            evidence_role=evidence_role,
+            provider=provider,
+            external_ref=external_ref,
+            captured_at=captured_at,
+            payload_json=payload_json or {},
+            artifact_uri=artifact_uri,
+            source_url=source_url,
+            license=license,
+            redistribution_policy=redistribution_policy,
+            confidence=confidence,
+            geometry_metadata=geometry_metadata or {},
+            tags=tags or [],
+        )
+        self.session.add(record)
+        await self.session.commit()
+        await self.session.refresh(record)
+        return record
+
+
+    async def upsert_record(
+        self,
+        *,
+        org_id: str | None,
+        asset_id: str | None,
+        subsystem_id: str | None = None,
+        source_type: str,
+        evidence_role: str = "runtime",
+        provider: str | None = None,
+        external_ref: str | None = None,
+        captured_at=None,
+        payload_json: dict | None = None,
+        artifact_uri: str | None = None,
+        source_url: str | None = None,
+        license: str | None = None,
+        redistribution_policy: str | None = None,
+        confidence: float | None = None,
+        geometry_metadata: dict | None = None,
+        tags: list | None = None,
+    ) -> EvidenceRecord:
+        existing = None
+        if external_ref:
+            query = select(EvidenceRecord).where(EvidenceRecord.source_type == source_type).where(EvidenceRecord.external_ref == external_ref)
+            if asset_id is not None:
+                query = query.where(EvidenceRecord.asset_id == asset_id)
+            if org_id is not None:
+                query = query.where(EvidenceRecord.org_id == org_id)
+            result = await self.session.execute(query.order_by(EvidenceRecord.ingested_at.desc()).limit(1))
+            existing = result.scalar_one_or_none()
+        if existing:
+            existing.evidence_role = evidence_role
+            existing.provider = provider
+            existing.captured_at = captured_at or existing.captured_at
+            existing.payload_json = payload_json or existing.payload_json or {}
+            existing.artifact_uri = artifact_uri or existing.artifact_uri
+            existing.source_url = source_url or existing.source_url
+            existing.license = license or existing.license
+            existing.redistribution_policy = redistribution_policy or existing.redistribution_policy
+            existing.confidence = confidence if confidence is not None else existing.confidence
+            existing.geometry_metadata = geometry_metadata or existing.geometry_metadata or {}
+            existing.tags = tags or existing.tags or []
+            existing.ingested_at = datetime.now(timezone.utc)
+            await self.session.commit()
+            await self.session.refresh(existing)
+            return existing
+        return await self.create_record(
+            org_id=org_id,
+            asset_id=asset_id,
+            subsystem_id=subsystem_id,
+            source_type=source_type,
+            evidence_role=evidence_role,
+            provider=provider,
+            external_ref=external_ref,
+            captured_at=captured_at,
+            payload_json=payload_json,
+            artifact_uri=artifact_uri,
+            source_url=source_url,
+            license=license,
+            redistribution_policy=redistribution_policy,
+            confidence=confidence,
+            geometry_metadata=geometry_metadata,
+            tags=tags,
+        )
+
+    async def link_analysis_evidence(
+        self,
+        *,
+        analysis_id: str,
+        evidence_id: str,
+        used_for: str | None = None,
+    ) -> AnalysisEvidenceLink:
+        query = (
+            select(AnalysisEvidenceLink)
+            .where(AnalysisEvidenceLink.analysis_id == analysis_id)
+            .where(AnalysisEvidenceLink.evidence_id == evidence_id)
+            .where(AnalysisEvidenceLink.used_for == used_for)
+            .limit(1)
+        )
+        result = await self.session.execute(query)
+        existing = result.scalar_one_or_none()
+        if existing:
+            return existing
+        link = AnalysisEvidenceLink(
+            analysis_id=analysis_id,
+            evidence_id=evidence_id,
+            used_for=used_for,
+        )
+        self.session.add(link)
+        await self.session.commit()
+        await self.session.refresh(link)
+        return link
+
+    async def list_analysis_evidence(
+        self,
+        *,
+        analysis_id: str,
+    ) -> list[tuple[AnalysisEvidenceLink, EvidenceRecord]]:
+        result = await self.session.execute(
+            select(AnalysisEvidenceLink, EvidenceRecord)
+            .join(EvidenceRecord, EvidenceRecord.id == AnalysisEvidenceLink.evidence_id)
+            .where(AnalysisEvidenceLink.analysis_id == analysis_id)
+            .order_by(AnalysisEvidenceLink.created_at.asc())
+        )
+        return list(result.all())
+
+    async def list_asset_evidence(
+        self,
+        *,
+        asset_id: str,
+        org_id: str | None = None,
+        limit: int = 25,
+    ) -> list[EvidenceRecord]:
+        query = (
+            select(EvidenceRecord)
+            .where(EvidenceRecord.asset_id == asset_id)
+            .order_by(
+                EvidenceRecord.captured_at.desc().nullslast(),
+                EvidenceRecord.ingested_at.desc(),
+            )
+            .limit(limit)
+        )
+        if org_id:
+            query = query.where(EvidenceRecord.org_id == org_id)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_asset_reference_profile(
+        self,
+        *,
+        asset_id: str,
+        org_id: str | None = None,
+    ) -> AssetReferenceProfile | None:
+        query = (
+            select(AssetReferenceProfile)
+            .where(AssetReferenceProfile.asset_id == asset_id)
+            .limit(1)
+        )
+        if org_id:
+            query = query.where(AssetReferenceProfile.org_id == org_id)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def reassign_analysis_evidence(
+        self,
+        *,
+        analysis_id: str,
+        asset_id: str,
+        subsystem_id: str | None = None,
+    ) -> None:
+        linked = await self.list_analysis_evidence(analysis_id=analysis_id)
+        dirty = False
+        for _link, record in linked:
+            if record.asset_id != asset_id:
+                record.asset_id = asset_id
+                dirty = True
+            if subsystem_id is not None and record.subsystem_id != subsystem_id:
+                record.subsystem_id = subsystem_id
+                dirty = True
+        if dirty:
+            await self.session.commit()
+
+    async def upsert_asset_reference_profile(
+        self,
+        *,
+        asset_id: str,
+        org_id: str | None = None,
+        operator_name: str | None = None,
+        manufacturer: str | None = None,
+        mission_class: str | None = None,
+        orbit_regime: str | None = None,
+        reference_revision: str | None = None,
+        dimensions_json: dict | None = None,
+        subsystem_baseline_json: dict | None = None,
+        reference_sources_json: list | None = None,
+        last_verified_at=None,
+    ) -> AssetReferenceProfile:
+        result = await self.session.execute(
+            select(AssetReferenceProfile)
+            .where(AssetReferenceProfile.asset_id == asset_id)
+            .limit(1)
+        )
+        profile = result.scalar_one_or_none()
+        if profile:
+            profile.org_id = org_id if org_id is not None else profile.org_id
+            profile.operator_name = operator_name if operator_name is not None else profile.operator_name
+            profile.manufacturer = manufacturer if manufacturer is not None else profile.manufacturer
+            profile.mission_class = mission_class if mission_class is not None else profile.mission_class
+            profile.orbit_regime = orbit_regime if orbit_regime is not None else profile.orbit_regime
+            profile.reference_revision = (
+                reference_revision if reference_revision is not None else profile.reference_revision
+            )
+            profile.dimensions_json = dimensions_json or profile.dimensions_json or {}
+            profile.subsystem_baseline_json = (
+                subsystem_baseline_json or profile.subsystem_baseline_json or {}
+            )
+            profile.reference_sources_json = (
+                reference_sources_json or profile.reference_sources_json or []
+            )
+            profile.last_verified_at = last_verified_at or profile.last_verified_at
+            await self.session.commit()
+            await self.session.refresh(profile)
+            return profile
+
+        profile = AssetReferenceProfile(
+            asset_id=asset_id,
+            org_id=org_id,
+            operator_name=operator_name,
+            manufacturer=manufacturer,
+            mission_class=mission_class,
+            orbit_regime=orbit_regime,
+            reference_revision=reference_revision,
+            dimensions_json=dimensions_json or {},
+            subsystem_baseline_json=subsystem_baseline_json or {},
+            reference_sources_json=reference_sources_json or [],
+            last_verified_at=last_verified_at,
+        )
+        self.session.add(profile)
+        await self.session.commit()
+        await self.session.refresh(profile)
+        return profile
+
+    async def start_ingest_run(
+        self,
+        *,
+        source_type: str,
+        org_id: str | None = None,
+        rate_limit_window: str | None = None,
+        cursor_or_checkpoint: str | None = None,
+    ) -> IngestRun:
+        run = IngestRun(
+            org_id=org_id,
+            source_type=source_type,
+            rate_limit_window=rate_limit_window,
+            cursor_or_checkpoint=cursor_or_checkpoint,
+            status="started",
+        )
+        self.session.add(run)
+        await self.session.commit()
+        await self.session.refresh(run)
+        return run
+
+    async def finish_ingest_run(
+        self,
+        run_id: str,
+        *,
+        status: str,
+        records_created: int = 0,
+        records_updated: int = 0,
+        error_summary: str | None = None,
+        cursor_or_checkpoint: str | None = None,
+    ) -> None:
+        await self.session.execute(
+            update(IngestRun)
+            .where(IngestRun.id == run_id)
+            .values(
+                status=status,
+                completed_at=datetime.now(timezone.utc),
+                records_created=records_created,
+                records_updated=records_updated,
+                error_summary=error_summary,
+                cursor_or_checkpoint=cursor_or_checkpoint,
+            )
+        )
+        await self.session.commit()
+
+    async def register_dataset(
+        self,
+        *,
+        name: str,
+        dataset_type: str,
+        source_url: str,
+        org_id: str | None = None,
+        license: str | None = None,
+        intended_use: str = "offline_eval",
+        local_storage_uri: str | None = None,
+        version: str | None = None,
+        notes: str | None = None,
+    ) -> DatasetRegistry:
+        result = await self.session.execute(
+            select(DatasetRegistry)
+            .where(DatasetRegistry.org_id == org_id)
+            .where(DatasetRegistry.name == name)
+            .limit(1)
+        )
+        dataset = result.scalar_one_or_none()
+        if dataset:
+            dataset.dataset_type = dataset_type
+            dataset.source_url = source_url
+            dataset.license = license
+            dataset.intended_use = intended_use
+            dataset.local_storage_uri = local_storage_uri
+            dataset.version = version
+            dataset.notes = notes
+            await self.session.commit()
+            await self.session.refresh(dataset)
+            return dataset
+
+        dataset = DatasetRegistry(
+            org_id=org_id,
+            name=name,
+            dataset_type=dataset_type,
+            source_url=source_url,
+            license=license,
+            intended_use=intended_use,
+            local_storage_uri=local_storage_uri,
+            version=version,
+            notes=notes,
+        )
+        self.session.add(dataset)
+        await self.session.commit()
+        await self.session.refresh(dataset)
+        return dataset
 
 
 class ReportRepository:

@@ -6,6 +6,11 @@ Tables:
   - assets: Stable orbital asset identities within an org
   - asset_aliases: Canonical and external identifiers for assets
   - asset_subsystems: Stable subsystem identities within an asset
+  - asset_reference_profiles: Canonical baseline/reference profiles for assets
+  - evidence_records: Reusable evidence collected from external or internal sources
+  - analysis_evidence_links: Provenance links from analyses to evidence records
+  - ingest_runs: Source-ingestion execution tracking
+  - dataset_registry: Offline benchmark dataset registry
   - analyses: Satellite inspection jobs
   - analysis_events: SSE events per analysis (audit trail)
   - reports: Finalized condition reports with approval workflow
@@ -39,6 +44,9 @@ class Organization(Base):
 
     analyses = relationship("Analysis", back_populates="organization")
     assets = relationship("Asset", back_populates="organization")
+    evidence_records = relationship("EvidenceRecord", back_populates="organization")
+    ingest_runs = relationship("IngestRun", back_populates="organization")
+    datasets = relationship("DatasetRegistry", back_populates="organization")
 
 
 class Asset(Base):
@@ -72,6 +80,13 @@ class Asset(Base):
     analyses = relationship("Analysis", back_populates="asset", foreign_keys="Analysis.asset_id")
     aliases = relationship("AssetAlias", back_populates="asset", cascade="all, delete-orphan")
     subsystems = relationship("AssetSubsystem", back_populates="asset", cascade="all, delete-orphan")
+    evidence_records = relationship("EvidenceRecord", back_populates="asset", cascade="all, delete-orphan")
+    reference_profile = relationship(
+        "AssetReferenceProfile",
+        back_populates="asset",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
     current_analysis = relationship("Analysis", foreign_keys=[current_analysis_id], post_update=True)
 
 
@@ -123,8 +138,154 @@ class AssetSubsystem(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
+
     asset = relationship("Asset", back_populates="subsystems")
     analyses = relationship("Analysis", back_populates="subsystem")
+    evidence_records = relationship("EvidenceRecord", back_populates="subsystem")
+
+
+class AssetReferenceProfile(Base):
+    """Canonical baseline/reference profile for one asset."""
+
+    __tablename__ = "asset_reference_profiles"
+    __table_args__ = (
+        Index("ix_asset_reference_profiles_asset", "asset_id"),
+        Index("ix_asset_reference_profiles_org_asset", "org_id", "asset_id"),
+    )
+
+    id = Column(String(32), primary_key=True, default=_uuid)
+    asset_id = Column(String(32), ForeignKey("assets.id"), nullable=False, unique=True)
+    org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
+    operator_name = Column(String(255), nullable=True)
+    manufacturer = Column(String(255), nullable=True)
+    mission_class = Column(String(100), nullable=True)
+    orbit_regime = Column(String(50), nullable=True)
+    reference_revision = Column(String(64), nullable=True)
+    dimensions_json = Column(JSON, default=dict)
+    subsystem_baseline_json = Column(JSON, default=dict)
+    reference_sources_json = Column(JSON, default=list)
+    last_verified_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    asset = relationship("Asset", back_populates="reference_profile")
+
+
+class EvidenceRecord(Base):
+    """Reusable evidence persisted independently of a single analysis."""
+
+    __tablename__ = "evidence_records"
+    __table_args__ = (
+        Index("ix_evidence_records_org_asset", "org_id", "asset_id"),
+        Index("ix_evidence_records_source_role", "source_type", "evidence_role"),
+        Index("ix_evidence_records_external_ref", "external_ref"),
+        Index("ix_evidence_records_captured", "captured_at"),
+    )
+
+    id = Column(String(32), primary_key=True, default=_uuid)
+    org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
+    asset_id = Column(String(32), ForeignKey("assets.id"), nullable=True)
+    subsystem_id = Column(String(32), ForeignKey("asset_subsystems.id"), nullable=True)
+    source_type = Column(String(50), nullable=False)
+    evidence_role = Column(String(32), default="runtime")
+    provider = Column(String(100), nullable=True)
+    external_ref = Column(String(255), nullable=True)
+    captured_at = Column(DateTime, nullable=True)
+    ingested_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    payload_json = Column(JSON, default=dict)
+    artifact_uri = Column(String(500), nullable=True)
+    source_url = Column(String(1000), nullable=True)
+    license = Column(String(255), nullable=True)
+    redistribution_policy = Column(Text, nullable=True)
+    confidence = Column(Float, nullable=True)
+    geometry_metadata = Column(JSON, default=dict)
+    tags = Column(JSON, default=list)
+
+    organization = relationship("Organization", back_populates="evidence_records")
+    asset = relationship("Asset", back_populates="evidence_records")
+    subsystem = relationship("AssetSubsystem", back_populates="evidence_records")
+    analysis_links = relationship(
+        "AnalysisEvidenceLink",
+        back_populates="evidence_record",
+        cascade="all, delete-orphan",
+    )
+
+
+class AnalysisEvidenceLink(Base):
+    """Link table preserving which evidence records informed one analysis."""
+
+    __tablename__ = "analysis_evidence_links"
+    __table_args__ = (
+        Index("ix_analysis_evidence_links_analysis", "analysis_id"),
+        Index("ix_analysis_evidence_links_evidence", "evidence_id"),
+        Index("ix_analysis_evidence_links_unique", "analysis_id", "evidence_id", "used_for"),
+    )
+
+    id = Column(String(32), primary_key=True, default=_uuid)
+    analysis_id = Column(String(32), ForeignKey("analyses.id"), nullable=False)
+    evidence_id = Column(String(32), ForeignKey("evidence_records.id"), nullable=False)
+    used_for = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    analysis = relationship("Analysis", back_populates="evidence_links")
+    evidence_record = relationship("EvidenceRecord", back_populates="analysis_links")
+
+
+class IngestRun(Base):
+    """Tracks one source-ingestion run and its checkpoint/summary."""
+
+    __tablename__ = "ingest_runs"
+    __table_args__ = (
+        Index("ix_ingest_runs_source_status", "source_type", "status"),
+        Index("ix_ingest_runs_org_started", "org_id", "started_at"),
+    )
+
+    id = Column(String(32), primary_key=True, default=_uuid)
+    org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
+    source_type = Column(String(50), nullable=False)
+    status = Column(String(32), default="started")
+    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime, nullable=True)
+    records_created = Column(Integer, default=0)
+    records_updated = Column(Integer, default=0)
+    error_summary = Column(Text, nullable=True)
+    cursor_or_checkpoint = Column(Text, nullable=True)
+    rate_limit_window = Column(String(100), nullable=True)
+
+    organization = relationship("Organization", back_populates="ingest_runs")
+
+
+class DatasetRegistry(Base):
+    """Metadata for offline benchmark datasets used in evaluation/R&D."""
+
+    __tablename__ = "dataset_registry"
+    __table_args__ = (
+        Index("ix_dataset_registry_type", "dataset_type"),
+        Index("ix_dataset_registry_org_name", "org_id", "name"),
+    )
+
+    id = Column(String(32), primary_key=True, default=_uuid)
+    org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
+    name = Column(String(255), nullable=False)
+    dataset_type = Column(String(50), nullable=False)
+    source_url = Column(String(1000), nullable=False)
+    license = Column(String(255), nullable=True)
+    intended_use = Column(String(50), default="offline_eval")
+    local_storage_uri = Column(String(500), nullable=True)
+    version = Column(String(64), nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    organization = relationship("Organization", back_populates="datasets")
 
 
 class Analysis(Base):
@@ -208,6 +369,11 @@ class Analysis(Base):
     organization = relationship("Organization", back_populates="analyses")
     asset = relationship("Asset", back_populates="analyses", foreign_keys=[asset_id])
     subsystem = relationship("AssetSubsystem", back_populates="analyses")
+    evidence_links = relationship(
+        "AnalysisEvidenceLink",
+        back_populates="analysis",
+        cascade="all, delete-orphan",
+    )
     events = relationship("AnalysisEvent", back_populates="analysis", order_by="AnalysisEvent.sequence")
     report = relationship("Report", back_populates="analysis", uselist=False)
     dead_letters = relationship("DeadLetterJob", back_populates="analysis")

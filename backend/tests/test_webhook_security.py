@@ -1,5 +1,8 @@
 import os
+import queue
+import threading
 from types import SimpleNamespace
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -11,7 +14,7 @@ from api.webhooks import WebhookCreate, create_webhook
 from auth.dependencies import CurrentUser
 from config import settings
 from services.secret_service import decrypt_webhook_secret, encrypt_webhook_secret, hash_secret
-from services.webhook_service import dispatch_registered_webhooks
+from services.webhook_service import dispatch_registered_webhooks, sign_payload
 
 
 class _MockSessionContext:
@@ -20,6 +23,45 @@ class _MockSessionContext:
 
     async def __aexit__(self, exc_type, exc, tb):
         return False
+
+
+class _WebhookRequestHandler(BaseHTTPRequestHandler):
+    queue_ref: queue.Queue | None = None
+    status_code = 202
+
+    def do_POST(self):  # noqa: N802 - stdlib callback name
+        body_length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(body_length)
+        if self.queue_ref is not None:
+            self.queue_ref.put({
+                "path": self.path,
+                "headers": dict(self.headers.items()),
+                "body": body,
+            })
+
+        self.send_response(self.status_code)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"accepted")
+
+    def log_message(self, format, *args):  # noqa: A003 - stdlib signature
+        return
+
+
+@pytest.fixture
+def webhook_receiver():
+    captured = queue.Queue()
+    _WebhookRequestHandler.queue_ref = captured
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _WebhookRequestHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}/hook", captured
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 @pytest.fixture
@@ -139,3 +181,45 @@ async def test_dispatch_registered_webhooks_fails_closed_on_invalid_ciphertext(w
     assert persisted["success"] is False
     assert persisted["attempt_count"] == 0
     assert "Invalid encrypted webhook secret" in persisted["response_excerpt"]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_registered_webhooks_delivers_real_signed_payload(
+    webhook_key,
+    webhook_receiver,
+):
+    receiver_url, captured = webhook_receiver
+    mock_session = _MockSessionContext()
+    webhook_repo = AsyncMock()
+    webhook_repo.list_for_org = AsyncMock(return_value=[
+        SimpleNamespace(
+            id="webhook-1",
+            url=receiver_url,
+            events=["analysis.completed"],
+            secret_ciphertext=encrypt_webhook_secret("hook-secret"),
+        )
+    ])
+    delivery_repo = AsyncMock()
+
+    with patch("db.base.async_session_factory", return_value=mock_session), \
+         patch("db.repository.WebhookRepository", return_value=webhook_repo), \
+         patch("db.repository.WebhookDeliveryRepository", return_value=delivery_repo):
+        await dispatch_registered_webhooks(
+            org_id="org-1",
+            event_type="analysis.completed",
+            payload={"analysis_id": "analysis-42", "status": "completed"},
+        )
+
+    delivered = captured.get(timeout=5)
+    assert delivered["path"] == "/hook"
+    assert delivered["headers"]["X-Orbital-Event"] == "analysis.completed"
+    assert delivered["headers"]["X-Orbital-Webhook-ID"] == "webhook-1"
+
+    expected_signature = f"sha256={sign_payload(delivered['body'], 'hook-secret')}"
+    assert delivered["headers"]["X-Orbital-Signature"] == expected_signature
+
+    delivery_repo.create.assert_awaited_once()
+    persisted = delivery_repo.create.await_args.kwargs
+    assert persisted["success"] is True
+    assert persisted["status_code"] == 202
+    assert persisted["attempt_count"] == 1

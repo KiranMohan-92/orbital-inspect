@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
+const BACKEND_BASE_URL = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const ANALYST_TOKEN = process.env.VITE_API_BEARER_TOKEN;
+
 const SAMPLE_JPEG = Buffer.from([
   0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
   0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43,
@@ -54,6 +57,20 @@ async function useRoleToken(page: Page, role: 'analyst' | 'admin') {
     },
     ['orbitalInspectAuthToken', token],
   );
+}
+
+async function fetchJsonWithAuth(page: Page, path: string) {
+  if (!ANALYST_TOKEN) {
+    throw new Error('Missing analyst E2E token');
+  }
+
+  const response = await page.context().request.get(`${BACKEND_BASE_URL}${path}`, {
+    headers: {
+      Authorization: `Bearer ${ANALYST_TOKEN}`,
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  return response.json();
 }
 
 test('completed durable analysis persists into portfolio', async ({ page }) => {
@@ -151,4 +168,93 @@ test('decision workflow supports approve, block, reimage, and override', async (
   await page.getByTestId('decision-override-button').click();
   await expect(page.getByText(/Override active/i)).toBeVisible();
   await expect(page.getByText(/Administrative override to monitor/i)).toBeVisible();
+});
+
+test('analyst sees decision review controls without admin override controls', async ({ page }) => {
+  await submitAnalysis(page, {
+    noradId: '910008',
+    assetType: 'compute_platform',
+    context: '[e2e:success] Analyst permission workflow verification.',
+  });
+
+  await expect(page.getByTestId('analysis-status')).toHaveText('ASSESSMENT COMPLETE');
+  await expect(page.getByTestId('decision-summary-panel')).toBeVisible();
+  await expect(page.getByTestId('decision-approve-button')).toBeVisible();
+  await expect(page.getByTestId('decision-block-button')).toBeVisible();
+  await expect(page.getByTestId('decision-reimage-button')).toBeVisible();
+  await expect(page.getByTestId('decision-override-button')).toHaveCount(0);
+  await expect(page.getByText('ADMIN OVERRIDE')).toHaveCount(0);
+});
+
+test('report artifact generation returns stored downloadable pdf metadata', async ({ page }) => {
+  await submitAnalysis(page, {
+    noradId: '910009',
+    assetType: 'compute_platform',
+    context: '[e2e:success] Report artifact generation verification.',
+  });
+
+  await expect(page.getByTestId('analysis-status')).toHaveText('ASSESSMENT COMPLETE');
+  await expect(page.getByTestId('download-report-button')).toBeVisible();
+
+  const generateResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes('/api/reports/') &&
+      response.url().includes('/generate-pdf'),
+  );
+
+  await page.getByTestId('download-report-button').click();
+  const generateResponse = await generateResponsePromise;
+  expect(generateResponse.ok()).toBeTruthy();
+  const payload = (await generateResponse.json()) as {
+    report_id: string;
+    artifact_kind: string;
+    artifact_download_url: string;
+  };
+
+  expect(payload.report_id).toBeTruthy();
+  expect(payload.artifact_kind).toBe('pdf');
+  expect(payload.artifact_download_url).toContain('/api/reports/artifacts/');
+
+  const artifactResponse = await page.context().request.get(
+    `${BACKEND_BASE_URL}${payload.artifact_download_url}`,
+  );
+  expect(artifactResponse.ok()).toBeTruthy();
+  expect(artifactResponse.headers()['content-type']).toContain('application/pdf');
+  const artifactBody = await artifactResponse.body();
+  expect(artifactBody.subarray(0, 4).toString()).toBe('%PDF');
+
+  const reportDetail = (await fetchJsonWithAuth(page, `/api/reports/${payload.report_id}`)) as {
+    artifact_kind: string;
+    artifact_path: string | null;
+    artifact_size_bytes: number | null;
+  };
+  expect(reportDetail.artifact_kind).toBe('pdf');
+  expect(reportDetail.artifact_path).toBeTruthy();
+  expect(reportDetail.artifact_size_bytes ?? 0).toBeGreaterThan(100);
+});
+
+test('portfolio refresh reflects approved decision state for the reviewed asset', async ({ page }) => {
+  await submitAnalysis(page, {
+    noradId: '910010',
+    assetType: 'compute_platform',
+    context: '[e2e:success] Portfolio sync after decision approval verification.',
+  });
+
+  await expect(page.getByTestId('analysis-status')).toHaveText('ASSESSMENT COMPLETE');
+  await expect(page.getByTestId('decision-approve-button')).toBeVisible();
+  await page.getByTestId('decision-approve-button').click();
+  await expect(page.getByText(/Approved for use by/i)).toBeVisible();
+
+  await page.getByTestId('nav-portfolio').click();
+  await expect(page.getByTestId('portfolio-view')).toBeVisible();
+  await page.getByTestId('portfolio-decision-filter').selectOption('approved_for_use');
+  await page.getByTestId('portfolio-refresh-button').click();
+
+  const approvedCard = page
+    .getByTestId('portfolio-satellite-card')
+    .filter({ hasText: '#910010' });
+  await expect(approvedCard).toContainText('approved_for_use');
+  await expect(approvedCard).toContainText('Approved by analyst-e2e-user');
+  await expect(page.getByText('OPEN ATTENTION')).toBeVisible();
 });

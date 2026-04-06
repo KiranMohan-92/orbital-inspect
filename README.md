@@ -16,6 +16,10 @@ It combines a durable backend analysis pipeline, persisted event streaming, evid
 - supports analyst review of decision recommendations separate from report approval
 - enforces admin-only exception overrides with explicit reason code and rationale
 - maintains org-scoped asset registry state with aliases, subsystems, and current-analysis projection
+- persists reusable evidence records and provenance links across analyses
+- enriches analyses with public orbital/reference context from CelesTrak, optional Space-Track, UCS, and SatNOGS
+- exposes evidence lineage, source confidence, and canonical reference-profile context in analysis and asset views
+- tracks offline evaluation datasets separately from runtime customer evidence
 - supports browser E2E validation against a live backend
 - supports local filesystem or S3-compatible object storage for uploaded inspection evidence
 
@@ -65,6 +69,14 @@ The latest production hardening tranche added:
 - decision review endpoint separate from report approval
 - demo-only legacy `/api/analyze` path with deprecation headers and production shutdown
 - startup and script-based backfill for historical decisions in demo and ephemeral environments
+- persistent evidence foundation for reusable public/runtime/reference/offline-eval evidence records
+- analysis-to-evidence provenance links and ingest-run tracking for source-aware enrichment
+- canonical asset reference profiles synthesized from baseline input plus linked public/reference evidence
+- extended asset alias support for operator asset IDs, COSPAR identifiers, SATCAT IDs, and manufacturer designations
+- optional public-source adapters for Space-Track SATCAT, UCS baseline metadata, and SatNOGS observation summaries
+- dataset registry foundation for offline anomaly and pose benchmark corpora
+- analysis-level evidence lineage panels with source-domain and confidence context
+- portfolio asset context surfaces with reference profile, recent evidence, and analysis timeline views
 
 ## Architecture
 
@@ -83,6 +95,8 @@ The latest production hardening tranche added:
 - queue dispatch, retry tracking, and dead-letter visibility for worker execution
 - asset-backed triage and decision persistence on completed analyses
 - asset registry aliases, subsystem identities, and current-analysis projection on the canonical asset
+- reusable evidence store with analysis provenance links, asset reference profiles, and ingest-run audit records
+- public-source enrichment adapters for orbital context, reference baselines, and RF-activity hints
 - encrypted secret handling for registered webhooks
 - optional trace-aware observability hooks with `X-Trace-ID` response propagation when OTel is active
 - worker-side trace spans so collector-backed telemetry captures background execution and not only HTTP requests
@@ -106,6 +120,8 @@ Key backend paths:
 - admin override exception workflow with policy-vs-override context
 - operator triage queue with review-state, action, urgency, and degraded-only filtering
 - manual portfolio refresh and surfaced approval/override metadata for operator workflows
+- analysis evidence lineage with provenance, confidence, and reference-profile context
+- asset detail surfaces with alias, reference-profile, evidence-summary, and timeline context
 - Playwright browser E2E and Vitest unit coverage
 
 Key frontend paths:
@@ -183,6 +199,33 @@ Backend health:
 
 - `http://127.0.0.1:8000/api/health`
 
+## Public Evidence Layer
+
+The platform now distinguishes between three classes of supporting data:
+
+- `runtime` evidence used directly in customer analyses
+- `reference` evidence used to enrich asset baselines and operator context
+- `offline_eval` datasets reserved for benchmarking and future model evaluation
+
+Current free-data support includes:
+
+- CelesTrak orbital/TLE history enrichment
+- optional Space-Track SATCAT lookups when credentials are configured
+- UCS Satellite Database reference metadata for baseline/operator context
+- SatNOGS observation summaries as low-confidence RF-activity hints
+
+These sources are persisted as reusable evidence records with source URL, provider, external reference, confidence, and redistribution metadata. They are linked to analyses through explicit provenance records rather than copied as opaque JSON blobs.
+
+After analysis completion, Orbital Inspect now folds baseline input plus linked reference evidence into one canonical asset reference profile. That profile is where operator name, mission class, orbit regime, subsystem baseline hints, and stronger alias identities are meant to accumulate over time.
+
+Operators can now inspect that context directly through:
+
+- `GET /api/analyses/{id}/evidence` for linked evidence lineage, per-source provenance, and reference-profile context
+- `GET /api/assets/{id}` for canonical asset detail, alias state, recent evidence, and current-analysis context
+- `GET /api/assets/{id}/timeline` for multi-epoch analysis history on the same asset
+
+Benchmark datasets such as anomaly and pose corpora are intended to be registered separately through the dataset registry so they do not contaminate runtime customer evidence paths.
+
 ## Tests
 
 ### Backend
@@ -214,6 +257,13 @@ npm run test:e2e
 
 The browser E2E suite runs against a live backend using deterministic backend-side fixtures. It exercises the real submission, worker, persistence, SSE, and portfolio paths.
 The default browser E2E path now runs with backend auth enabled and frontend API calls authenticated through the same header layer used in production-like environments.
+Current browser coverage includes:
+- durable analysis submission across `completed`, `completed_partial`, `failed`, and `rejected`
+- analyst/admin decision workflow behavior, including role-gated override controls
+- report artifact generation plus signed PDF retrieval
+- portfolio synchronization after reviewed decisions
+
+The backend E2E/security suite also includes a real-network webhook delivery check that validates signed outbound payloads against a temporary HTTP receiver.
 
 To force a Postgres-backed live run locally:
 
@@ -250,13 +300,18 @@ The portfolio surface is intended to be used as an operational triage queue rath
 - the header summary highlights open attention items, urgent assets, approved assets, and pending review count
 - cards surface approval, block, and override context so operators can understand review state without opening the full analysis
 - the manual `REFRESH` control is the intended operator sync path after reviews or new analyses
+- selecting an asset now opens canonical alias, reference-profile, recent-evidence, and timeline context without leaving the portfolio
+- analysis detail now distinguishes public context, operator-supplied evidence, and internal prior-analysis context instead of flattening them into one bucket
 
 ## Key Endpoints
 
 - `POST /api/analyses`
 - `GET /api/analyses`
 - `GET /api/analyses/{id}`
+- `GET /api/analyses/{id}/evidence`
 - `GET /api/analyses/{id}/events/stream`
+- `GET /api/assets/{id}`
+- `GET /api/assets/{id}/timeline`
 - `GET /api/portfolio`
 - `GET /api/portfolio/summary`
 - `POST /api/analyses/{id}/decision/review`
@@ -274,14 +329,14 @@ The portfolio surface is intended to be used as an operational triage queue rath
 
 Latest verified commands on the current shipped tranche:
 
-- backend full suite: `188 passed`
+- backend full suite: `203 passed`
+- backend targeted evidence/product-integration suite: `21 passed`
 - frontend unit tests: `16 passed`
-- frontend browser E2E: `5 passed`
 - frontend production build: passed
 
 Current production build footprint:
 
-- main app bundle: `252.61 kB`
+- main app bundle: `268.36 kB`
 - degradation timeline lazy chunk: `61.18 kB`
 - risk matrix lazy chunk: `7.56 kB`
 

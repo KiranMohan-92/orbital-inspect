@@ -35,6 +35,8 @@ interface SatelliteData {
 
 interface SatelliteCardProps {
   satellite: SatelliteData;
+  selected?: boolean;
+  onSelect?: () => void;
 }
 
 const TIER_COLORS: Record<string, string> = {
@@ -46,7 +48,7 @@ const TIER_COLORS: Record<string, string> = {
   UNKNOWN: "#666",
 };
 
-export default function SatelliteCard({ satellite }: SatelliteCardProps) {
+export default function SatelliteCard({ satellite, selected = false, onSelect }: SatelliteCardProps) {
   const color = TIER_COLORS[satellite.risk_tier] || "#666";
   const satType = (satellite.classification?.satellite_type as string) || "unknown";
   const regime = (satellite.classification?.orbital_regime as string) || "";
@@ -56,7 +58,11 @@ export default function SatelliteCard({ satellite }: SatelliteCardProps) {
     <div
       data-testid="portfolio-satellite-card"
       className="glass-panel rounded-lg p-4 transition-all hover:scale-[1.01] cursor-pointer"
-      style={{ borderLeft: `3px solid ${color}` }}
+      style={{
+        borderLeft: `3px solid ${color}`,
+        boxShadow: selected ? `0 0 0 1px ${color}40, 0 0 18px ${color}18` : undefined,
+      }}
+      onClick={onSelect}
     >
       <div className="flex items-start justify-between mb-2">
         <div>

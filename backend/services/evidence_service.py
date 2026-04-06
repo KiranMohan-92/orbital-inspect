@@ -3,6 +3,9 @@ Evidence fusion service — collects and merges evidence from multiple sources.
 
 Currently supports:
   - Current and historical orbital data from CelesTrak
+  - Optional Space-Track SATCAT enrichment when credentials are configured
+  - Optional UCS public reference profile ingestion when a text URL is configured
+  - Public SatNOGS observation metadata
   - Prior analyses from the database
   - Enhanced space weather snapshots and forecasts from NOAA SWPC
   - ORDEM debris environment data
@@ -28,6 +31,8 @@ async def build_evidence_bundle(
     include_weather: bool = True,
     include_debris: bool = True,
     include_conjunction: bool = True,
+    include_reference_profile: bool = True,
+    include_rf_activity: bool = True,
 ) -> EvidenceBundle:
     """
     Build a comprehensive evidence bundle for a satellite.
@@ -41,7 +46,6 @@ async def build_evidence_bundle(
     )
     sat_data: dict | None = None
 
-    # 1. CelesTrak current TLE and 90-day orbital health history
     if include_tle and norad_id:
         try:
             from services.celestrak_service import lookup_by_norad_id
@@ -67,7 +71,13 @@ async def build_evidence_bundle(
                         "launch_date": sat_data.get("launch_date"),
                         "rcs_size": sat_data.get("rcs_size"),
                     },
-                    metadata={"provider": "CelesTrak", "norad_id": norad_id},
+                    metadata={
+                        "provider": "CelesTrak",
+                        "norad_id": norad_id,
+                        "external_ref": f"celestrak:gp:{norad_id}:{sat_data.get('epoch', '')}",
+                        "source_url": "https://celestrak.org/NORAD/elements/gp.php",
+                        "tags": ["orbital_context", "public"],
+                    },
                 ))
 
             tle_analysis = await analyze_tle_history(norad_id, days=90)
@@ -108,12 +118,60 @@ async def build_evidence_bundle(
                             for event in tle_analysis.detected_maneuvers[:10]
                         ],
                     },
-                    metadata={"provider": "CelesTrak", "norad_id": norad_id},
+                    metadata={
+                        "provider": "CelesTrak",
+                        "norad_id": norad_id,
+                        "external_ref": f"celestrak:history:{norad_id}:{tle_analysis.history_end}",
+                        "source_url": "https://celestrak.org/NORAD/documentation/gp-data-formats.php",
+                        "tags": ["orbital_context", "historical", "public"],
+                    },
                 ))
-        except Exception as e:
-            log.warning("TLE evidence fetch failed", extra={"error": str(e)})
+        except Exception as exc:
+            log.warning("TLE evidence fetch failed", extra={"error": str(exc)})
 
-    # 2. Prior analyses from database
+    if include_reference_profile and norad_id:
+        try:
+            from services.space_track_service import lookup_satcat_by_norad_id
+            from services.ucs_service import lookup_by_norad_id as lookup_ucs_by_norad_id
+
+            satcat = await lookup_satcat_by_norad_id(norad_id)
+            if satcat:
+                bundle.add_item(EvidenceItem(
+                    source=EvidenceSource.REFERENCE_PROFILE,
+                    data_type="application/json",
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    description=f"Space-Track SATCAT profile for NORAD {norad_id}",
+                    confidence=0.9,
+                    payload=satcat,
+                    metadata={
+                        "provider": "Space-Track",
+                        "external_ref": f"space_track:satcat:{norad_id}",
+                        "source_url": "https://www.space-track.org/documentation",
+                        "tags": ["baseline", "catalog", "public"],
+                    },
+                ))
+
+            ucs_profile = await lookup_ucs_by_norad_id(norad_id)
+            if ucs_profile:
+                bundle.add_item(EvidenceItem(
+                    source=EvidenceSource.REFERENCE_PROFILE,
+                    data_type="application/json",
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    description=(
+                        f"Public reference profile — {ucs_profile.get('purpose') or 'mission metadata'}"
+                    ),
+                    confidence=0.78,
+                    payload=ucs_profile,
+                    metadata={
+                        "provider": "UCS",
+                        "external_ref": f"ucs:{norad_id}",
+                        "source_url": "https://www.ucs.org/resources/satellite-database",
+                        "tags": ["baseline", "reference", "public"],
+                    },
+                ))
+        except Exception as exc:
+            log.warning("Reference profile evidence fetch failed", extra={"error": str(exc)})
+
     if include_prior_analyses and norad_id:
         try:
             from db.base import async_session_factory
@@ -124,8 +182,8 @@ async def build_evidence_bundle(
                 analyses, _total = await repo.list_analyses(org_id=org_id, limit=25)
 
                 matching = [
-                    a for a in analyses
-                    if a.norad_id == norad_id and a.status in {"completed", "completed_partial"}
+                    analysis for analysis in analyses
+                    if analysis.norad_id == norad_id and analysis.status in {"completed", "completed_partial"}
                 ]
                 bundle.prior_analyses_count = len(matching)
 
@@ -146,14 +204,49 @@ async def build_evidence_bundle(
                             "report_completeness": analysis.report_completeness,
                             "underwriting_recommendation": risk_result.get("underwriting_recommendation"),
                         },
-                        metadata={"analysis_id": analysis.id},
+                        metadata={
+                            "analysis_id": analysis.id,
+                            "provider": "Orbital Inspect",
+                            "external_ref": f"analysis:{analysis.id}",
+                            "tags": ["historical", "internal"],
+                        },
                     ))
         except ImportError:
             log.info("Database not available for prior analysis evidence")
-        except Exception as e:
-            log.warning("Prior analysis evidence fetch failed", extra={"error": str(e)})
+        except Exception as exc:
+            log.warning("Prior analysis evidence fetch failed", extra={"error": str(exc)})
 
-    # 3. Enhanced space weather
+    if include_rf_activity and norad_id:
+        try:
+            from services.satnogs_service import fetch_recent_observations, summarize_observations
+
+            observations = await fetch_recent_observations(norad_id)
+            if observations:
+                summary = summarize_observations(observations)
+                bundle.add_item(EvidenceItem(
+                    source=EvidenceSource.RF_ACTIVITY,
+                    data_type="application/json",
+                    timestamp=summary.get("latest_start") or datetime.now(timezone.utc).isoformat(),
+                    description=(
+                        f"SatNOGS observation activity — {summary['observation_count']} recent observations"
+                    ),
+                    confidence=0.62,
+                    payload={
+                        **summary,
+                        "observations": observations[:5],
+                    },
+                    metadata={
+                        "provider": "SatNOGS",
+                        "external_ref": f"satnogs:{norad_id}:{summary.get('latest_start') or 'latest'}",
+                        "source_url": "https://network.satnogs.org/",
+                        "license": "CC BY-SA",
+                        "redistribution_policy": "public observation metadata",
+                        "tags": ["rf_activity", "public"],
+                    },
+                ))
+        except Exception as exc:
+            log.warning("RF activity evidence fetch failed", extra={"error": str(exc)})
+
     if include_weather:
         try:
             from services.enhanced_weather_service import fetch_enhanced_space_weather
@@ -189,44 +282,51 @@ async def build_evidence_bundle(
                     "twenty_seven_day_outlook": weather.twenty_seven_day_outlook,
                     "data_sources": weather.data_sources or [],
                 },
-                metadata={"provider": "NOAA SWPC"},
+                metadata={
+                    "provider": "NOAA SWPC",
+                    "source_url": "https://services.swpc.noaa.gov/",
+                    "external_ref": f"noaa_swpc:{datetime.now(timezone.utc).date().isoformat()}",
+                    "tags": ["environment", "public"],
+                },
             ))
-        except Exception as e:
-            log.warning("Space weather evidence fetch failed", extra={"error": str(e)})
+        except Exception as exc:
+            log.warning("Space weather evidence fetch failed", extra={"error": str(exc)})
 
-    # 4. Debris environment
     if include_debris and norad_id:
         try:
             from services.celestrak_service import lookup_by_norad_id
             from services.ordem_service import get_debris_severity, lookup_debris_flux
 
             sat_data = sat_data or await lookup_by_norad_id(norad_id)
-            alt = sat_data.get("altitude_avg_km") if sat_data else None
+            altitude_km = sat_data.get("altitude_avg_km") if sat_data else None
 
-            if alt:
-                flux = lookup_debris_flux(alt)
+            if altitude_km:
+                flux = lookup_debris_flux(altitude_km)
                 if flux:
                     bundle.add_item(EvidenceItem(
                         source=EvidenceSource.DEBRIS_ENVIRONMENT,
                         data_type="application/json",
                         timestamp=datetime.now(timezone.utc).isoformat(),
-                        description=f"Debris environment at {alt:.0f}km — {get_debris_severity(alt)}",
+                        description=f"Debris environment at {altitude_km:.0f}km — {get_debris_severity(altitude_km)}",
                         confidence=0.9,
                         payload={
-                            "altitude_km": alt,
+                            "altitude_km": altitude_km,
                             "flux_1mm": flux.flux_1mm,
                             "flux_1cm": flux.flux_1cm,
                             "flux_10cm": flux.flux_10cm,
                             "collision_prob_per_year": flux.collision_prob_per_year,
                             "cataloged_objects": flux.cataloged_objects,
-                            "severity": get_debris_severity(alt),
+                            "severity": get_debris_severity(altitude_km),
                         },
-                        metadata={"provider": "NASA ORDEM 4.0"},
+                        metadata={
+                            "provider": "NASA ORDEM 4.0",
+                            "external_ref": f"ordem:{norad_id}:{datetime.now(timezone.utc).date().isoformat()}",
+                            "tags": ["environment", "public"],
+                        },
                     ))
-        except Exception as e:
-            log.warning("Debris evidence fetch failed", extra={"error": str(e)})
+        except Exception as exc:
+            log.warning("Debris evidence fetch failed", extra={"error": str(exc)})
 
-    # 5. Conjunction risk
     if include_conjunction and norad_id:
         try:
             from services.conjunction_service import assess_conjunction_risk
@@ -266,15 +366,17 @@ async def build_evidence_bundle(
                         for event in conjunction.events[:10]
                     ],
                 },
-                metadata={"provider": conjunction.data_source, "norad_id": norad_id},
+                metadata={
+                    "provider": conjunction.data_source,
+                    "norad_id": norad_id,
+                    "external_ref": f"conjunction:{norad_id}:{datetime.now(timezone.utc).date().isoformat()}",
+                    "tags": ["conjunction", "public"],
+                },
             ))
-        except Exception as e:
-            log.warning("Conjunction evidence fetch failed", extra={"error": str(e)})
+        except Exception as exc:
+            log.warning("Conjunction evidence fetch failed", extra={"error": str(exc)})
 
-    timestamps = [
-        item.timestamp for item in bundle.items
-        if item.timestamp
-    ]
+    timestamps = [item.timestamp for item in bundle.items if item.timestamp]
     if timestamps:
         bundle.earliest_evidence = min(timestamps)
         bundle.latest_evidence = max(timestamps)

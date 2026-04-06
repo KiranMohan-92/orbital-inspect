@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     SIGNED_ARTIFACT_TTL_MINUTES: int = 30
     REPORT_ARTIFACT_RETENTION_DAYS: int = 30
 
+    # Free/public evidence sources
+    SPACE_TRACK_BASE_URL: str = "https://www.space-track.org"
+    SPACE_TRACK_USERNAME: str | None = None
+    SPACE_TRACK_PASSWORD: str | None = None
+    UCS_DATABASE_TEXT_URL: str | None = None
+    SATNOGS_NETWORK_API_BASE: str = "https://network.satnogs.org/api"
+    SATNOGS_MAX_OBSERVATIONS: int = 10
+
     # Queueing
     ANALYSIS_QUEUE_NAME: str = "arq:queue"
     ANALYSIS_JOB_MAX_RETRIES: int = 3

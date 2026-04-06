@@ -151,6 +151,12 @@ except ImportError:
     pass
 
 try:
+    from api.assets import router as assets_router
+    app.include_router(assets_router)
+except ImportError:
+    pass
+
+try:
     from api.admin import router as admin_router
     app.include_router(admin_router)
 except ImportError:
@@ -251,7 +257,6 @@ def _compute_evidence_completeness(bundle_summary: dict[str, Any]) -> float | No
         "tle_history",
         "conjunction_risk",
         "space_weather",
-        "prior_analysis",
         "debris_environment",
     }
     return round((len(sources & required_sources) / len(required_sources)) * 100.0, 1)
@@ -316,6 +321,7 @@ async def _create_analysis_record(
         },
     )
 
+    evidence_bundle = None
     if settings.E2E_TEST_MODE:
         evidence_bundle_summary = {
             "satellite_id": norad or "e2e-test-asset",
@@ -370,6 +376,26 @@ async def _create_analysis_record(
         repo = AnalysisRepository(session)
         assets = AssetRepository(session)
         audit_logs = AuditLogRepository(session)
+        asset_alias_candidates = {
+            "operator_asset_id": (
+                enriched_baseline_reference.get("operator_asset_id")
+                or enriched_capture_metadata.get("operator_asset_id")
+            ),
+            "cospar": (
+                enriched_baseline_reference.get("cospar_id")
+                or enriched_baseline_reference.get("international_designator")
+                or enriched_capture_metadata.get("cospar_id")
+                or enriched_capture_metadata.get("international_designator")
+            ),
+            "satcat": (
+                enriched_baseline_reference.get("satcat_id")
+                or enriched_capture_metadata.get("satcat_id")
+            ),
+            "manufacturer_designation": (
+                enriched_baseline_reference.get("manufacturer_designation")
+                or enriched_baseline_reference.get("platform")
+            ),
+        }
         asset = await assets.resolve_or_create(
             org_id=user.org_id if user else None,
             norad_id=norad,
@@ -377,6 +403,7 @@ async def _create_analysis_record(
             asset_type=asset_type,
             name=asset_name or enriched_baseline_reference.get("asset_name"),
             operator_name=(enriched_baseline_reference or {}).get("operator_name"),
+            alias_candidates=asset_alias_candidates,
         )
         subsystem = await assets.resolve_or_create_subsystem(
             asset_id=asset.id,
@@ -414,6 +441,25 @@ async def _create_analysis_record(
         )
         if subsystem:
             await repo.update_fields(analysis.id, subsystem_id=subsystem.id)
+        if evidence_bundle is not None:
+            from services.evidence_ingest_service import persist_evidence_bundle
+
+            linked_evidence_count = await persist_evidence_bundle(
+                session,
+                analysis_id=analysis.id,
+                org_id=user.org_id if user else None,
+                asset_id=asset.id,
+                subsystem_id=subsystem.id if subsystem else None,
+                bundle=evidence_bundle,
+            )
+            await repo.update_fields(
+                analysis.id,
+                evidence_bundle_summary={
+                    **evidence_bundle_summary,
+                    "linked_evidence_count": linked_evidence_count,
+                },
+            )
+            evidence_bundle_summary["linked_evidence_count"] = linked_evidence_count
         await audit_logs.create(
             org_id=user.org_id if user else None,
             actor_id=user.user_id if user else "anonymous",

@@ -1,18 +1,20 @@
 """
 Evidence fusion models for multi-source satellite intelligence.
 
-Evidence sources include imagery, telemetry, TLE orbital history,
-operator maintenance records, and prior analysis results.
+Evidence sources include imagery, telemetry, orbital history,
+public reference profiles, RF observations, operator maintenance
+records, and prior analysis results.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
 from datetime import datetime, timezone
 from enum import Enum
+
+from pydantic import BaseModel, Field
 
 
 class EvidenceSource(str, Enum):
     """Types of evidence that can be fused into an analysis."""
+
     IMAGERY = "imagery"
     TELEMETRY = "telemetry"
     TLE_HISTORY = "tle_history"
@@ -22,18 +24,21 @@ class EvidenceSource(str, Enum):
     PRIOR_ANALYSIS = "prior_analysis"
     SPACE_WEATHER = "space_weather"
     DEBRIS_ENVIRONMENT = "debris_environment"
+    REFERENCE_PROFILE = "reference_profile"
+    RF_ACTIVITY = "rf_activity"
 
 
 class EvidenceItem(BaseModel):
     """A single piece of evidence from any source."""
+
     id: str = ""
     source: EvidenceSource
-    data_type: str = ""           # e.g., "image/jpeg", "application/json", "text/plain"
-    timestamp: str = ""           # ISO 8601 when the evidence was captured
+    data_type: str = ""
+    timestamp: str = ""
     description: str = ""
-    confidence: float = 1.0       # 0.0-1.0 — how reliable is this source
-    payload: dict = {}            # Source-specific data
-    metadata: dict = {}           # Additional context (sensor, provider, etc.)
+    confidence: float = 1.0
+    payload: dict = {}
+    metadata: dict = {}
 
 
 class EvidenceBundle(BaseModel):
@@ -43,25 +48,21 @@ class EvidenceBundle(BaseModel):
     Combines all available evidence sources into a single bundle
     that agents can consume for richer, more accurate analysis.
     """
-    satellite_id: str = ""        # NORAD ID or internal ID
+
+    satellite_id: str = ""
     satellite_name: str = ""
     items: list[EvidenceItem] = []
 
-    # Summary statistics
     total_items: int = 0
     sources_available: list[str] = []
-    earliest_evidence: str = ""   # ISO 8601
-    latest_evidence: str = ""     # ISO 8601
+    earliest_evidence: str = ""
+    latest_evidence: str = ""
 
-    # Prior analysis context
     prior_analyses_count: int = 0
-    prior_risk_tiers: list[str] = []  # Historical risk tier progression
+    prior_risk_tiers: list[str] = []
 
-    # Fusion metadata
-    fused_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
-    fusion_confidence: float = 1.0  # Overall confidence in the fused bundle
+    fused_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    fusion_confidence: float = 1.0
 
     def add_item(self, item: EvidenceItem):
         self.items.append(item)
@@ -82,10 +83,10 @@ class EvidenceBundle(BaseModel):
         for item in self.items:
             parts.append(f"\n  [{item.source.value}] {item.description}")
             if item.payload:
-                for k, v in item.payload.items():
-                    if isinstance(v, str) and len(v) > 200:
-                        parts.append(f"    {k}: {v[:200]}...")
+                for key, value in item.payload.items():
+                    if isinstance(value, str) and len(value) > 200:
+                        parts.append(f"    {key}: {value[:200]}...")
                     else:
-                        parts.append(f"    {k}: {v}")
+                        parts.append(f"    {key}: {value}")
 
         return "\n".join(parts)

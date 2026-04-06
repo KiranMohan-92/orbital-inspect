@@ -46,6 +46,109 @@ interface PersistedAnalysisDetail {
   };
 }
 
+interface AnalysisEvidenceItem {
+  evidence_id: string;
+  used_for?: string | null;
+  source_type: string;
+  evidence_role: string;
+  source_label: string;
+  source_domain: string;
+  confidence?: number | null;
+  confidence_bucket: string;
+  provider?: string | null;
+  captured_at?: string | null;
+  ingested_at?: string | null;
+  source_url?: string | null;
+  tags?: string[];
+  highlights?: string[];
+}
+
+interface ReferenceProfileDetail {
+  operator_name?: string | null;
+  manufacturer?: string | null;
+  mission_class?: string | null;
+  orbit_regime?: string | null;
+  reference_revision?: string | null;
+  dimensions_json?: Record<string, unknown>;
+  subsystem_baseline_json?: Record<string, unknown>;
+  reference_sources_json?: string[];
+  last_verified_at?: string | null;
+}
+
+interface AnalysisEvidenceDetail {
+  summary?: {
+    evidence_completeness_pct?: number | null;
+    linked_evidence_count?: number;
+    sources_available?: string[];
+    evidence_gaps?: string[];
+    counts_by_role?: Record<string, number>;
+    counts_by_domain?: Record<string, number>;
+  };
+  reference_profile?: ReferenceProfileDetail | null;
+  items?: AnalysisEvidenceItem[];
+}
+
+const DOMAIN_LABELS: Record<string, string> = {
+  public: "PUBLIC",
+  operator_supplied: "OPERATOR",
+  internal: "INTERNAL",
+  partner: "PARTNER",
+  offline_eval: "OFFLINE",
+  unknown: "UNKNOWN",
+};
+
+const DOMAIN_STYLES: Record<string, { color: string; background: string; border: string }> = {
+  public: {
+    color: "#60a5fa",
+    background: "rgba(96,165,250,0.12)",
+    border: "rgba(96,165,250,0.22)",
+  },
+  operator_supplied: {
+    color: "#34d399",
+    background: "rgba(52,211,153,0.12)",
+    border: "rgba(52,211,153,0.22)",
+  },
+  internal: {
+    color: "#c084fc",
+    background: "rgba(192,132,252,0.12)",
+    border: "rgba(192,132,252,0.22)",
+  },
+  partner: {
+    color: "#f59e0b",
+    background: "rgba(245,158,11,0.12)",
+    border: "rgba(245,158,11,0.22)",
+  },
+  offline_eval: {
+    color: "#94a3b8",
+    background: "rgba(148,163,184,0.12)",
+    border: "rgba(148,163,184,0.22)",
+  },
+  unknown: {
+    color: "#94a3b8",
+    background: "rgba(148,163,184,0.12)",
+    border: "rgba(148,163,184,0.22)",
+  },
+};
+
+const CONFIDENCE_COLORS: Record<string, string> = {
+  high: "#22c55e",
+  medium: "#f59e0b",
+  low: "#ef4444",
+  unknown: "#94a3b8",
+};
+
+function titleize(value: string | null | undefined): string {
+  if (!value) return "Unknown";
+  return value.replace(/_/g, " ").replace(/-/g, " ").toUpperCase();
+}
+
+function safeDateTime(value: string | null | undefined): string {
+  if (!value) return "n/a";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+}
+
 export default function IntelligenceReport({ analysis }: Props) {
   const { state, AGENT_ORDER } = analysis;
   const insurancePayload = state.agents.insurance_risk.payload as InsuranceRiskReport | null;
@@ -64,6 +167,9 @@ export default function IntelligenceReport({ analysis }: Props) {
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionLoading, setDecisionLoading] = useState(false);
+  const [evidenceDetail, setEvidenceDetail] = useState<AnalysisEvidenceDetail | null>(null);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [evidenceError, setEvidenceError] = useState<string | null>(null);
   const [overrideAction, setOverrideAction] = useState("monitor");
   const [overrideReasonCode, setOverrideReasonCode] = useState("new_evidence");
   const [overrideComments, setOverrideComments] = useState("");
@@ -104,6 +210,42 @@ export default function IntelligenceReport({ analysis }: Props) {
       }
     }
     void fetchDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.analysisId, state.analysisStatus]);
+
+  useEffect(() => {
+    if (!state.analysisId || !["completed", "completed_partial", "failed", "rejected"].includes(state.analysisStatus)) {
+      setEvidenceDetail(null);
+      return;
+    }
+
+    let cancelled = false;
+    async function fetchEvidence() {
+      setEvidenceLoading(true);
+      setEvidenceError(null);
+      try {
+        const response = await apiFetch(`/api/analyses/${state.analysisId}/evidence`);
+        if (!response.ok) {
+          throw new Error(await readApiErrorMessage(response, "Evidence detail unavailable"));
+        }
+        const payload = await response.json() as AnalysisEvidenceDetail;
+        if (!cancelled) {
+          setEvidenceDetail(payload);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setEvidenceError(error instanceof Error ? error.message : "Evidence detail unavailable");
+        }
+      } finally {
+        if (!cancelled) {
+          setEvidenceLoading(false);
+        }
+      }
+    }
+
+    void fetchEvidence();
     return () => {
       cancelled = true;
     };
@@ -273,6 +415,183 @@ export default function IntelligenceReport({ analysis }: Props) {
             <p className="text-xs" style={{ color: "var(--text-primary)" }}>
               One or more evidence sources or pipeline stages degraded. Treat the underwriting result as triage only.
             </p>
+          </div>
+        )}
+
+        {(evidenceLoading || evidenceDetail || evidenceError) && (
+          <div className="data-card" data-testid="analysis-evidence-panel">
+            <div className="flex items-center justify-between gap-3">
+              <p className="label-mono">EVIDENCE LINEAGE</p>
+              {typeof evidenceDetail?.summary?.evidence_completeness_pct === "number" && (
+                <span className="font-mono-data text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                  {evidenceDetail.summary.evidence_completeness_pct.toFixed(1)}% complete
+                </span>
+              )}
+            </div>
+
+            {evidenceLoading && !evidenceDetail && (
+              <div className="mt-3 text-xs" style={{ color: "var(--text-tertiary)" }}>
+                Loading evidence provenance…
+              </div>
+            )}
+
+            {evidenceError && (
+              <div className="mt-3 text-xs" style={{ color: "var(--severity-critical)" }}>
+                {evidenceError}
+              </div>
+            )}
+
+            {evidenceDetail && (
+              <>
+                <div className="grid grid-cols-2 gap-3 mt-3 text-xs">
+                  <div>
+                    <p style={{ color: "var(--text-tertiary)" }}>Linked Evidence</p>
+                    <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                      {evidenceDetail.summary?.linked_evidence_count ?? evidenceDetail.items?.length ?? 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p style={{ color: "var(--text-tertiary)" }}>Evidence Gaps</p>
+                    <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                      {evidenceDetail.summary?.evidence_gaps?.length
+                        ? evidenceDetail.summary.evidence_gaps.join(", ")
+                        : "none"}
+                    </p>
+                  </div>
+                </div>
+
+                {evidenceDetail.summary?.counts_by_domain && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {Object.entries(evidenceDetail.summary.counts_by_domain).map(([domain, count]) => {
+                      const style = DOMAIN_STYLES[domain] || DOMAIN_STYLES.unknown;
+                      return (
+                        <span
+                          key={domain}
+                          className="px-2 py-1 rounded-md text-[11px] font-mono-data"
+                          style={{
+                            color: style.color,
+                            background: style.background,
+                            border: `1px solid ${style.border}`,
+                          }}
+                        >
+                          {DOMAIN_LABELS[domain] || titleize(domain)} · {count}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {evidenceDetail.summary?.sources_available?.length ? (
+                  <div className="mt-3 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                    Runtime bundle: {evidenceDetail.summary.sources_available.join(", ")}
+                  </div>
+                ) : null}
+
+                <div className="space-y-2 mt-4">
+                  {(evidenceDetail.items || []).slice(0, 8).map((item) => {
+                    const style = DOMAIN_STYLES[item.source_domain] || DOMAIN_STYLES.unknown;
+                    const confidenceColor = CONFIDENCE_COLORS[item.confidence_bucket] || CONFIDENCE_COLORS.unknown;
+                    return (
+                      <div key={item.evidence_id} className="rounded-md p-3" style={{ border: "1px solid var(--bg-panel-border)" }}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="font-mono-display text-xs" style={{ color: "var(--text-primary)" }}>
+                              {item.source_label}
+                            </div>
+                            <div className="text-[11px] mt-1" style={{ color: "var(--text-tertiary)" }}>
+                              {item.used_for ? `Used for ${item.used_for.replace(/_/g, " ")}` : titleize(item.evidence_role)}
+                              {item.provider ? ` · ${item.provider}` : ""}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap justify-end">
+                            <span
+                              className="px-2 py-1 rounded-md text-[11px] font-mono-data"
+                              style={{
+                                color: style.color,
+                                background: style.background,
+                                border: `1px solid ${style.border}`,
+                              }}
+                            >
+                              {DOMAIN_LABELS[item.source_domain] || titleize(item.source_domain)}
+                            </span>
+                            <span className="text-[11px] font-mono-data" style={{ color: confidenceColor }}>
+                              {titleize(item.confidence_bucket)}
+                              {typeof item.confidence === "number" ? ` ${(item.confidence * 100).toFixed(0)}%` : ""}
+                            </span>
+                          </div>
+                        </div>
+
+                        {item.highlights?.length ? (
+                          <div className="mt-2 text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                            {item.highlights.join(" · ")}
+                          </div>
+                        ) : null}
+
+                        <div className="mt-2 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                          Captured: {safeDateTime(item.captured_at)} · Ingested: {safeDateTime(item.ingested_at)}
+                        </div>
+                        {item.source_url && (
+                          <a
+                            href={item.source_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-block mt-2 text-[11px] underline"
+                            style={{ color: "var(--accent-orbital)" }}
+                          >
+                            Source provenance
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {evidenceDetail?.reference_profile && (
+          <div className="data-card" data-testid="analysis-reference-profile-panel">
+            <div className="flex items-center justify-between gap-3">
+              <p className="label-mono">REFERENCE PROFILE</p>
+              {evidenceDetail.reference_profile.last_verified_at && (
+                <span className="font-mono-data text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                  Verified {safeDateTime(evidenceDetail.reference_profile.last_verified_at)}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3 text-xs">
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Operator</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                  {evidenceDetail.reference_profile.operator_name || "n/a"}
+                </p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Manufacturer</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                  {evidenceDetail.reference_profile.manufacturer || "n/a"}
+                </p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Mission Class</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                  {evidenceDetail.reference_profile.mission_class || "n/a"}
+                </p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Orbit Regime</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                  {evidenceDetail.reference_profile.orbit_regime || "n/a"}
+                </p>
+              </div>
+            </div>
+
+            {evidenceDetail.reference_profile.reference_sources_json?.length ? (
+              <div className="mt-3 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                Sources: {evidenceDetail.reference_profile.reference_sources_json.join(", ")}
+              </div>
+            ) : null}
           </div>
         )}
 
