@@ -255,10 +255,6 @@ export default function PortfolioView() {
     void refreshPortfolioSurface(true);
   }, [refreshPortfolioSurface]);
 
-  useEffect(() => {
-    void fetchPortfolio();
-  }, [fetchPortfolio]);
-
   const satellites = portfolio?.satellites ?? [];
 
   useEffect(() => {

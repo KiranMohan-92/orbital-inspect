@@ -323,3 +323,190 @@ async def test_seed_datasets_all_marked_offline_eval(session: AsyncSession):
         assert ds.intended_use == "offline_eval", (
             f"Dataset {ds.name} has intended_use={ds.intended_use!r}, expected 'offline_eval'"
         )
+
+
+# ── list_asset_evidence offline_eval leak guardrail ──────────────────
+
+
+@pytest.mark.asyncio
+async def test_list_asset_evidence_excludes_offline_eval(
+    session: AsyncSession, org: Organization
+):
+    """offline_eval evidence must NOT be returned by list_asset_evidence.
+
+    This is the API-layer leak: even though offline_eval records cannot be
+    *linked* to analyses, they were still surfaced through the asset detail
+    endpoint.  The fix is a .where() filter inside list_asset_evidence.
+    """
+    asset_repo = AssetRepository(session)
+    evidence_repo = EvidenceRepository(session)
+
+    asset = await asset_repo.resolve_or_create(
+        org_id=org.id, norad_id="99001", asset_type="satellite", name="TestSat",
+    )
+
+    # Create an offline_eval record attached to the asset.
+    offline_record = await evidence_repo.create_record(
+        org_id=org.id,
+        asset_id=asset.id,
+        source_type="benchmark_corpus",
+        evidence_role="offline_eval",
+        provider="SPEED+",
+        payload_json={"domain": "lightbox"},
+    )
+
+    results = await evidence_repo.list_asset_evidence(asset_id=asset.id)
+    result_ids = [r.id for r in results]
+
+    assert offline_record.id not in result_ids, (
+        "list_asset_evidence must not expose offline_eval evidence records"
+    )
+
+
+@pytest.mark.asyncio
+async def test_list_asset_evidence_includes_runtime(
+    session: AsyncSession, org: Organization
+):
+    """Runtime evidence for an asset MUST still be returned by list_asset_evidence."""
+    asset_repo = AssetRepository(session)
+    evidence_repo = EvidenceRepository(session)
+
+    asset = await asset_repo.resolve_or_create(
+        org_id=org.id, norad_id="99002", asset_type="satellite", name="TestSat2",
+    )
+
+    runtime_record = await evidence_repo.create_record(
+        org_id=org.id,
+        asset_id=asset.id,
+        source_type="celestrak",
+        evidence_role="runtime",
+        provider="CelesTrak",
+        payload_json={"orbit_regime": "LEO"},
+    )
+
+    results = await evidence_repo.list_asset_evidence(asset_id=asset.id)
+    result_ids = [r.id for r in results]
+
+    assert runtime_record.id in result_ids, (
+        "list_asset_evidence must return runtime evidence records"
+    )
+
+
+# ── count_asset_evidence_summary ─────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_count_asset_evidence_summary_returns_true_total(
+    session: AsyncSession, org: Organization
+):
+    """count_asset_evidence_summary must return total_count == 15 when 15
+    non-offline_eval records exist, even though list_asset_evidence limit=12."""
+    asset_repo = AssetRepository(session)
+    evidence_repo = EvidenceRepository(session)
+
+    asset = await asset_repo.resolve_or_create(
+        org_id=org.id, norad_id="88001", asset_type="satellite", name="CountSat",
+    )
+
+    roles = ["runtime", "public_data", "telemetry"]
+    for i in range(15):
+        await evidence_repo.create_record(
+            org_id=org.id,
+            asset_id=asset.id,
+            source_type="celestrak",
+            evidence_role=roles[i % len(roles)],
+            provider="CelesTrak",
+            payload_json={"seq": i},
+        )
+
+    total, counts_by_role, counts_by_source_type = (
+        await evidence_repo.count_asset_evidence_summary(asset_id=asset.id)
+    )
+
+    assert total == 15, f"Expected 15 total records, got {total}"
+    assert sum(counts_by_role.values()) == 15
+    assert counts_by_role.get("runtime") == 5
+    assert counts_by_role.get("public_data") == 5
+    assert counts_by_role.get("telemetry") == 5
+
+
+@pytest.mark.asyncio
+async def test_count_summary_vs_list_limit(
+    session: AsyncSession, org: Organization
+):
+    """list_asset_evidence(limit=12) returns only 12 records while
+    count_asset_evidence_summary returns the true total of 15."""
+    asset_repo = AssetRepository(session)
+    evidence_repo = EvidenceRepository(session)
+
+    asset = await asset_repo.resolve_or_create(
+        org_id=org.id, norad_id="88002", asset_type="satellite", name="LimitSat",
+    )
+
+    for i in range(15):
+        await evidence_repo.create_record(
+            org_id=org.id,
+            asset_id=asset.id,
+            source_type="celestrak",
+            evidence_role="runtime",
+            provider="CelesTrak",
+            payload_json={"seq": i},
+        )
+
+    limited = await evidence_repo.list_asset_evidence(asset_id=asset.id, limit=12)
+    assert len(limited) == 12, (
+        f"list_asset_evidence(limit=12) should return 12 records, got {len(limited)}"
+    )
+
+    total, _, _ = await evidence_repo.count_asset_evidence_summary(asset_id=asset.id)
+    assert total == 15, (
+        f"count_asset_evidence_summary should return 15 (full dataset), got {total}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_count_summary_excludes_offline_eval(
+    session: AsyncSession, org: Organization
+):
+    """count_asset_evidence_summary must exclude offline_eval records from
+    total_count and all grouping dicts."""
+    asset_repo = AssetRepository(session)
+    evidence_repo = EvidenceRepository(session)
+
+    asset = await asset_repo.resolve_or_create(
+        org_id=org.id, norad_id="88003", asset_type="satellite", name="ExcludeSat",
+    )
+
+    for i in range(5):
+        await evidence_repo.create_record(
+            org_id=org.id,
+            asset_id=asset.id,
+            source_type="celestrak",
+            evidence_role="runtime",
+            provider="CelesTrak",
+            payload_json={"seq": i},
+        )
+
+    # Add one offline_eval record — must NOT be counted.
+    await evidence_repo.create_record(
+        org_id=org.id,
+        asset_id=asset.id,
+        source_type="benchmark_corpus",
+        evidence_role="offline_eval",
+        provider="SPEED+",
+        payload_json={"domain": "lightbox"},
+    )
+
+    total, counts_by_role, counts_by_source_type = (
+        await evidence_repo.count_asset_evidence_summary(asset_id=asset.id)
+    )
+
+    assert total == 5, (
+        f"Expected 5 (offline_eval excluded), got {total}"
+    )
+    assert "offline_eval" not in counts_by_role, (
+        "offline_eval must not appear in counts_by_role"
+    )
+    assert counts_by_source_type.get("benchmark_corpus", 0) == 0, (
+        "benchmark_corpus from offline_eval must not appear in counts_by_source_type"
+    )

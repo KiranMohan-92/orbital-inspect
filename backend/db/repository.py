@@ -6,7 +6,7 @@ Isolates SQLAlchemy queries from business logic. All methods are async.
 
 import hashlib
 from datetime import datetime, timezone
-from sqlalchemy import select, update, func, delete, and_
+from sqlalchemy import select, update, func, delete, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 from db.models import (
@@ -1021,21 +1021,70 @@ class EvidenceRepository:
         *,
         asset_id: str,
         org_id: str | None = None,
-        limit: int = 25,
+        limit: int | None = 25,
     ) -> list[EvidenceRecord]:
         query = (
             select(EvidenceRecord)
             .where(EvidenceRecord.asset_id == asset_id)
+            .where(or_(EvidenceRecord.evidence_role != "offline_eval", EvidenceRecord.evidence_role.is_(None)))
             .order_by(
                 EvidenceRecord.captured_at.desc().nullslast(),
                 EvidenceRecord.ingested_at.desc(),
             )
-            .limit(limit)
         )
+        if limit is not None:
+            query = query.limit(limit)
         if org_id:
             query = query.where(EvidenceRecord.org_id == org_id)
         result = await self.session.execute(query)
         return list(result.scalars().all())
+
+    async def count_asset_evidence_summary(
+        self,
+        *,
+        asset_id: str,
+        org_id: str | None = None,
+    ) -> tuple[int, dict[str, int], dict[str, int]]:
+        """Return (total_count, counts_by_role, counts_by_source_type) for all
+        non-offline_eval evidence records attached to an asset.
+
+        Unlike list_asset_evidence this query carries no LIMIT so the counts
+        always reflect the full dataset.
+        """
+        base_filter = [
+            EvidenceRecord.asset_id == asset_id,
+            or_(EvidenceRecord.evidence_role != "offline_eval", EvidenceRecord.evidence_role.is_(None)),
+        ]
+        if org_id:
+            base_filter.append(EvidenceRecord.org_id == org_id)
+
+        # total count
+        total_result = await self.session.execute(
+            select(func.count()).select_from(EvidenceRecord).where(*base_filter)
+        )
+        total_count: int = total_result.scalar_one()
+
+        # counts grouped by evidence_role
+        role_result = await self.session.execute(
+            select(EvidenceRecord.evidence_role, func.count())
+            .where(*base_filter)
+            .group_by(EvidenceRecord.evidence_role)
+        )
+        counts_by_role: dict[str, int] = {
+            (row[0] or "unknown"): row[1] for row in role_result.all()
+        }
+
+        # counts grouped by source_type
+        stype_result = await self.session.execute(
+            select(EvidenceRecord.source_type, func.count())
+            .where(*base_filter)
+            .group_by(EvidenceRecord.source_type)
+        )
+        counts_by_source_type: dict[str, int] = {
+            (row[0] or "unknown"): row[1] for row in stype_result.all()
+        }
+
+        return total_count, counts_by_role, counts_by_source_type
 
     async def get_asset_reference_profile(
         self,

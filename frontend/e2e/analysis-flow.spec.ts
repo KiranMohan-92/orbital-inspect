@@ -258,3 +258,49 @@ test('portfolio refresh reflects approved decision state for the reviewed asset'
   await expect(approvedCard).toContainText('Approved by analyst-e2e-user');
   await expect(page.getByText('OPEN ATTENTION')).toBeVisible();
 });
+
+test('analysis evidence panel is visible for completed analysis', async ({ page }) => {
+  await submitAnalysis(page, {
+    noradId: '910011',
+    assetType: 'compute_platform',
+    context: '[e2e:success] Evidence lineage panel verification.',
+  });
+
+  await expect(page.getByTestId('analysis-status')).toHaveText('ASSESSMENT COMPLETE');
+  await expect(page.getByTestId('analysis-evidence-panel')).toBeVisible();
+  await expect(page.getByTestId('analysis-evidence-panel')).toContainText('EVIDENCE LINEAGE');
+});
+
+test('analysis reference profile panel is visible for completed analysis', async ({ page }) => {
+  await submitAnalysis(page, {
+    noradId: '910012',
+    assetType: 'compute_platform',
+    context: '[e2e:success] Reference profile panel verification.',
+  });
+
+  await expect(page.getByTestId('analysis-status')).toHaveText('ASSESSMENT COMPLETE');
+  await expect(page.getByTestId('analysis-reference-profile-panel')).toBeVisible();
+  await expect(page.getByTestId('analysis-reference-profile-panel')).toContainText('REFERENCE PROFILE');
+});
+
+test('portfolio asset detail panel shows asset context', async ({ page }) => {
+  await submitAnalysis(page, {
+    noradId: '910013',
+    assetType: 'compute_platform',
+    context: '[e2e:success] Portfolio asset detail panel verification.',
+  });
+
+  await expect(page.getByTestId('analysis-status')).toHaveText('ASSESSMENT COMPLETE');
+
+  await page.getByTestId('nav-portfolio').click();
+  await expect(page.getByTestId('portfolio-view')).toBeVisible();
+
+  const assetCard = page
+    .getByTestId('portfolio-satellite-card')
+    .filter({ hasText: '#910013' });
+  await expect(assetCard).toBeVisible();
+  await assetCard.click();
+
+  await expect(page.getByTestId('portfolio-asset-detail-panel')).toBeVisible();
+  await expect(page.getByTestId('portfolio-asset-detail-panel')).toContainText('ASSET CONTEXT');
+});

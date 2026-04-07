@@ -309,17 +309,31 @@ async def get_asset_detail(
             }
             for alias in await asset_repo.list_aliases(asset.id)
         ]
-        recent_evidence_records = await evidence_repo.list_asset_evidence(
+        # Fetch the full dataset (no limit) to compute accurate summary counts.
+        all_evidence_records = await evidence_repo.list_asset_evidence(
             asset_id=asset.id,
             org_id=user.org_id if user else None,
-            limit=12,
+            limit=None,
         )
+        # Recent slice for the response payload — keeps the API response small.
+        recent_evidence_records = all_evidence_records[:12]
         recent_evidence = [_serialize_evidence_item(record) for record in recent_evidence_records]
         latest_captured = None
-        for record in recent_evidence_records:
+        for record in all_evidence_records:
             if record.captured_at:
                 latest_captured = record.captured_at
                 break
+
+        # Compute summary counts from the full dataset via the repository helper.
+        total_records, counts_by_role, _counts_by_source_type = (
+            await evidence_repo.count_asset_evidence_summary(
+                asset_id=asset.id,
+                org_id=user.org_id if user else None,
+            )
+        )
+        # Domain classification requires API-layer logic (_source_domain) so we
+        # compute it here from the full serialised evidence list.
+        all_evidence_serialized = [_serialize_evidence_item(r) for r in all_evidence_records]
 
         current_analysis = getattr(asset, "current_analysis", None)
         return {
@@ -338,10 +352,10 @@ async def get_asset_detail(
             "aliases": aliases,
             "reference_profile": _serialize_reference_profile(getattr(asset, "reference_profile", None)),
             "evidence_summary": {
-                "total_records": len(recent_evidence_records),
-                "counts_by_role": _count_by(recent_evidence, "evidence_role"),
-                "counts_by_domain": _count_by(recent_evidence, "source_domain"),
-                "providers": sorted({item["source_label"] for item in recent_evidence}),
+                "total_records": total_records,
+                "counts_by_role": counts_by_role,
+                "counts_by_domain": _count_by(all_evidence_serialized, "source_domain"),
+                "providers": sorted({item["source_label"] for item in all_evidence_serialized}),
                 "latest_captured_at": _iso(latest_captured),
             },
             "recent_evidence": recent_evidence,

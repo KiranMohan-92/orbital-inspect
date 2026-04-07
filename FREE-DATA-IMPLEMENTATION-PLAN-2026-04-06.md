@@ -104,7 +104,7 @@ Acceptance:
 - Reference profiles are derived from real persisted evidence, not ad hoc side data
 
 ### Phase 4: Product Integration
-Status: In progress
+Status: Completed
 
 Deliverables:
 - Expose evidence summaries, provenance, and reference-profile context through analysis and asset-facing APIs
@@ -186,10 +186,8 @@ Completed:
 - Phase 1
 - Phase 2
 - Phase 3
-- Phase 5
-
-Active:
 - Phase 4
+- Phase 5 (commit 5a4e068; hardening fixes: offline_eval leak fix, evidence count accuracy, duplicate fetch removal)
 
 Pending:
 - Phase 6
