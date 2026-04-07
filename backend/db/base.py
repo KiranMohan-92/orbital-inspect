@@ -132,6 +132,10 @@ async def _ensure_sqlite_schema(conn) -> None:
         "webhook_endpoints": {
             "secret_ciphertext": "ALTER TABLE webhook_endpoints ADD COLUMN secret_ciphertext TEXT DEFAULT ''",
         },
+        "dataset_registry": {
+            "record_count": "ALTER TABLE dataset_registry ADD COLUMN record_count INTEGER",
+            "checksum_sha256": "ALTER TABLE dataset_registry ADD COLUMN checksum_sha256 VARCHAR(64)",
+        },
     }
 
     for table_name, columns in desired_columns.items():

@@ -168,6 +168,12 @@ try:
 except ImportError:
     pass
 
+try:
+    from api.datasets import router as datasets_router
+    app.include_router(datasets_router)
+except ImportError:
+    pass
+
 
 # ── Demo cache directory ─────────────────────────────────────────────
 DEMO_DIR = settings.demo_cache_dir_path

@@ -976,6 +976,12 @@ class EvidenceRepository:
         evidence_id: str,
         used_for: str | None = None,
     ) -> AnalysisEvidenceLink:
+        if not await self.validate_evidence_not_offline_eval(evidence_id):
+            raise ValueError(
+                f"Evidence record {evidence_id} has role 'offline_eval' and cannot "
+                "be linked to a runtime analysis. Benchmark datasets must stay out "
+                "of customer evidence paths."
+            )
         query = (
             select(AnalysisEvidenceLink)
             .where(AnalysisEvidenceLink.analysis_id == analysis_id)
@@ -1181,6 +1187,8 @@ class EvidenceRepository:
         intended_use: str = "offline_eval",
         local_storage_uri: str | None = None,
         version: str | None = None,
+        record_count: int | None = None,
+        checksum_sha256: str | None = None,
         notes: str | None = None,
     ) -> DatasetRegistry:
         result = await self.session.execute(
@@ -1197,6 +1205,10 @@ class EvidenceRepository:
             dataset.intended_use = intended_use
             dataset.local_storage_uri = local_storage_uri
             dataset.version = version
+            if record_count is not None:
+                dataset.record_count = record_count
+            if checksum_sha256 is not None:
+                dataset.checksum_sha256 = checksum_sha256
             dataset.notes = notes
             await self.session.commit()
             await self.session.refresh(dataset)
@@ -1211,12 +1223,66 @@ class EvidenceRepository:
             intended_use=intended_use,
             local_storage_uri=local_storage_uri,
             version=version,
+            record_count=record_count,
+            checksum_sha256=checksum_sha256,
             notes=notes,
         )
         self.session.add(dataset)
         await self.session.commit()
         await self.session.refresh(dataset)
         return dataset
+
+    async def list_datasets(
+        self,
+        *,
+        org_id: str | None = None,
+        dataset_type: str | None = None,
+        intended_use: str | None = None,
+    ) -> list[DatasetRegistry]:
+        query = select(DatasetRegistry).order_by(DatasetRegistry.name.asc())
+        if org_id is not None:
+            query = query.where(
+                (DatasetRegistry.org_id == org_id) | DatasetRegistry.org_id.is_(None)
+            )
+        else:
+            query = query.where(DatasetRegistry.org_id.is_(None))
+        if dataset_type:
+            query = query.where(DatasetRegistry.dataset_type == dataset_type)
+        if intended_use:
+            query = query.where(DatasetRegistry.intended_use == intended_use)
+        result = await self.session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_dataset(
+        self,
+        dataset_id: str,
+        *,
+        org_id: str | None = None,
+    ) -> DatasetRegistry | None:
+        query = select(DatasetRegistry).where(DatasetRegistry.id == dataset_id)
+        if org_id is not None:
+            query = query.where(
+                (DatasetRegistry.org_id == org_id) | DatasetRegistry.org_id.is_(None)
+            )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+
+    async def validate_evidence_not_offline_eval(
+        self,
+        evidence_id: str,
+    ) -> bool:
+        """Return True if the evidence record is safe to link to a runtime analysis.
+
+        Returns False when the record carries evidence_role='offline_eval',
+        which must never leak into customer-facing analysis paths.
+        """
+        result = await self.session.execute(
+            select(EvidenceRecord.evidence_role)
+            .where(EvidenceRecord.id == evidence_id)
+            .limit(1)
+        )
+        role = result.scalar_one_or_none()
+        return role != "offline_eval"
 
 
 class ReportRepository:

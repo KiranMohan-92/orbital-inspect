@@ -127,12 +127,25 @@ Acceptance:
 - Asset reference profile context is visible where it affects decisions and triage
 
 ### Phase 5: Offline Evaluation Layer
-Status: Pending
+Status: Completed
 
 Deliverables:
 - Register offline benchmark datasets such as ESA anomaly, OPS-SAT-AD, SPEED, and SPEED+
 - Keep benchmark datasets out of runtime customer evidence paths
 - Add metadata scripts and tests for dataset registration/versioning
+- Extend DatasetRegistry model with record_count and checksum_sha256 columns
+- Add repository guardrail blocking offline_eval evidence from runtime analysis linking
+- Add dataset listing, detail, and filtering APIs
+- Add seed service and CLI script for benchmark dataset registration
+
+Primary files:
+- `backend/db/models.py` (DatasetRegistry extended)
+- `backend/db/repository.py` (list_datasets, get_dataset, validate_evidence_not_offline_eval, guardrail in link_analysis_evidence)
+- `backend/services/dataset_registry_service.py` (benchmark specs, seed function)
+- `backend/api/datasets.py` (GET /api/datasets, GET /api/datasets/{id}, POST /api/datasets/seed)
+- `backend/scripts/seed_benchmark_datasets.py` (CLI seeder)
+- `backend/alembic/versions/20260407_0005_offline_eval_layer.py` (migration)
+- `backend/tests/test_offline_eval.py` (13 tests)
 
 Acceptance:
 - Offline datasets are tracked by source, license, version, and intended use
@@ -173,10 +186,10 @@ Completed:
 - Phase 1
 - Phase 2
 - Phase 3
+- Phase 5
 
 Active:
 - Phase 4
 
 Pending:
-- Phase 5
 - Phase 6

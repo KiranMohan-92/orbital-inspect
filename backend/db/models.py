@@ -277,6 +277,8 @@ class DatasetRegistry(Base):
     intended_use = Column(String(50), default="offline_eval")
     local_storage_uri = Column(String(500), nullable=True)
     version = Column(String(64), nullable=True)
+    record_count = Column(Integer, nullable=True)
+    checksum_sha256 = Column(String(64), nullable=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
