@@ -188,6 +188,35 @@ Completed:
 - Phase 3
 - Phase 4
 - Phase 5 (commit 5a4e068; hardening fixes: offline_eval leak fix, evidence count accuracy, duplicate fetch removal)
+- Phase 6 status: Pending
+
+## Enterprise Transformation Progress
+
+Phase 1 — Partnership-Ready API Layer (commit 21baf3a):
+- API v1 versioning with backward-compat middleware
+- Batch analysis endpoint (up to 100 items)
+- RFC 7807 error envelope
+- OpenAPI 3.1 export with security schemes
+
+Phase 2 — Fleet-Scale Operations (commit 536271d):
+- Cache service (Redis + in-memory LRU fallback)
+- Alert service (conjunction, risk, staleness, triage thresholds)
+- Fleet ingestion service (periodic TLE/conjunction/weather)
+- Fleet summary service (cached portfolio stats)
+- Performance indexes for fleet-scale portfolio queries
+
+Phase 3 — Provable Reliability (commit b59c31f):
+- SLO service (99.5% pipeline completion, p95 < 45s, evidence freshness, webhook delivery)
+- Retention service (configurable purge with audit trail)
+
+Phase 4 — Compliance & Security (commit b59c31f):
+- ITAR/CUI classification marking service
+- Feature flag service (database-backed, no SaaS dependency)
+- BSL 1.1 LICENSE file
+
+Phase 5 — Intelligent Fleet Analytics (commit b59c31f):
+- Trend analysis service (degradation velocity, time-to-threshold)
+- Trends API (per-asset and fleet-wide endpoints)
 
 Pending:
-- Phase 6
+- Enterprise Phase 6 — Deployment Readiness (Helm charts, runbook, smoke tests, a11y)
