@@ -70,4 +70,10 @@ def mount_v1_routers() -> APIRouter:
     except ImportError:
         pass
 
+    try:
+        from api.trends import router as trends_router
+        v1_router.include_router(trends_router)
+    except ImportError:
+        pass
+
     return v1_router
