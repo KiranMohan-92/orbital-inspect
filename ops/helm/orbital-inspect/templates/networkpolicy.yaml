@@ -1,0 +1,141 @@
+---
+# Allow the API pods to receive traffic from the Ingress controller and from frontend pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "orbital-inspect.fullname" . }}-api-ingress
+  labels:
+    {{- include "orbital-inspect.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "orbital-inspect.apiSelectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Accept traffic from nginx ingress controller pods
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.service.port }}
+    # Accept traffic from frontend pods (same namespace)
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "orbital-inspect.frontendSelectorLabels" . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.service.port }}
+  egress:
+    # Allow DNS resolution
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow outbound to PostgreSQL (external; permit all egress on 5432)
+    - ports:
+        - protocol: TCP
+          port: 5432
+    # Allow outbound to Redis (external; permit all egress on 6379)
+    - ports:
+        - protocol: TCP
+          port: 6379
+    # Allow outbound to S3 / MinIO (HTTPS + plain HTTP for MinIO)
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 9000
+    # Allow outbound to external APIs (Space-Track, SatNOGS, Gemini)
+    - ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Allow the worker pods to reach PostgreSQL, Redis, and storage — but not to
+# accept any inbound traffic (workers only pull from Redis queues).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "orbital-inspect.fullname" . }}-worker
+  labels:
+    {{- include "orbital-inspect.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "orbital-inspect.workerSelectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    # Allow DNS resolution
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # PostgreSQL
+    - ports:
+        - protocol: TCP
+          port: 5432
+    # Redis
+    - ports:
+        - protocol: TCP
+          port: 6379
+    # S3 / MinIO
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 9000
+    # External APIs (Gemini, Space-Track, SatNOGS)
+    - ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Frontend pods may only talk to the API service inside the cluster.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "orbital-inspect.fullname" . }}-frontend
+  labels:
+    {{- include "orbital-inspect.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "orbital-inspect.frontendSelectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Accept traffic from the ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.service.port }}
+  egress:
+    # Allow DNS
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow frontend → API (nginx proxies /api/* server-side if configured,
+    # but Vite-built SPAs call the API from the browser; this covers SSR/proxy cases)
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "orbital-inspect.apiSelectorLabels" . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.service.port }}

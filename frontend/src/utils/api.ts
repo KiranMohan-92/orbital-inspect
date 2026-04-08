@@ -35,6 +35,37 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   });
 }
 
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [1000, 2000, 4000]; // Exponential backoff
+
+export async function fetchWithRetry(
+  url: string,
+  init?: RequestInit,
+  retries = MAX_RETRIES,
+): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...init,
+        headers: buildApiHeaders(init?.headers),
+      });
+      // Don't retry client errors (4xx) — only server errors (5xx) and network failures
+      if (response.ok || (response.status >= 400 && response.status < 500)) {
+        return response;
+      }
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt] || 4000));
+        continue;
+      }
+      return response;
+    } catch (error) {
+      if (attempt >= retries) throw error;
+      await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt] || 4000));
+    }
+  }
+  throw new Error('Request failed after retries');
+}
+
 export async function readApiErrorMessage(
   response: Response,
   fallback: string,

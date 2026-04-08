@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "orbital-inspect.fullname" . }}-config
+  labels:
+    {{- include "orbital-inspect.labels" . | nindent 4 }}
+data:
+  APP_ENV: {{ .Values.app.env | quote }}
+  DEMO_MODE: {{ .Values.app.demoMode | toString | quote }}
+  LOG_LEVEL: {{ .Values.app.logLevel | quote }}
+  LOG_FORMAT: {{ .Values.app.logFormat | quote }}
+  METRICS_ENABLED: {{ .Values.app.metricsEnabled | toString | quote }}
+  PROMETHEUS_METRICS_ENABLED: {{ .Values.app.prometheusMetricsEnabled | toString | quote }}
+  ALLOWED_ORIGINS: {{ .Values.app.allowedOrigins | quote }}
+
+  # Auth (non-secret settings)
+  AUTH_ENABLED: {{ .Values.auth.enabled | toString | quote }}
+  JWT_EXPIRY_MINUTES: {{ .Values.auth.jwtExpiryMinutes | toString | quote }}
+  JWT_ISSUER: {{ .Values.auth.jwtIssuer | quote }}
+  JWT_AUDIENCE: {{ .Values.auth.jwtAudience | quote }}
+  API_KEY_PREFIX: {{ .Values.auth.apiKeyPrefix | quote }}
+
+  # Database
+  DATABASE_AUTO_INIT: {{ .Values.postgresql.autoInit | toString | quote }}
+
+  # Redis
+  REDIS_REQUIRED: {{ .Values.redis.required | toString | quote }}
+
+  # Storage
+  STORAGE_BACKEND: {{ .Values.storage.backend | quote }}
+  STORAGE_BUCKET: {{ .Values.storage.bucket | quote }}
+  STORAGE_REGION: {{ .Values.storage.region | quote }}
+  {{- if .Values.storage.endpointUrl }}
+  STORAGE_ENDPOINT_URL: {{ .Values.storage.endpointUrl | quote }}
+  {{- end }}
+  STORAGE_PREFIX: {{ .Values.storage.prefix | quote }}
+  STORAGE_FORCE_PATH_STYLE: {{ .Values.storage.forcePathStyle | toString | quote }}
+  STORAGE_CREATE_BUCKET: {{ .Values.storage.createBucket | toString | quote }}
+  SIGNED_ARTIFACT_TTL_MINUTES: {{ .Values.storage.signedArtifactTtlMinutes | toString | quote }}
+  REPORT_ARTIFACT_RETENTION_DAYS: {{ .Values.storage.reportArtifactRetentionDays | toString | quote }}
+
+  # Gemini / AI
+  GEMINI_MODEL: {{ .Values.gemini.model | quote }}
+  AGENT_TIMEOUT_SECONDS: {{ .Values.gemini.agentTimeoutSeconds | toString | quote }}
+  GEMINI_CIRCUIT_BREAKER_THRESHOLD: {{ .Values.gemini.circuitBreakerThreshold | toString | quote }}
+  JOB_TIMEOUT_SECONDS: {{ .Values.gemini.jobTimeoutSeconds | toString | quote }}
+
+  # Space-Track / SatNOGS
+  SPACE_TRACK_BASE_URL: {{ .Values.spaceTrack.baseUrl | quote }}
+  SATNOGS_NETWORK_API_BASE: {{ .Values.satnogs.networkApiBase | quote }}
+  SATNOGS_MAX_OBSERVATIONS: {{ .Values.satnogs.maxObservations | toString | quote }}
+
+  # Queue
+  ANALYSIS_QUEUE_NAME: {{ .Values.queue.name | quote }}
+  ANALYSIS_JOB_MAX_RETRIES: {{ .Values.queue.jobMaxRetries | toString | quote }}
+  ANALYSIS_RETRY_BACKOFF_BASE_SECONDS: {{ .Values.queue.retryBackoffBaseSeconds | toString | quote }}
+
+  # Rate limiting
+  RATE_LIMIT_BACKEND: {{ .Values.rateLimit.backend | quote }}
+  ANALYSIS_RATE_LIMIT_PER_HOUR: {{ .Values.rateLimit.analysisPerHour | toString | quote }}
+  REPORT_RATE_LIMIT_PER_HOUR: {{ .Values.rateLimit.reportPerHour | toString | quote }}
+  RATE_LIMIT_FAIL_OPEN: {{ .Values.rateLimit.failOpen | toString | quote }}
+
+  # Caching
+  CACHE_BACKEND: {{ .Values.cache.backend | quote }}
+  CACHE_DEFAULT_TTL_SECONDS: {{ .Values.cache.defaultTtlSeconds | toString | quote }}
+
+  # OpenTelemetry
+  OTEL_ENABLED: {{ .Values.otel.enabled | toString | quote }}
+  OTEL_REQUIRED: {{ .Values.otel.required | toString | quote }}
+  OTEL_SERVICE_NAME: {{ .Values.otel.serviceName | quote }}
+  {{- if .Values.otel.exporterEndpoint }}
+  OTEL_EXPORTER_OTLP_ENDPOINT: {{ .Values.otel.exporterEndpoint | quote }}
+  {{- end }}
+  OTEL_EXPORTER_OTLP_HEADERS: {{ .Values.otel.exporterHeaders | quote }}
+  OTEL_RESOURCE_ATTRIBUTES: {{ .Values.otel.resourceAttributes | quote }}
+  OTEL_TRACES_SAMPLER_RATIO: {{ .Values.otel.tracesSamplerRatio | toString | quote }}
+  OTEL_CONSOLE_EXPORTER: {{ .Values.otel.consoleExporter | toString | quote }}
+
+  # Governance
+  GOVERNANCE_POLICY_VERSION: {{ .Values.governance.policyVersion | quote }}
+  MIN_EVIDENCE_COMPLETENESS_FOR_DECISION: {{ .Values.governance.minEvidenceCompletenessForDecision | toString | quote }}
+  REQUIRE_HUMAN_REVIEW_FOR_DECISIONS: {{ .Values.governance.requireHumanReviewForDecisions | toString | quote }}

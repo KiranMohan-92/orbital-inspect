@@ -1,0 +1,5 @@
+apiVersion: v2
+name: orbital-inspect
+description: AI-powered satellite inspection and risk assessment platform
+version: 0.1.0
+appVersion: "0.2.0"

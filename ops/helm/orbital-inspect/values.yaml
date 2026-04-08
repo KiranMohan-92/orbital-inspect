@@ -1,0 +1,231 @@
+# Default values for orbital-inspect Helm chart.
+# Override these in environment-specific values files.
+
+# ── Image configuration ────────────────────────────────────────────────────────
+api:
+  image:
+    repository: orbital-inspect/api
+    tag: "0.2.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+  service:
+    port: 8000
+  # Liveness / readiness probe paths
+  probes:
+    liveness:
+      path: /api/health
+      initialDelaySeconds: 15
+      periodSeconds: 20
+      failureThreshold: 3
+    readiness:
+      path: /api/ready
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      failureThreshold: 3
+
+worker:
+  image:
+    repository: orbital-inspect/api   # same image, different command
+    tag: "0.2.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  command:
+    - python
+    - -m
+    - arq
+    - workers.analysis_worker.WorkerSettings
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+
+frontend:
+  image:
+    repository: orbital-inspect/frontend
+    tag: "0.2.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  service:
+    port: 80
+
+# ── Global image pull secrets ──────────────────────────────────────────────────
+imagePullSecrets: []
+
+# ── Application environment ────────────────────────────────────────────────────
+app:
+  env: "production"          # development | staging | production | test
+  demoMode: false
+  logLevel: "INFO"
+  logFormat: "json"
+  metricsEnabled: true
+  prometheusMetricsEnabled: true
+  # CORS – comma-separated list of allowed origins
+  allowedOrigins: "https://your-domain.com"
+
+# ── Auth ───────────────────────────────────────────────────────────────────────
+auth:
+  enabled: true
+  # Reference an existing secret; the secret must contain JWT_SECRET key
+  existingSecret: "orbital-inspect-jwt"
+  jwtExpiryMinutes: 60
+  jwtIssuer: "orbital-inspect"
+  jwtAudience: "orbital-inspect-api"
+  apiKeyPrefix: "oi"
+
+# ── PostgreSQL (external) ──────────────────────────────────────────────────────
+postgresql:
+  # Reference an existing secret; must contain DATABASE_URL key
+  existingSecret: "orbital-inspect-db"
+  # Used only if existingSecret is not set (not recommended for production)
+  url: ""
+  autoInit: true
+
+# ── Redis (external) ──────────────────────────────────────────────────────────
+redis:
+  # Reference an existing secret; must contain REDIS_URL key
+  existingSecret: "orbital-inspect-redis"
+  # Used only if existingSecret is not set
+  url: ""
+  required: false
+
+# ── S3 / MinIO storage ────────────────────────────────────────────────────────
+storage:
+  backend: "s3"           # local | s3
+  bucket: "orbital-inspect"
+  region: "us-east-1"
+  endpointUrl: ""         # leave empty for AWS S3; set for MinIO
+  prefix: "runtime"
+  forcePathStyle: false   # set true for MinIO
+  createBucket: false
+  # Reference an existing secret; must contain STORAGE_ACCESS_KEY_ID and STORAGE_SECRET_ACCESS_KEY
+  existingSecret: "orbital-inspect-storage"
+  signedArtifactTtlMinutes: 30
+  reportArtifactRetentionDays: 30
+
+# ── Gemini / AI ───────────────────────────────────────────────────────────────
+gemini:
+  model: "gemini-2.5-flash"
+  # Reference an existing secret; must contain GEMINI_API_KEY
+  existingSecret: "orbital-inspect-gemini"
+  agentTimeoutSeconds: 120
+  circuitBreakerThreshold: 5
+  jobTimeoutSeconds: 300
+
+# ── Space-Track / SatNOGS ────────────────────────────────────────────────────
+spaceTrack:
+  baseUrl: "https://www.space-track.org"
+  # Reference an existing secret; must contain SPACE_TRACK_USERNAME and SPACE_TRACK_PASSWORD
+  existingSecret: ""   # optional; leave empty to skip
+
+satnogs:
+  networkApiBase: "https://network.satnogs.org/api"
+  maxObservations: 10
+
+# ── Queue ────────────────────────────────────────────────────────────────────
+queue:
+  name: "arq:queue"
+  jobMaxRetries: 3
+  retryBackoffBaseSeconds: 5
+
+# ── Rate limiting ─────────────────────────────────────────────────────────────
+rateLimit:
+  backend: "redis"     # memory | redis
+  analysisPerHour: 20
+  reportPerHour: 60
+  failOpen: true
+
+# ── Caching ───────────────────────────────────────────────────────────────────
+cache:
+  backend: "redis"     # auto | redis | memory
+  defaultTtlSeconds: 900
+
+# ── OpenTelemetry ─────────────────────────────────────────────────────────────
+otel:
+  enabled: false
+  required: false
+  serviceName: "orbital-inspect"
+  exporterEndpoint: ""
+  exporterHeaders: ""
+  resourceAttributes: ""
+  tracesSamplerRatio: 1.0
+  consoleExporter: false
+
+# ── Governance / underwriting policy ─────────────────────────────────────────
+governance:
+  policyVersion: "2026-04-03"
+  minEvidenceCompletenessForDecision: 80.0
+  requireHumanReviewForDecisions: true
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: orbital-inspect.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: api
+        - path: /
+          pathType: Prefix
+          service: frontend
+  tls:
+    - secretName: orbital-inspect-tls
+      hosts:
+        - orbital-inspect.example.com
+
+# ── Service account ───────────────────────────────────────────────────────────
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}
+
+# ── Pod security context ──────────────────────────────────────────────────────
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# ── Node selector / tolerations / affinity ────────────────────────────────────
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# ── Extra environment variables ───────────────────────────────────────────────
+# Injected into both api and worker pods.
+extraEnv: []
+# - name: MY_VAR
+#   value: "my-value"
