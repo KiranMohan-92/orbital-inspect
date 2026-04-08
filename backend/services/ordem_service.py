@@ -6,6 +6,10 @@ NASA ORDEM 4.0 data for particles >= 1mm at various orbital altitudes.
 Real-time API integration would require ORDEM desktop software — this service
 uses pre-computed reference tables from published NASA technical reports.
 
+DISCLAIMER: This service uses pre-computed reference tables derived from NASA
+ORDEM 4.0 published data (NTRS ID 20240000961). Values are NOT fetched from
+a live API and may not reflect the most current debris environment assessment.
+
 Data sources:
   - NASA ORDEM 4.0 (2024) — NTRS ID 20240000961
   - ESA MASTER-8 cross-reference
@@ -80,7 +84,9 @@ def format_flux_summary(altitude_km: float) -> str:
         f"  Flux >= 10cm: {band.flux_10cm:.2e} particles/m²/year\n"
         f"  Tracked objects in band: ~{band.cataloged_objects:,}\n"
         f"  Collision probability: {band.collision_prob_per_year:.2e} /m²/year\n"
-        f"  Debris severity: {severity}"
+        f"  Debris severity: {severity}\n"
+        f"\nNote: Values are from pre-computed ORDEM 4.0 reference tables (NTRS ID 20240000961)\n"
+        f"and do not reflect real-time updates to the debris environment."
     )
 
 
@@ -96,13 +102,21 @@ _RADIATION_TABLE: dict[str, dict[str, float]] = {
 def lookup_radiation(altitude_km: float) -> dict[str, float] | None:
     """Look up radiation environment for a given altitude."""
     if altitude_km < 600:
-        return _RADIATION_TABLE["LEO_LOW"]
+        result = _RADIATION_TABLE["LEO_LOW"].copy()
+        result["data_source"] = "AE-8/AP-8 reference model (static, not real-time)"
+        return result
     if altitude_km < 1200:
-        return _RADIATION_TABLE["LEO_HIGH"]
+        result = _RADIATION_TABLE["LEO_HIGH"].copy()
+        result["data_source"] = "AE-8/AP-8 reference model (static, not real-time)"
+        return result
     if altitude_km < 20000:
-        return _RADIATION_TABLE["MEO"]
+        result = _RADIATION_TABLE["MEO"].copy()
+        result["data_source"] = "AE-8/AP-8 reference model (static, not real-time)"
+        return result
     if altitude_km >= 35000:
-        return _RADIATION_TABLE["GEO"]
+        result = _RADIATION_TABLE["GEO"].copy()
+        result["data_source"] = "AE-8/AP-8 reference model (static, not real-time)"
+        return result
     return None
 
 
@@ -120,4 +134,8 @@ def lookup_thermal(orbital_regime: str) -> dict | None:
     regime = orbital_regime.upper().replace("-", "")
     if regime == "SSO":
         regime = "LEO"
-    return _THERMAL_TABLE.get(regime)
+    result = _THERMAL_TABLE.get(regime)
+    if result is not None:
+        result = result.copy()
+        result["data_source"] = "Orbital thermal model reference tables (static, not real-time)"
+    return result

@@ -79,6 +79,13 @@ class BatchService:
         )
         await self.session.commit()
 
+    async def update_batch_status(self, batch_id: str, status: str) -> None:
+        """Update the status field of a batch job."""
+        await self.session.execute(
+            update(BatchJob).where(BatchJob.id == batch_id).values(status=status)
+        )
+        await self.session.commit()
+
     async def finalize_batch(self, batch_id: str) -> None:
         """Mark batch as completed or partial_failure based on counts."""
         from datetime import datetime, timezone
