@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth.dependencies import require_role, CurrentUser
 from config import settings
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 @router.post("/api-key/rotate")

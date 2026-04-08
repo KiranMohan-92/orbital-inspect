@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from auth.dependencies import get_current_user, CurrentUser
 
 log = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
+router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
 
 @router.get("")

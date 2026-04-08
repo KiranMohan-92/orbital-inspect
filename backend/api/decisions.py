@@ -42,7 +42,7 @@ def _derive_override_urgency(action: str | None) -> str | None:
     return None
 
 
-@router.post("/api/analyses/{analysis_id}/decision/review")
+@router.post("/analyses/{analysis_id}/decision/review")
 async def review_decision(
     analysis_id: str,
     body: DecisionReviewRequest,

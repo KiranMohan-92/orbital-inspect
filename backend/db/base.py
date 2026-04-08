@@ -61,6 +61,7 @@ async def init_db():
     """Create all tables for demo, E2E, or ephemeral service-backed environments."""
     # Import ORM models before create_all so metadata is fully registered.
     from db import models  # noqa: F401
+    from db import batch_models  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -135,6 +136,10 @@ async def _ensure_sqlite_schema(conn) -> None:
         "dataset_registry": {
             "record_count": "ALTER TABLE dataset_registry ADD COLUMN record_count INTEGER",
             "checksum_sha256": "ALTER TABLE dataset_registry ADD COLUMN checksum_sha256 VARCHAR(64)",
+        },
+        "batch_jobs": {
+            "item_analysis_ids": "ALTER TABLE batch_jobs ADD COLUMN item_analysis_ids JSON DEFAULT '[]'",
+            "item_errors": "ALTER TABLE batch_jobs ADD COLUMN item_errors JSON DEFAULT '[]'",
         },
     }
 

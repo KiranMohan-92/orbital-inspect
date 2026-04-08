@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from auth.dependencies import CurrentUser, get_current_user, require_role
 
-router = APIRouter(prefix="/api/datasets", tags=["datasets"])
+router = APIRouter(prefix="/datasets", tags=["datasets"])
 
 
 def _iso(value: Any) -> str | None:

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from auth.dependencies import CurrentUser, get_current_user
 
-router = APIRouter(prefix="/api", tags=["assets", "evidence"])
+router = APIRouter(prefix="", tags=["assets", "evidence"])
 
 
 PUBLIC_SOURCES = {

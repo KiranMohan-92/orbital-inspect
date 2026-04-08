@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Query
 
 log = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/precedents", tags=["precedents"])
+router = APIRouter(prefix="/precedents", tags=["precedents"])
 
 _DATA_PATH = Path(__file__).parent.parent / "data" / "precedents.json"
 _precedents: list[dict] = []

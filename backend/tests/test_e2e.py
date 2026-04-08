@@ -713,8 +713,8 @@ async def test_create_analysis_returns_durable_resource_urls(client, monkeypatch
     payload = response.json()
     assert payload["analysis_id"] == "analysis-queued-1"
     assert payload["status"] == "queued"
-    assert payload["analysis_url"] == "/api/analyses/analysis-queued-1"
-    assert payload["events_url"] == "/api/analyses/analysis-queued-1/events/stream"
+    assert payload["analysis_url"] == "/api/v1/analyses/analysis-queued-1"
+    assert payload["events_url"] == "/api/v1/analyses/analysis-queued-1/events/stream"
     assert isinstance(payload["request_id"], str)
     assert response.headers["x-request-id"] == payload["request_id"]
 

@@ -13,7 +13,7 @@ from config import settings
 from services.secret_service import encrypt_webhook_secret, hash_secret
 
 log = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
+router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 # In-memory webhook store (replace with DB in production)
 _webhooks: dict[str, dict] = {}

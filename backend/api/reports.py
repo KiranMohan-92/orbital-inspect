@@ -14,7 +14,7 @@ from auth.jwt_service import create_artifact_token, decode_token, AuthError
 from config import settings
 
 log = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/reports", tags=["reports"])
+router = APIRouter(prefix="/reports", tags=["reports"])
 _REPORTABLE_ANALYSIS_STATUSES = {"completed", "completed_partial"}
 
 

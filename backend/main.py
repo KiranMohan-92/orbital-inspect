@@ -118,6 +118,36 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# ── Backward-compat redirect: /api/<path> → /api/v1/<path> ─────────
+# Infrastructure endpoints (health, ready, metrics) are excluded.
+_UNVERSIONED_PREFIXES = ("/api/health", "/api/ready", "/api/metrics")
+
+
+class ApiVersionRedirectMiddleware(BaseHTTPMiddleware):
+    """Transparently rewrite legacy /api/X requests to /api/v1/X."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        path = request.scope["path"]
+        if (
+            path.startswith("/api/")
+            and not path.startswith("/api/v1/")
+            and not any(path.startswith(p) for p in _UNVERSIONED_PREFIXES)
+        ):
+            # Rewrite path in-place (internal redirect, no 301/302)
+            new_path = "/api/v1/" + path[len("/api/"):]
+            request.scope["path"] = new_path
+        return await call_next(request)
+
+
+app.add_middleware(ApiVersionRedirectMiddleware)
+
+# Register RFC 7807 error envelope
+try:
+    from api.error_envelope import register_error_handlers
+    register_error_handlers(app)
+except ImportError:
+    pass
+
 # Request logging middleware
 try:
     from middleware.request_logging import RequestLoggingMiddleware
@@ -125,52 +155,11 @@ try:
 except ImportError:
     pass
 
-# Mount API routers
+# Mount versioned API router (all business endpoints under /api/v1/)
 try:
-    from api.reports import router as reports_router
-    app.include_router(reports_router)
-except ImportError:
-    pass
-
-try:
-    from api.webhooks import router as webhooks_router
-    app.include_router(webhooks_router)
-except ImportError:
-    pass
-
-try:
-    from api.precedents import router as precedents_router
-    app.include_router(precedents_router)
-except ImportError:
-    pass
-
-try:
-    from api.portfolio import router as portfolio_router
-    app.include_router(portfolio_router)
-except ImportError:
-    pass
-
-try:
-    from api.assets import router as assets_router
-    app.include_router(assets_router)
-except ImportError:
-    pass
-
-try:
-    from api.admin import router as admin_router
-    app.include_router(admin_router)
-except ImportError:
-    pass
-
-try:
-    from api.decisions import router as decisions_router
-    app.include_router(decisions_router)
-except ImportError:
-    pass
-
-try:
-    from api.datasets import router as datasets_router
-    app.include_router(datasets_router)
+    from api.v1 import mount_v1_routers
+    v1_router = mount_v1_routers()
+    app.include_router(v1_router)
 except ImportError:
     pass
 
@@ -197,7 +186,7 @@ def _legacy_analyze_headers() -> dict[str, str]:
     return {
         "Deprecation": "true",
         "Sunset": LEGACY_ANALYZE_SUNSET,
-        "Link": '</api/analyses>; rel="successor-version"',
+        "Link": '</api/v1/analyses>; rel="successor-version"',
         "X-Orbital-Legacy-Endpoint": "true",
     }
 
@@ -717,7 +706,7 @@ async def prometheus_metrics(user: CurrentUser | None = Depends(require_observab
 
 
 # ── Durable analysis submission ─────────────────────────────────────
-@app.post("/api/analyses")
+@app.post("/api/v1/analyses")
 async def create_analysis(
     request: Request,
     image: UploadFile | None = File(default=None),
@@ -771,8 +760,8 @@ async def create_analysis(
     return {
         "analysis_id": analysis_id,
         "status": "dispatched" if dispatch["dispatch_mode"] == "arq" else "queued",
-        "analysis_url": f"/api/analyses/{analysis_id}",
-        "events_url": f"/api/analyses/{analysis_id}/events/stream",
+        "analysis_url": f"/api/v1/analyses/{analysis_id}",
+        "events_url": f"/api/v1/analyses/{analysis_id}/events/stream",
         "request_id": getattr(request.state, "request_id", None),
         "dispatch_mode": dispatch["dispatch_mode"],
         "queue_job_id": dispatch["queue_job_id"],
@@ -780,7 +769,7 @@ async def create_analysis(
 
 
 # ── Legacy analyze stream wrapper ───────────────────────────────────
-@app.post("/api/analyze")
+@app.post("/api/v1/analyze")
 async def analyze(
     image: UploadFile = File(...),
     norad_id: str = Form(default=""),
@@ -853,7 +842,7 @@ DEMO_CONFIGS = {
 }
 
 
-@app.get("/api/demos")
+@app.get("/api/v1/demos")
 async def list_demos():
     """List available demo cases."""
     if not settings.DEMO_MODE:
@@ -861,7 +850,7 @@ async def list_demos():
     return {"demos": DEMO_CONFIGS}
 
 
-@app.post("/api/demo/{demo_name}")
+@app.post("/api/v1/demo/{demo_name}")
 async def run_demo(demo_name: str):
     """Run a pre-configured demo analysis."""
     if not settings.DEMO_MODE:
@@ -916,7 +905,7 @@ async def run_demo(demo_name: str):
 
 
 # ── Analysis Results (persistent) ────────────────────────────────────
-@app.get("/api/analyses")
+@app.get("/api/v1/analyses")
 async def list_analyses(
     limit: int = 20,
     offset: int = 0,
@@ -981,7 +970,7 @@ async def list_analyses(
         return {"items": [], "total": 0, "limit": limit, "offset": offset}
 
 
-@app.get("/api/analyses/{analysis_id}")
+@app.get("/api/v1/analyses/{analysis_id}")
 async def get_analysis(
     analysis_id: str,
     user: CurrentUser | None = Depends(get_current_user),
@@ -1067,7 +1056,7 @@ async def get_analysis(
         raise HTTPException(status_code=503, detail="Database not available")
 
 
-@app.get("/api/ops/dead-letters")
+@app.get("/api/v1/ops/dead-letters")
 async def list_dead_letters(
     limit: int = 50,
     user: CurrentUser | None = Depends(require_role("admin")),
@@ -1097,7 +1086,7 @@ async def list_dead_letters(
         raise HTTPException(status_code=503, detail="Database not available")
 
 
-@app.get("/api/analyses/{analysis_id}/events/stream")
+@app.get("/api/v1/analyses/{analysis_id}/events/stream")
 async def stream_analysis_events(
     analysis_id: str,
     user: CurrentUser | None = Depends(get_current_user),
@@ -1106,7 +1095,7 @@ async def stream_analysis_events(
     return EventSourceResponse(_stream_analysis_events_generator(analysis_id, user))
 
 
-@app.get("/api/analyses/{analysis_id}/events")
+@app.get("/api/v1/analyses/{analysis_id}/events")
 async def get_analysis_events(
     analysis_id: str,
     user: CurrentUser | None = Depends(get_current_user),
