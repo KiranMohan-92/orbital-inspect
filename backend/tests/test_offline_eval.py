@@ -419,7 +419,7 @@ async def test_count_asset_evidence_summary_returns_true_total(
             payload_json={"seq": i},
         )
 
-    total, counts_by_role, counts_by_source_type = (
+    total, counts_by_role, counts_by_source_type, providers, latest = (
         await evidence_repo.count_asset_evidence_summary(asset_id=asset.id)
     )
 
@@ -458,7 +458,7 @@ async def test_count_summary_vs_list_limit(
         f"list_asset_evidence(limit=12) should return 12 records, got {len(limited)}"
     )
 
-    total, _, _ = await evidence_repo.count_asset_evidence_summary(asset_id=asset.id)
+    total, _, _, _, _ = await evidence_repo.count_asset_evidence_summary(asset_id=asset.id)
     assert total == 15, (
         f"count_asset_evidence_summary should return 15 (full dataset), got {total}"
     )
@@ -497,7 +497,7 @@ async def test_count_summary_excludes_offline_eval(
         payload_json={"domain": "lightbox"},
     )
 
-    total, counts_by_role, counts_by_source_type = (
+    total, counts_by_role, counts_by_source_type, providers, latest = (
         await evidence_repo.count_asset_evidence_summary(asset_id=asset.id)
     )
 

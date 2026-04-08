@@ -1098,7 +1098,30 @@ class EvidenceRepository:
             (row[0] or "unknown"): row[1] for row in stype_result.all()
         }
 
-        return total_count, counts_by_role, counts_by_source_type
+        # distinct providers (preserve original provider name, fall back to
+        # source_type titleized for provider-less records)
+        provider_result = await self.session.execute(
+            select(EvidenceRecord.provider, EvidenceRecord.source_type)
+            .where(*base_filter)
+            .group_by(EvidenceRecord.provider, EvidenceRecord.source_type)
+        )
+        seen_labels: set[str] = set()
+        for row in provider_result.all():
+            provider_val, source_type_val = row
+            if provider_val and provider_val.strip():
+                seen_labels.add(provider_val.strip())
+            elif source_type_val:
+                seen_labels.add(source_type_val.replace("_", " ").title())
+        distinct_providers: list[str] = sorted(seen_labels)
+
+        # latest captured_at (or ingested_at as fallback)
+        latest_result = await self.session.execute(
+            select(func.max(func.coalesce(EvidenceRecord.captured_at, EvidenceRecord.ingested_at)))
+            .where(*base_filter)
+        )
+        latest_captured = latest_result.scalar()
+
+        return total_count, counts_by_role, counts_by_source_type, distinct_providers, latest_captured
 
     async def get_asset_reference_profile(
         self,

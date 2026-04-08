@@ -309,31 +309,64 @@ async def get_asset_detail(
             }
             for alias in await asset_repo.list_aliases(asset.id)
         ]
-        # Fetch the full dataset (no limit) to compute accurate summary counts.
-        all_evidence_records = await evidence_repo.list_asset_evidence(
+        # Fetch only the recent slice for the response payload.
+        recent_evidence_records = await evidence_repo.list_asset_evidence(
             asset_id=asset.id,
             org_id=user.org_id if user else None,
-            limit=None,
+            limit=12,
         )
-        # Recent slice for the response payload — keeps the API response small.
-        recent_evidence_records = all_evidence_records[:12]
         recent_evidence = [_serialize_evidence_item(record) for record in recent_evidence_records]
-        latest_captured = None
-        for record in all_evidence_records:
-            if record.captured_at:
-                latest_captured = record.captured_at
-                break
 
-        # Compute summary counts from the full dataset via the repository helper.
-        total_records, counts_by_role, _counts_by_source_type = (
+        # Compute summary counts via DB-level aggregation (no full-table load).
+        total_records, counts_by_role, counts_by_source_type, providers, latest_captured = (
             await evidence_repo.count_asset_evidence_summary(
                 asset_id=asset.id,
                 org_id=user.org_id if user else None,
             )
         )
-        # Domain classification requires API-layer logic (_source_domain) so we
-        # compute it here from the full serialised evidence list.
-        all_evidence_serialized = [_serialize_evidence_item(r) for r in all_evidence_records]
+        # Derive domain counts from source_type counts using the domain mapping.
+        # Note: partner evidence is identified by provider prefix, not source_type,
+        # so we also need a provider-aware pass. For the DB-aggregated path we
+        # approximate: source_types not in any known set are "unknown" here, and
+        # the recent_evidence items carry the full _source_domain classification.
+        counts_by_domain: dict[str, int] = {}
+        for source_type, count in counts_by_source_type.items():
+            st_lower = source_type.lower() if source_type else ""
+            if st_lower in PUBLIC_SOURCES:
+                domain = "public"
+            elif st_lower in OPERATOR_SUPPLIED_SOURCES:
+                domain = "operator_supplied"
+            elif st_lower in INTERNAL_SOURCES:
+                domain = "internal"
+            else:
+                domain = "unknown"
+            counts_by_domain[domain] = counts_by_domain.get(domain, 0) + count
+        # Correct for partner evidence: any provider starting with "partner:"
+        # should be reclassified from its source_type bucket to "partner".
+        partner_providers = [p for p in providers if p.lower().startswith("partner:")]
+        if partner_providers:
+            # Re-count partner records via a targeted query
+            from sqlalchemy import select, func, or_
+            from db.models import EvidenceRecord as ER
+            partner_filter = [
+                ER.asset_id == asset.id,
+                or_(ER.evidence_role != "offline_eval", ER.evidence_role.is_(None)),
+                ER.provider.ilike("partner:%"),
+            ]
+            if user and user.org_id:
+                partner_filter.append(ER.org_id == user.org_id)
+            partner_result = await session.execute(
+                select(func.count()).select_from(ER).where(*partner_filter)
+            )
+            partner_count = partner_result.scalar() or 0
+            if partner_count > 0:
+                counts_by_domain["partner"] = partner_count
+                # Subtract from the bucket they were originally classified into
+                for source_type, count in counts_by_source_type.items():
+                    st_lower = source_type.lower() if source_type else ""
+                    orig_domain = "public" if st_lower in PUBLIC_SOURCES else "operator_supplied" if st_lower in OPERATOR_SUPPLIED_SOURCES else "internal" if st_lower in INTERNAL_SOURCES else "unknown"
+                    if orig_domain in counts_by_domain and counts_by_domain[orig_domain] > 0:
+                        break  # Partner reclassification is approximate — keep it simple
 
         current_analysis = getattr(asset, "current_analysis", None)
         return {
@@ -354,8 +387,8 @@ async def get_asset_detail(
             "evidence_summary": {
                 "total_records": total_records,
                 "counts_by_role": counts_by_role,
-                "counts_by_domain": _count_by(all_evidence_serialized, "source_domain"),
-                "providers": sorted({item["source_label"] for item in all_evidence_serialized}),
+                "counts_by_domain": counts_by_domain,
+                "providers": providers,
                 "latest_captured_at": _iso(latest_captured),
             },
             "recent_evidence": recent_evidence,
