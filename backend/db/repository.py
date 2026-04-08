@@ -854,6 +854,20 @@ class AssetRepository:
         self.session.add(alias)
         await self.session.commit()
 
+    async def list_fleet_assets(
+        self,
+        org_id: str | None = None,
+        limit: int = 500,
+    ) -> list:
+        """List all active assets with NORAD IDs for fleet ingestion."""
+        from db.models import Asset
+        stmt = select(Asset).where(Asset.norad_id.isnot(None))
+        if org_id is not None:
+            stmt = stmt.where(Asset.org_id == org_id)
+        stmt = stmt.order_by(Asset.updated_at.desc()).limit(limit)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
 
 class EvidenceRepository:
     """Persistence for reusable evidence, reference profiles, and ingest metadata."""

@@ -100,12 +100,8 @@ async def get_portfolio(
 async def get_portfolio_summary(user: CurrentUser | None = Depends(get_current_user)):
     """Get fleet health summary statistics."""
     try:
-        from db.base import async_session_factory
-        from db.repository import AnalysisRepository
-
-        async with async_session_factory() as session:
-            repo = AnalysisRepository(session)
-            return await repo.get_asset_portfolio_summary(org_id=user.org_id if user else None)
+        from services.fleet_summary_service import get_or_compute_portfolio_summary
+        return await get_or_compute_portfolio_summary(org_id=user.org_id if user else None)
     except ImportError:
         return {
             "total_assets": 0,

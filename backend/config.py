@@ -120,6 +120,10 @@ class Settings(BaseSettings):
     REPORT_RATE_LIMIT_PER_HOUR: int = 60
     RATE_LIMIT_FAIL_OPEN: bool = True
 
+    # Caching
+    CACHE_BACKEND: str = "auto"  # auto | redis | memory
+    CACHE_DEFAULT_TTL_SECONDS: int = 900  # 15 minutes
+
     # CORS
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:5173", "http://localhost:5174", "http://localhost:5175",

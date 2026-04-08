@@ -57,6 +57,8 @@ class Asset(Base):
         Index("ix_assets_org_norad_type", "org_id", "norad_id", "asset_type"),
         Index("ix_assets_org_external_type", "org_id", "external_asset_id", "asset_type"),
         Index("ix_assets_org_created", "org_id", "created_at"),
+        Index("ix_assets_current_analysis", "current_analysis_id"),
+        Index("ix_assets_org_norad_fleet", "org_id", "norad_id"),
     )
 
     id = Column(String(32), primary_key=True, default=_uuid)
