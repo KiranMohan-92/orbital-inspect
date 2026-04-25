@@ -5,7 +5,7 @@ import { defineConfig } from '@playwright/test';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const frontendPort = 4173;
-const backendPort = 8000;
+const backendPort = Number(process.env.ORBITAL_INSPECT_E2E_BACKEND_PORT || '8000');
 const frontendUrl = `http://127.0.0.1:${frontendPort}`;
 const backendUrl = `http://127.0.0.1:${backendPort}`;
 const backendDir = path.resolve(__dirname, '../backend');
@@ -14,6 +14,8 @@ const e2eDbPath = path.join(e2eRoot, 'orbital_inspect.db');
 const e2eStorageRoot = path.join(e2eRoot, 'storage');
 const useServiceBackedDb =
   process.env.ORBITAL_INSPECT_E2E_USE_POSTGRES === '1' || process.env.CI === 'true';
+const useExistingServers = process.env.ORBITAL_CAPTURE_EXISTING_SERVERS === '1';
+const includeCaptureTests = process.env.ORBITAL_INCLUDE_CAPTURE_TESTS === '1';
 const e2eDbUrl =
   process.env.ORBITAL_INSPECT_E2E_DATABASE_URL ||
   (useServiceBackedDb
@@ -61,6 +63,7 @@ process.env.ORBITAL_INSPECT_E2E_STORAGE_BACKEND =
 process.env.ORBITAL_INSPECT_E2E_DATABASE_AUTO_INIT = 'true';
 process.env.ORBITAL_INSPECT_E2E_AUTH_ENABLED = 'true';
 process.env.ORBITAL_INSPECT_E2E_JWT_SECRET = e2eJwtSecret;
+process.env.VITE_API_BASE_URL = process.env.VITE_API_BASE_URL || backendUrl;
 process.env.VITE_API_BEARER_TOKEN = process.env.VITE_API_BEARER_TOKEN || buildE2eToken('analyst');
 process.env.ORBITAL_INSPECT_E2E_ADMIN_TOKEN =
   process.env.ORBITAL_INSPECT_E2E_ADMIN_TOKEN || buildE2eToken('admin');
@@ -91,6 +94,7 @@ if (!useMockBackend) {
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: includeCaptureTests ? [] : ['**/*.capture.spec.ts'],
   fullyParallel: false,
   workers: process.env.CI ? 1 : undefined,
   retries: process.env.CI ? 2 : 0,
@@ -110,5 +114,5 @@ export default defineConfig({
       ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
       : undefined,
   },
-  webServer: webServers,
+  webServer: useExistingServers ? undefined : webServers,
 });

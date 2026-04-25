@@ -53,6 +53,68 @@ Orbital Inspect answers that question with AI, real data, and provable methodolo
 
 ---
 
+## Product Demo
+
+<p align="center">
+  <img src="docs/demo/assets/orbital-inspect-demo-hero.png" alt="Orbital Inspect live product demo showing analysis, decision workflow, and fleet triage surfaces." width="100%"/>
+</p>
+
+<p align="center">
+  <strong>Best first demo:</strong> start with a known orbital incident, stream the 5-agent evidence chain, convert it into an auditable human decision, then zoom out to fleet triage.
+</p>
+
+Orbital Inspect should be demoed as a decision intelligence platform, not a generic AI image analyzer. The README demo story is designed to prove four things quickly: the system reaches signal fast, shows evidence instead of hand-waving, keeps a human in control of the final action, and scales from a single anomaly to an operational fleet queue.
+
+| In 3 to 5 minutes, prove this | Demo surface |
+|---|---|
+| **Speed to signal** | Pre-configured demo cases, live SSE analysis, visible stage progression |
+| **Evidence over vibes** | Visual inspection overlays, evidence lineage, per-stage outputs |
+| **Human control** | Review actions, fail-closed escalation, signed PDF export |
+| **Fleet relevance** | Portfolio filters, degradation trends, open attention queue |
+
+### Recommended walkthrough
+
+1. Start with `ISS — Debris Strike` or `SENTINEL-1A — Impact` from the demo selector so the audience sees a recognizable orbital event immediately.
+2. Let the live 5-agent pipeline run onscreen and narrate the handoff: orbital classification, visual damage assessment, environmental hazard analysis, failure mode analysis, and insurance risk synthesis.
+3. Pause on the intelligence panel and call out the exact trust mechanism: if evidence is incomplete or a stage fails, the system escalates to `FURTHER_INVESTIGATION` instead of inventing certainty.
+4. Generate the PDF artifact to show the output is operational, portable, and reviewable outside the UI.
+5. Switch to `PORTFOLIO` and show that the same product can rank risk, filter decision states, and surface the open attention queue across a fleet.
+
+### Demo gallery
+
+The images below are real local captures generated from the running product. The SVG files in the same directory remain available as editable storyboard fallbacks.
+
+| Analyze Surface | Decision + Report | Portfolio Surface |
+|---|---|---|
+| ![Analyze surface](docs/demo/assets/orbital-inspect-demo-analyze.png) | ![Decision and report surface](docs/demo/assets/orbital-inspect-demo-decision.png) | ![Portfolio surface](docs/demo/assets/orbital-inspect-demo-portfolio.png) |
+
+### Run the local demo
+
+```bash
+# Terminal 1
+cd backend
+DEMO_MODE=true GEMINI_API_KEY=test-dummy-key \
+  python -m uvicorn main:app --host 0.0.0.0 --port 8000
+
+# Terminal 2
+cd frontend
+npm install
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+Open `http://localhost:5173`, launch a built-in demo case, let the pipeline finish, generate the report, then switch to `PORTFOLIO`.
+
+### Recording notes
+
+- Lead with the operator question: "Can we keep this asset in service, insure it, or escalate now?"
+- Keep the first demo reproducible by using the built-in cases before showing custom upload flows.
+- Narrate the fail-closed design explicitly because it is the main trust differentiator.
+- Use the portfolio view as the close so the story ends on operational leverage, not a single-screen analysis.
+- Refresh the local README captures with `cd frontend && npm run demo:assets`.
+- For the full talk track, shot list, and asset replacement plan, see [`docs/demo/DEMO-RUNBOOK.md`](docs/demo/DEMO-RUNBOOK.md).
+
+---
+
 ## Architecture
 
 ### System Overview

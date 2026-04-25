@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import FleetSummary from "./FleetSummary";
 import SatelliteCard from "./SatelliteCard";
 import RiskHeatmap from "./RiskHeatmap";
+import FleetHealthMap from "./FleetHealthMap";
 import { apiFetch } from "../../utils/api";
 
 interface PortfolioData {
@@ -62,6 +63,25 @@ interface SummaryData {
   open_attention_queue?: number;
   urgent_assets?: number;
   approved_assets?: number;
+}
+
+interface FleetTrendsData {
+  total_assets_analyzed: number;
+  worst_trending: Array<{
+    asset_id: string;
+    asset_name: string | null;
+    norad_id: string | null;
+    current_score: number;
+    predicted_score_30d: number;
+    slope_per_day: number;
+    trend_direction: string;
+    degradation_velocity: string;
+    days_to_threshold: number | null;
+  }>;
+  fleet_avg_slope: number;
+  assets_degrading: number;
+  assets_stable: number;
+  assets_improving: number;
 }
 
 interface AssetDetailData {
@@ -197,6 +217,7 @@ function safeDateTime(value: string | null | undefined): string {
 export default function PortfolioView() {
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
   const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [fleetTrends, setFleetTrends] = useState<FleetTrendsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -232,6 +253,13 @@ export default function PortfolioView() {
     }
   }, [actionFilter, decisionFilter, degradedOnly, riskFilter, statusFilter, urgencyFilter]);
 
+  const fetchFleetTrends = useCallback(async () => {
+    const trendsRes = await apiFetch("/api/trends/portfolio?limit=5");
+    if (trendsRes.ok) {
+      setFleetTrends(await trendsRes.json());
+    }
+  }, []);
+
   const refreshPortfolioSurface = useCallback(async (withLoading: boolean) => {
     if (withLoading) {
       setLoading(true);
@@ -239,7 +267,7 @@ export default function PortfolioView() {
       setRefreshing(true);
     }
     try {
-      await Promise.all([fetchPortfolio(), fetchSummary()]);
+      await Promise.all([fetchPortfolio(), fetchSummary(), fetchFleetTrends()]);
     } catch (e) {
       console.error("Failed to fetch portfolio data", e);
     } finally {
@@ -249,7 +277,7 @@ export default function PortfolioView() {
         setRefreshing(false);
       }
     }
-  }, [fetchPortfolio, fetchSummary]);
+  }, [fetchFleetTrends, fetchPortfolio, fetchSummary]);
 
   useEffect(() => {
     void refreshPortfolioSurface(true);
@@ -362,6 +390,8 @@ export default function PortfolioView() {
             underwritingDistribution={summary.underwriting_distribution}
           />
         )}
+
+        <FleetHealthMap fleetTrends={fleetTrends} loading={loading} />
 
         {summary && (
           <div className="grid grid-cols-4 gap-3">

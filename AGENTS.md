@@ -1,3 +1,63 @@
+<!-- Generated: 2026-04-18 | Updated: 2026-04-18 -->
+
+# orbital-inspect
+
+## Purpose
+Multi-agent satellite insurance underwriting intelligence platform. A 5-agent pipeline — Classification → Vision → Environment → Failure Mode → Insurance Risk — ingests public satellite data (TLE, ORDEM, SATNOGS, space weather) and imagery, then produces decision-grade risk reports with full provenance and an approval workflow. Built by three AI models (Claude, Codex GPT-5.4, Gemini 3.1 Pro) under the governance framework captured in this file's `<!-- MANUAL -->` section.
+
+## Key Files
+| File | Description |
+|------|-------------|
+| `CLAUDE.md` | Project rules for Claude Code — builder role, attribution, conventions, fail-closed invariants |
+| `README.md` | World-class product overview with architectural diagrams |
+| `docker-compose.yml` | Local dev stack (backend + frontend + Postgres + Redis) |
+| `docker-compose.observability.yml` | Optional OTel + Prometheus + Grafana + Tempo overlay |
+| `AUDIT-GPT54.md` | Codex GPT-5.4 architecture audit (20 recs, all implemented) |
+| `ROADMAP-PRODUCTION-2026-04-02.md` | Production roadmap |
+| `PRODUCT-FEATURE-RESEARCH-2026-04-04.md` | Product feature research |
+| `REVIEW-2026-04-01.md` | Mid-project review |
+| `FREE-DATA-IMPLEMENTATION-PLAN-2026-04-06.md` | Public-data integration plan |
+| `LICENSE` | Project license |
+
+## Subdirectories
+| Directory | Purpose |
+|-----------|---------|
+| `backend/` | Python/FastAPI service, 5-agent pipeline, services, workers, tests (see `backend/AGENTS.md`) |
+| `frontend/` | React/Vite/TS/Tailwind UI — analysis, portfolio, viz (see `frontend/AGENTS.md`) |
+| `ops/` | Production ops — Helm chart, observability stack, runbooks, architecture docs (see `ops/AGENTS.md`) |
+| `docs/` | Demo runbook and captured demo assets (see `docs/AGENTS.md`) |
+| `scripts/` | Repo-root tooling scripts (see `scripts/AGENTS.md`) |
+| `.agents/` | Multi-model workflow config — workflow.yaml, verification-gates.yaml (see `.agents/AGENTS.md`) |
+| `data/` | Runtime data mounts (demo cache, uploads) — not documented, runtime-only |
+
+## For AI Agents
+
+### Working In This Directory
+- Every commit MUST carry `Co-Authored-By` tags for every AI model that contributed (see `CLAUDE.md`).
+- Implementing findings from another model's audit/review: credit that model in the commit body.
+- Cross-model review gates apply to: security, LLM output handling, new agents or pipeline changes, insurance risk logic, schema changes.
+- Never bypass `resilient_call()` for agent invocations; never weaken the fail-closed classification rejection; evidence gaps must force `FURTHER_INVESTIGATION`.
+
+### Testing Requirements
+- Backend: `cd backend && pytest`
+- Frontend unit: `cd frontend && npm run test`
+- Frontend E2E: `cd frontend && npx playwright test`
+- Do not commit `.env` files or API keys.
+
+### Common Patterns
+- Python: async/await, structlog, Pydantic models for all data.
+- Frontend: TypeScript strict, no `any`, Tailwind for styling.
+- All agent error handlers return `degraded=True`, never silently succeed.
+
+## Dependencies
+
+### External
+- Python 3.11+, FastAPI, SQLAlchemy, Alembic, Pydantic, structlog, Redis, Postgres.
+- Node 20+, Vite, React 18, TypeScript, Tailwind, Vitest, Playwright.
+- Gemini (Google AI) for pipeline LLM calls.
+
+<!-- MANUAL: Multi-Model Collaboration Log — do not autogenerate below this line -->
+
 # Multi-Model Agent Collaboration Log
 
 > This document tracks the structured multi-model AI engineering workflow used to build Orbital Inspect.

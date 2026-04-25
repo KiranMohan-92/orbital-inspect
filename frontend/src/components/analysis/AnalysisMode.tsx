@@ -24,11 +24,11 @@ export default function AnalysisMode() {
   };
 
   return (
-    <div className="h-full flex flex-col orbital-bg overflow-hidden">
+    <div data-testid="analysis-mode" className="h-full flex flex-col orbital-bg overflow-hidden">
       {/* 3-Panel Layout */}
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Panel A: Target Acquisition (300px) */}
-        <div className="w-[300px] flex-shrink-0 flex flex-col glass-panel overflow-hidden"
+        <div data-testid="analysis-input-panel" className="w-[300px] flex-shrink-0 flex flex-col glass-panel overflow-hidden"
           style={{ borderRight: "1px solid var(--bg-panel-border)" }}>
           <ErrorBoundary panelName="Target Acquisition">
             <SatelliteInput analysis={analysis} onAnalyze={handleAnalyze} onDemo={analyzeDemo} />
@@ -37,11 +37,13 @@ export default function AnalysisMode() {
 
         {/* Panel B: Visual Analysis (flex-1) */}
         <ErrorBoundary panelName="Visual Analysis">
-          <VisualAnalysis analysis={analysis} />
+          <div data-testid="analysis-visual-panel" className="flex-1">
+            <VisualAnalysis analysis={analysis} />
+          </div>
         </ErrorBoundary>
 
         {/* Panel C: Intelligence Report (380px) */}
-        <div className="w-[380px] flex-shrink-0 flex flex-col glass-panel overflow-hidden"
+        <div data-testid="analysis-report-panel" className="w-[380px] flex-shrink-0 flex flex-col glass-panel overflow-hidden"
           style={{ borderLeft: "1px solid var(--bg-panel-border)" }}>
           <ErrorBoundary panelName="Intelligence Report">
             <IntelligenceReport analysis={analysis} />

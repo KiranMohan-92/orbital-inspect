@@ -1,0 +1,55 @@
+<svg width="1200" height="780" viewBox="0 0 1200 780" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="120" y1="42" x2="1088" y2="738" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071022"/>
+      <stop offset="1" stop-color="#0A1738"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="780" rx="28" fill="url(#bg)"/>
+  <rect x="44" y="40" width="1112" height="700" rx="22" fill="#040B18" stroke="#213966"/>
+  <rect x="44" y="40" width="1112" height="54" rx="22" fill="#071329"/>
+  <text x="76" y="75" fill="#F5F8FF" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700">Analyze Surface</text>
+  <text x="948" y="75" fill="#93A9D7" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">DEMO MODE</text>
+
+  <rect x="72" y="122" width="238" height="580" rx="18" fill="#081226" stroke="#203B69"/>
+  <text x="96" y="156" fill="#8AA6DE" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17">TARGET ACQUISITION</text>
+  <rect x="96" y="186" width="190" height="110" rx="14" fill="#0B1835" stroke="#2A4A82"/>
+  <text x="122" y="232" fill="#66CBFF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">ISS</text>
+  <text x="122" y="262" fill="#C2D1EF" font-family="Arial, Helvetica, sans-serif" font-size="18">Debris strike case</text>
+  <rect x="96" y="314" width="190" height="110" rx="14" fill="#0B1835" stroke="#2A4A82"/>
+  <text x="122" y="360" fill="#66CBFF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">SENTINEL-1A</text>
+  <text x="122" y="390" fill="#C2D1EF" font-family="Arial, Helvetica, sans-serif" font-size="18">Impact case</text>
+  <rect x="96" y="462" width="190" height="180" rx="14" fill="#081124" stroke="#1F325B"/>
+  <text x="122" y="498" fill="#8AA6DE" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">OPERATOR CONTEXT</text>
+  <text x="122" y="536" fill="#B7C7EA" font-family="Arial, Helvetica, sans-serif" font-size="17">Subsystem notes</text>
+  <text x="122" y="566" fill="#B7C7EA" font-family="Arial, Helvetica, sans-serif" font-size="17">Inspection epoch</text>
+  <text x="122" y="596" fill="#B7C7EA" font-family="Arial, Helvetica, sans-serif" font-size="17">Mission context</text>
+
+  <rect x="332" y="122" width="470" height="580" rx="18" fill="#081226" stroke="#203B69"/>
+  <text x="360" y="156" fill="#8AA6DE" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17">VISUAL ANALYSIS</text>
+  <rect x="360" y="184" width="414" height="246" rx="16" fill="#0A1631" stroke="#294A84"/>
+  <rect x="388" y="212" width="358" height="190" rx="12" fill="#13274B"/>
+  <rect x="540" y="250" width="120" height="108" rx="8" fill="#1A3C6A"/>
+  <rect x="578" y="278" width="42" height="54" rx="4" fill="#7ACBFF" fill-opacity="0.85"/>
+  <circle cx="614" cy="306" r="86" stroke="#7AE0FF" stroke-opacity="0.6" stroke-width="2" stroke-dasharray="8 8"/>
+  <rect x="406" y="450" width="342" height="224" rx="14" fill="#081124" stroke="#1F325B"/>
+  <text x="432" y="488" fill="#8AA6DE" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">LIVE AGENT FEED</text>
+  <text x="432" y="530" fill="#73D2FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">[1] ORBITAL CLASSIFICATION COMPLETE</text>
+  <text x="432" y="564" fill="#73D2FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">[2] SATELLITE VISION COMPLETE</text>
+  <text x="432" y="598" fill="#73D2FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">[3] ORBITAL ENVIRONMENT RUNNING</text>
+  <text x="432" y="632" fill="#AABCE4" font-family="Arial, Helvetica, sans-serif" font-size="17">Visible stage progression makes the analysis feel trustworthy.</text>
+
+  <rect x="824" y="122" width="304" height="580" rx="18" fill="#081226" stroke="#203B69"/>
+  <text x="850" y="156" fill="#8AA6DE" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17">INTELLIGENCE REPORT</text>
+  <rect x="850" y="186" width="252" height="84" rx="14" fill="#0D2147" stroke="#315693"/>
+  <text x="876" y="224" fill="#BFE0FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22">RISK TIER: ELEVATED</text>
+  <rect x="850" y="286" width="252" height="84" rx="14" fill="#0A1A39" stroke="#2E4B82"/>
+  <text x="876" y="324" fill="#BFE0FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22">EVIDENCE: 84%</text>
+  <rect x="850" y="386" width="252" height="160" rx="14" fill="#0A132B" stroke="#23385F"/>
+  <text x="876" y="424" fill="#8AA6DE" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">WHY THIS SCREEN MATTERS</text>
+  <text x="876" y="460" fill="#B6C6E9" font-family="Arial, Helvetica, sans-serif" font-size="17">The product shows</text>
+  <text x="876" y="486" fill="#B6C6E9" font-family="Arial, Helvetica, sans-serif" font-size="17">image interpretation,</text>
+  <text x="876" y="512" fill="#B6C6E9" font-family="Arial, Helvetica, sans-serif" font-size="17">stage outputs, and</text>
+  <text x="876" y="538" fill="#B6C6E9" font-family="Arial, Helvetica, sans-serif" font-size="17">decision-ready signal</text>
+  <text x="876" y="564" fill="#B6C6E9" font-family="Arial, Helvetica, sans-serif" font-size="17">in one surface.</text>
+</svg>
