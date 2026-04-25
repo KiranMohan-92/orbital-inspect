@@ -37,6 +37,7 @@ export interface AnalysisContext {
   assetType?: AssetType;
   inspectionEpoch?: string;
   targetSubsystem?: string;
+  assessmentMode?: "PUBLIC_SCREEN" | "ENHANCED_TECHNICAL" | "UNDERWRITING_GRADE";
   captureMetadata?: Record<string, unknown>;
   telemetrySummary?: Record<string, unknown>;
   baselineReference?: Record<string, unknown>;
@@ -60,6 +61,8 @@ export interface AnalysisSubmissionResponse {
   status: string;
   analysis_url: string;
   events_url: string;
+  assessment_mode?: string;
+  decision_authority?: string;
   request_id?: string | null;
   dispatch_mode?: string;
   queue_job_id?: string | null;

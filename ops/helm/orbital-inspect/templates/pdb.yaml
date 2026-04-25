@@ -1,0 +1,40 @@
+{{- if .Values.podDisruptionBudgets.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "orbital-inspect.fullname" . }}-api
+  labels:
+    {{- include "orbital-inspect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  maxUnavailable: {{ .Values.podDisruptionBudgets.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "orbital-inspect.apiSelectorLabels" . | nindent 6 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "orbital-inspect.fullname" . }}-worker
+  labels:
+    {{- include "orbital-inspect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  maxUnavailable: {{ .Values.podDisruptionBudgets.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "orbital-inspect.workerSelectorLabels" . | nindent 6 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "orbital-inspect.fullname" . }}-frontend
+  labels:
+    {{- include "orbital-inspect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  maxUnavailable: {{ .Values.podDisruptionBudgets.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "orbital-inspect.frontendSelectorLabels" . | nindent 6 }}
+{{- end }}

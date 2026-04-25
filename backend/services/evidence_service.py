@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from models.evidence import EvidenceBundle, EvidenceItem, EvidenceSource
+from models.evidence import EvidenceBundle, EvidenceItem, EvidenceQualityStatus, EvidenceSource
 
 log = logging.getLogger(__name__)
 
@@ -128,6 +128,12 @@ async def build_evidence_bundle(
                 ))
         except Exception as exc:
             log.warning("TLE evidence fetch failed", extra={"error": str(exc)})
+            bundle.add_quality_gap(
+                source=EvidenceSource.TLE_HISTORY,
+                status=EvidenceQualityStatus.FETCH_FAILED,
+                description="TLE history evidence fetch failed",
+                error=str(exc),
+            )
 
     if include_reference_profile and norad_id:
         try:
@@ -171,6 +177,14 @@ async def build_evidence_bundle(
                 ))
         except Exception as exc:
             log.warning("Reference profile evidence fetch failed", extra={"error": str(exc)})
+            bundle.add_quality_gap(
+                source=EvidenceSource.REFERENCE_PROFILE,
+                status=EvidenceQualityStatus.FETCH_FAILED,
+                description="Reference profile evidence fetch failed",
+                error=str(exc),
+                required_for_decision=False,
+                mission_relevance="supporting",
+            )
 
     if include_prior_analyses and norad_id:
         try:
@@ -215,6 +229,14 @@ async def build_evidence_bundle(
             log.info("Database not available for prior analysis evidence")
         except Exception as exc:
             log.warning("Prior analysis evidence fetch failed", extra={"error": str(exc)})
+            bundle.add_quality_gap(
+                source=EvidenceSource.PRIOR_ANALYSIS,
+                status=EvidenceQualityStatus.FETCH_FAILED,
+                description="Prior analysis evidence fetch failed",
+                error=str(exc),
+                required_for_decision=False,
+                mission_relevance="supporting",
+            )
 
     if include_rf_activity and norad_id:
         try:
@@ -246,6 +268,14 @@ async def build_evidence_bundle(
                 ))
         except Exception as exc:
             log.warning("RF activity evidence fetch failed", extra={"error": str(exc)})
+            bundle.add_quality_gap(
+                source=EvidenceSource.RF_ACTIVITY,
+                status=EvidenceQualityStatus.FETCH_FAILED,
+                description="RF activity evidence fetch failed",
+                error=str(exc),
+                required_for_decision=False,
+                mission_relevance="supporting",
+            )
 
     if include_weather:
         try:
@@ -291,6 +321,12 @@ async def build_evidence_bundle(
             ))
         except Exception as exc:
             log.warning("Space weather evidence fetch failed", extra={"error": str(exc)})
+            bundle.add_quality_gap(
+                source=EvidenceSource.SPACE_WEATHER,
+                status=EvidenceQualityStatus.FETCH_FAILED,
+                description="Space weather evidence fetch failed",
+                error=str(exc),
+            )
 
     if include_debris and norad_id:
         try:
@@ -326,6 +362,12 @@ async def build_evidence_bundle(
                     ))
         except Exception as exc:
             log.warning("Debris evidence fetch failed", extra={"error": str(exc)})
+            bundle.add_quality_gap(
+                source=EvidenceSource.DEBRIS_ENVIRONMENT,
+                status=EvidenceQualityStatus.FETCH_FAILED,
+                description="Debris environment evidence fetch failed",
+                error=str(exc),
+            )
 
     if include_conjunction and norad_id:
         try:
@@ -375,6 +417,12 @@ async def build_evidence_bundle(
             ))
         except Exception as exc:
             log.warning("Conjunction evidence fetch failed", extra={"error": str(exc)})
+            bundle.add_quality_gap(
+                source=EvidenceSource.CONJUNCTION_RISK,
+                status=EvidenceQualityStatus.FETCH_FAILED,
+                description="Conjunction evidence fetch failed",
+                error=str(exc),
+            )
 
     timestamps = [item.timestamp for item in bundle.items if item.timestamp]
     if timestamps:

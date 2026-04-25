@@ -141,15 +141,28 @@ def _fake_pipeline_payloads():
                 "composite": 16,
             },
             "risk_tier": "LOW",
-            "estimated_remaining_life_years": 5.0,
-            "power_margin_percentage": 22.0,
-            "annual_degradation_rate_pct": 1.2,
-            "replacement_cost_usd": 150000000000.0,
-            "depreciated_value_usd": 60000000000.0,
-            "revenue_at_risk_annual_usd": 0.0,
-            "total_loss_probability": 0.03,
-            "underwriting_recommendation": "INSURABLE_STANDARD",
-            "recommendation_rationale": "Observed anomaly is minor and consistent with managed LEO exposure.",
+            "assessment_mode": "PUBLIC_SCREEN",
+            "decision_authority": "SCREENING_ONLY",
+            "report_title": "Public Risk Screen",
+            "unsupported_claims_blocked": ["total_loss_probability_without_actuarial_model"],
+            "required_evidence_gaps": [
+                {
+                    "id": "operator_telemetry",
+                    "label": "Operator telemetry",
+                    "status": "missing",
+                    "description": "Telemetry missing.",
+                    "required_for": "UNDERWRITING_GRADE",
+                }
+            ],
+            "estimated_remaining_life_years": None,
+            "power_margin_percentage": None,
+            "annual_degradation_rate_pct": None,
+            "replacement_cost_usd": None,
+            "depreciated_value_usd": None,
+            "revenue_at_risk_annual_usd": None,
+            "total_loss_probability": None,
+            "underwriting_recommendation": "FURTHER_INVESTIGATION",
+            "recommendation_rationale": "Public-data screening only.",
             "recommended_actions": [
                 {
                     "priority": "LOW",
@@ -159,10 +172,10 @@ def _fake_pipeline_payloads():
                 }
             ],
             "worst_case_scenario": "Gradual panel efficiency loss without operational impact.",
-            "summary": "ISS imagery shows a minor anomaly with low underwriting impact.",
-            "degraded": False,
-            "evidence_gaps": [],
-            "report_completeness": "COMPLETE",
+            "summary": "ISS imagery shows a minor anomaly for public screening.",
+            "degraded": True,
+            "evidence_gaps": ["Operator telemetry"],
+            "report_completeness": "PARTIAL",
         },
     }
 
@@ -505,7 +518,10 @@ async def test_analysis_pipeline_streams_full_agent_journey(client, monkeypatch,
 
     insurance_risk = completed_payloads["insurance_risk"]
     assert insurance_risk["risk_tier"] == "LOW"
-    assert insurance_risk["underwriting_recommendation"] == "INSURABLE_STANDARD"
+    assert insurance_risk["assessment_mode"] == "PUBLIC_SCREEN"
+    assert insurance_risk["decision_authority"] == "SCREENING_ONLY"
+    assert insurance_risk["underwriting_recommendation"] == "FURTHER_INVESTIGATION"
+    assert insurance_risk["total_loss_probability"] is None
     assert "risk_matrix" in insurance_risk
 
     assert any(
@@ -589,7 +605,7 @@ async def test_report_generation_returns_expected_sections(
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/html")
     html = resp.text
-    assert "SATELLITE CONDITION REPORT" in html
+    assert "PUBLIC RISK SCREEN" in html
     assert "Executive Summary" in html
     assert "Damage Assessment" in html
     assert "Insurance Risk Assessment" in html

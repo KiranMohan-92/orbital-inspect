@@ -40,6 +40,7 @@ async def run_analysis_job(
     from services.governance_service import apply_decision_governance
     from services.post_analysis_service import post_analysis_complete
     from services.storage_service import get_storage_backend
+    from services.assessment_mode_service import contract_from_analysis_metadata
     from services.webhook_service import dispatch_registered_webhooks
 
     log.info("Starting analysis job", extra={"analysis_id": analysis_id})
@@ -70,6 +71,7 @@ async def run_analysis_job(
             or mimetypes.guess_type(analysis.image_path or "")[0]
             or "image/jpeg"
         )
+        assessment_contract = contract_from_analysis_metadata(analysis)
 
         sequence = 0
         last_agent_results = {}
@@ -98,6 +100,8 @@ async def run_analysis_job(
                     norad_id=analysis.norad_id,
                     additional_context=analysis.additional_context or "",
                     analysis_id=analysis_id,
+                    assessment_mode=assessment_contract["assessment_mode"],
+                    assessment_contract=assessment_contract,
                 ):
                     event_name = event.get("event", "")
 
@@ -159,6 +163,7 @@ async def run_analysis_job(
                     evidence_completeness_pct=getattr(analysis, "evidence_completeness_pct", None),
                     degraded=any_degraded or pipeline_terminal_status == "completed_partial",
                     failure_reasons=failure_reasons,
+                    decision_authority=assessment_contract.get("decision_authority"),
                 )
                 if governed_insurance:
                     last_agent_results["insurance_risk"] = governed_insurance

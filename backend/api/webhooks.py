@@ -2,15 +2,14 @@
 Webhook management API — register, list, delete webhook endpoints.
 """
 
-import ipaddress
 import logging
-from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from auth.dependencies import require_role, CurrentUser
 from config import settings
 from services.secret_service import encrypt_webhook_secret, hash_secret
+from services.webhook_security import validate_webhook_url
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -19,31 +18,8 @@ router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 _webhooks: dict[str, dict] = {}
 _next_id = 1
 
-_BLOCKED_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "metadata.google.internal", "169.254.169.254"}
-_BLOCKED_NETWORKS = [
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("169.254.0.0/16"),
-]
-
-
 def _validate_webhook_url(url: str) -> None:
-    """Prevent SSRF by blocking internal/private URLs."""
-    parsed = urlparse(url)
-    if parsed.scheme not in ("https", "http"):
-        raise ValueError("Webhook URL must use HTTP(S)")
-    hostname = parsed.hostname or ""
-    if hostname in _BLOCKED_HOSTS:
-        raise ValueError("Internal hosts are not allowed")
-    try:
-        addr = ipaddress.ip_address(hostname)
-        for network in _BLOCKED_NETWORKS:
-            if addr in network:
-                raise ValueError("Private/internal IPs are not allowed")
-    except ValueError as e:
-        if "not allowed" in str(e):
-            raise
+    validate_webhook_url(url, resolve_dns=not settings.DEMO_MODE)
 
 
 class WebhookCreate(BaseModel):

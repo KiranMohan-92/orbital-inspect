@@ -33,6 +33,10 @@ interface PersistedAnalysisDetail {
   asset_identity_source?: string | null;
   subsystem_id?: string | null;
   subsystem_key?: string | null;
+  assessment_mode?: string | null;
+  decision_authority?: string | null;
+  required_evidence_gaps?: Array<{ id?: string; label?: string; description?: string; status?: string }>;
+  unsupported_claims_blocked?: string[];
   decision_summary?: DecisionSummary | null;
   decision_status?: string | null;
   decision_approved_by?: string | null;
@@ -81,6 +85,26 @@ interface AnalysisEvidenceDetail {
     linked_evidence_count?: number;
     sources_available?: string[];
     evidence_gaps?: string[];
+    evidence_quality?: {
+      quality_score?: number;
+      missing_required_sources?: string[];
+      failed_source_count?: number;
+      stale_source_count?: number;
+      low_confidence_count?: number;
+      gaps?: Array<{
+        source: string;
+        status: string;
+        description: string;
+      }>;
+    };
+    assessment_contract?: {
+      assessment_mode?: string;
+      decision_authority?: string;
+      report_title?: string;
+      required_evidence_gaps?: Array<{ id?: string; label?: string; description?: string; status?: string }>;
+      unsupported_claims_blocked?: string[];
+      authority_rationale?: string;
+    };
     counts_by_role?: Record<string, number>;
     counts_by_domain?: Record<string, number>;
   };
@@ -173,6 +197,30 @@ export default function IntelligenceReport({ analysis }: Props) {
   const [overrideAction, setOverrideAction] = useState("monitor");
   const [overrideReasonCode, setOverrideReasonCode] = useState("new_evidence");
   const [overrideComments, setOverrideComments] = useState("");
+  const assessmentMode =
+    (insurancePayload as { assessment_mode?: string } | null)?.assessment_mode ||
+    persistedAnalysis?.assessment_mode ||
+    evidenceDetail?.summary?.assessment_contract?.assessment_mode ||
+    state.assessmentMode;
+  const decisionAuthority =
+    (insurancePayload as { decision_authority?: string } | null)?.decision_authority ||
+    persistedAnalysis?.decision_authority ||
+    evidenceDetail?.summary?.assessment_contract?.decision_authority ||
+    "SCREENING_ONLY";
+  const reportTitle =
+    (insurancePayload as { report_title?: string } | null)?.report_title ||
+    evidenceDetail?.summary?.assessment_contract?.report_title ||
+    (decisionAuthority === "SCREENING_ONLY" ? "Public Risk Screen" : "Technical Risk Assessment");
+  const requiredEvidenceGaps =
+    (insurancePayload as { required_evidence_gaps?: Array<{ id?: string; label?: string; description?: string; status?: string }> } | null)?.required_evidence_gaps ||
+    persistedAnalysis?.required_evidence_gaps ||
+    evidenceDetail?.summary?.assessment_contract?.required_evidence_gaps ||
+    [];
+  const unsupportedClaims =
+    (insurancePayload as { unsupported_claims_blocked?: string[] } | null)?.unsupported_claims_blocked ||
+    persistedAnalysis?.unsupported_claims_blocked ||
+    evidenceDetail?.summary?.assessment_contract?.unsupported_claims_blocked ||
+    [];
 
   useEffect(() => {
     if (!state.analysisId || !["completed", "completed_partial", "failed", "rejected"].includes(state.analysisStatus)) {
@@ -339,7 +387,7 @@ export default function IntelligenceReport({ analysis }: Props) {
       <div className="px-4 py-3 flex-shrink-0" style={{ borderBottom: "1px solid var(--bg-panel-border)" }}>
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--agent-insurance)" }} />
-          <p className="label-mono">INTELLIGENCE REPORT</p>
+          <p className="label-mono">{reportTitle.toUpperCase()}</p>
         </div>
       </div>
 
@@ -361,6 +409,18 @@ export default function IntelligenceReport({ analysis }: Props) {
               )}
             </div>
             <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Mode</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                  {titleize(assessmentMode)}
+                </p>
+              </div>
+              <div>
+                <p style={{ color: "var(--text-tertiary)" }}>Authority</p>
+                <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                  {titleize(decisionAuthority)}
+                </p>
+              </div>
               <div>
                 <p style={{ color: "var(--text-tertiary)" }}>Asset Label</p>
                 <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
@@ -398,11 +458,18 @@ export default function IntelligenceReport({ analysis }: Props) {
                 </p>
               </div>
             </div>
-            {state.analysisStatus !== "idle" && (
-              <div className="mt-3 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
-                Governance: human review required before operational decision use.
-              </div>
-            )}
+            <div className="mt-3 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+              Governance: public/open data supports screening and evidence triage. Underwriting use requires private evidence and human review.
+            </div>
+          </div>
+        )}
+
+        {decisionAuthority === "SCREENING_ONLY" && state.analysisStatus !== "idle" && (
+          <div data-testid="public-risk-screen-banner" className="data-card" style={{ borderColor: "rgba(96,165,250,0.25)", background: "rgba(96,165,250,0.06)" }}>
+            <p className="label-mono mb-1" style={{ color: "#60a5fa" }}>SCREENING ONLY</p>
+            <p className="text-xs" style={{ color: "var(--text-primary)" }}>
+              This public-data assessment ranks risk and evidence gaps; it is not an insurability or loss-probability determination.
+            </p>
           </div>
         )}
 
@@ -415,6 +482,36 @@ export default function IntelligenceReport({ analysis }: Props) {
             <p className="text-xs" style={{ color: "var(--text-primary)" }}>
               One or more evidence sources or pipeline stages degraded. Treat the underwriting result as triage only.
             </p>
+          </div>
+        )}
+
+        {(requiredEvidenceGaps.length > 0 || unsupportedClaims.length > 0) && (
+          <div className="data-card" data-testid="required-evidence-gaps-panel">
+            <div className="flex items-center justify-between gap-3">
+              <p className="label-mono">NEXT DATA NEEDED</p>
+              <span className="font-mono-data text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                {requiredEvidenceGaps.length} gaps
+              </span>
+            </div>
+            {requiredEvidenceGaps.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {requiredEvidenceGaps.slice(0, 5).map((gap) => (
+                  <div key={gap.id || gap.label} className="text-xs">
+                    <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                      {(gap.label || gap.id || "Evidence").replace(/_/g, " ")}
+                    </p>
+                    {gap.description && (
+                      <p className="mt-1" style={{ color: "var(--text-tertiary)" }}>{gap.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {unsupportedClaims.length > 0 && (
+              <div className="mt-3 text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                Blocked claims: {unsupportedClaims.slice(0, 3).map((claim) => claim.replace(/_/g, " ")).join(", ")}
+              </div>
+            )}
           </div>
         )}
 
@@ -459,6 +556,50 @@ export default function IntelligenceReport({ analysis }: Props) {
                     </p>
                   </div>
                 </div>
+
+                {evidenceDetail.summary?.evidence_quality && (
+                  <div className="mt-3 rounded-md p-3" style={{ border: "1px solid var(--bg-panel-border)" }}>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="label-mono">SOURCE QUALITY</p>
+                      {typeof evidenceDetail.summary.evidence_quality.quality_score === "number" && (
+                        <span className="font-mono-data text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                          {evidenceDetail.summary.evidence_quality.quality_score.toFixed(1)} quality
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mt-3 text-[11px]">
+                      <div>
+                        <p style={{ color: "var(--text-tertiary)" }}>Missing</p>
+                        <p className="font-mono-data" style={{ color: "var(--severity-warning)" }}>
+                          {evidenceDetail.summary.evidence_quality.missing_required_sources?.length ?? 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p style={{ color: "var(--text-tertiary)" }}>Failed</p>
+                        <p className="font-mono-data" style={{ color: "var(--severity-critical)" }}>
+                          {evidenceDetail.summary.evidence_quality.failed_source_count ?? 0}
+                        </p>
+                      </div>
+                      <div>
+                        <p style={{ color: "var(--text-tertiary)" }}>Low Confidence</p>
+                        <p className="font-mono-data" style={{ color: "var(--text-primary)" }}>
+                          {evidenceDetail.summary.evidence_quality.low_confidence_count ?? 0}
+                        </p>
+                      </div>
+                    </div>
+                    {evidenceDetail.summary.evidence_quality.gaps?.length ? (
+                      <div className="mt-3 space-y-1">
+                        {evidenceDetail.summary.evidence_quality.gaps.slice(0, 4).map((gap) => (
+                          <div key={`${gap.source}-${gap.status}-${gap.description}`} className="text-[11px]" style={{ color: "var(--text-tertiary)" }}>
+                            <span className="font-mono-data" style={{ color: "var(--text-secondary)" }}>{gap.source}</span>
+                            {" "}
+                            {gap.status.replace(/_/g, " ")}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
 
                 {evidenceDetail.summary?.counts_by_domain && (
                   <div className="flex flex-wrap gap-2 mt-3">

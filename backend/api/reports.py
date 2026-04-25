@@ -31,14 +31,22 @@ class RejectRequest(BaseModel):
 
 
 def _report_payload(analysis) -> dict:
+    capture_metadata = getattr(analysis, "capture_metadata", {}) or {}
+    evidence_contract = (getattr(analysis, "evidence_bundle_summary", {}) or {}).get("assessment_contract", {}) or {}
+    insurance = analysis.insurance_risk_result or {}
     return {
+        "assessment_mode": insurance.get("assessment_mode") or capture_metadata.get("assessment_mode", "PUBLIC_SCREEN"),
+        "decision_authority": insurance.get("decision_authority") or evidence_contract.get("decision_authority", "SCREENING_ONLY"),
+        "report_title": insurance.get("report_title") or evidence_contract.get("report_title", "Public Risk Screen"),
         "classification": analysis.classification_result,
         "vision": analysis.vision_result,
         "environment": analysis.environment_result,
         "failure_mode": analysis.failure_mode_result,
-        "insurance_risk": analysis.insurance_risk_result,
+        "insurance_risk": insurance,
         "decision_summary": getattr(analysis, "decision_summary", {}) or {},
         "decision_status": getattr(analysis, "decision_status", None),
+        "required_evidence_gaps": insurance.get("required_evidence_gaps") or evidence_contract.get("required_evidence_gaps", []),
+        "unsupported_claims_blocked": insurance.get("unsupported_claims_blocked") or evidence_contract.get("unsupported_claims_blocked", []),
         "evidence_gaps": analysis.evidence_gaps,
         "report_completeness": analysis.report_completeness,
     }
@@ -52,6 +60,7 @@ def _governance_summary(analysis) -> dict:
         "decision_blocked_reason": getattr(analysis, "decision_blocked_reason", None),
         "decision_summary": getattr(analysis, "decision_summary", {}) or {},
         "decision_status": getattr(analysis, "decision_status", None),
+        "decision_authority": ((getattr(analysis, "insurance_risk_result", {}) or {}).get("decision_authority")),
     }
 
 

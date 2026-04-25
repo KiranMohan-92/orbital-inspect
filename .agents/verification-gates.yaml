@@ -63,6 +63,6 @@ gates:
 
 # ─── Enforcement ──────────────────────────────────────────────────
 enforcement:
-  mode: "advisory"  # Options: advisory | ci-blocking
+  mode: "ci-blocking"  # Options: advisory | ci-blocking
   log_to: "AGENTS.md"
-  escalation: "If a blocking gate is skipped, document reason in commit body"
+  escalation: "If a blocking gate is skipped, CI fails until a review artifact is committed"

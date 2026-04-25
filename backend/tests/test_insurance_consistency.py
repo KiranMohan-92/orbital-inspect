@@ -1,5 +1,6 @@
 """Tests for _enforce_consistency() in insurance_risk_agent.py."""
 import pytest
+from pydantic import ValidationError
 from agents.insurance_risk_agent import _enforce_consistency
 from models.satellite import (
     InsuranceRiskReport,
@@ -78,7 +79,7 @@ def test_tier_correct_no_anomaly():
 
 def test_recommendation_too_lenient_is_corrected():
     """composite=90, rec='INSURABLE_STANDARD' — should fix to 'UNINSURABLE'."""
-    report = _make_report(5, 3, 6, composite=90, risk_tier="HIGH", recommendation="INSURABLE_STANDARD")
+    report = _make_report(5, 4, 5, composite=100, risk_tier="CRITICAL", recommendation="INSURABLE_STANDARD")
     result = _enforce_consistency(report)
     assert result.underwriting_recommendation == "UNINSURABLE"
     assert any("too lenient" in a for a in result.consistency_check.anomalies)
@@ -86,7 +87,7 @@ def test_recommendation_too_lenient_is_corrected():
 
 def test_recommendation_elevated_premium_too_lenient_is_corrected():
     """composite=90, rec='INSURABLE_ELEVATED_PREMIUM' — should also fix to 'UNINSURABLE'."""
-    report = _make_report(5, 3, 6, composite=90, risk_tier="HIGH", recommendation="INSURABLE_ELEVATED_PREMIUM")
+    report = _make_report(5, 4, 5, composite=100, risk_tier="CRITICAL", recommendation="INSURABLE_ELEVATED_PREMIUM")
     result = _enforce_consistency(report)
     assert result.underwriting_recommendation == "UNINSURABLE"
 
@@ -117,3 +118,34 @@ def test_confidence_adjustment_set_on_anomaly():
     report = _make_report(3, 3, 3, composite=30, risk_tier="MEDIUM", recommendation="FURTHER_INVESTIGATION")
     result = _enforce_consistency(report)
     assert result.consistency_check.confidence_adjustment == "Server-side corrections applied"
+
+
+def test_risk_matrix_rejects_score_below_minimum():
+    with pytest.raises(ValidationError):
+        RiskMatrixDimension(score=0, reasoning="invalid")
+
+
+def test_risk_matrix_rejects_score_above_maximum():
+    with pytest.raises(ValidationError):
+        RiskMatrixDimension(score=6, reasoning="invalid")
+
+
+def test_insurance_report_rejects_invalid_recommendation():
+    with pytest.raises(ValidationError):
+        _make_report(3, 3, 3, composite=27, risk_tier="MEDIUM", recommendation="INSURABLE_MADE_UP")
+
+
+def test_insurance_report_rejects_out_of_range_probability():
+    with pytest.raises(ValidationError):
+        InsuranceRiskReport(
+            consistency_check={"passed": True, "anomalies": [], "confidence_adjustment": ""},
+            risk_matrix={
+                "severity": {"score": 3, "reasoning": "test"},
+                "probability": {"score": 3, "reasoning": "test"},
+                "consequence": {"score": 3, "reasoning": "test"},
+                "composite": 27,
+            },
+            risk_tier="MEDIUM",
+            underwriting_recommendation="FURTHER_INVESTIGATION",
+            total_loss_probability=1.5,
+        )

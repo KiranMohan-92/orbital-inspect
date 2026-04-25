@@ -60,6 +60,9 @@ dump.rdb
 
 # Testing
 .pytest_cache/
+.tmp-pytest*/
+temp_pytest*/
+.test-runtime/
 .coverage
 htmlcov/
 .tox/

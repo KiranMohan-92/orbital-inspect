@@ -12,6 +12,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
+from urllib.request import url2pathname
 import mimetypes
 import uuid
 
@@ -82,7 +83,7 @@ class LocalStorageBackend:
         parsed = urlparse(uri)
         if parsed.scheme and parsed.scheme != "file":
             raise ValueError(f"Unsupported local storage URI scheme: {parsed.scheme}")
-        path = Path(parsed.path if parsed.scheme == "file" else uri)
+        path = Path(url2pathname(parsed.path) if parsed.scheme == "file" else uri)
         return path.read_bytes()
 
 

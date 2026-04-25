@@ -15,6 +15,7 @@ from services.gemini_service import (
     parse_json_response,
 )
 from models.satellite import SatelliteDamagesAssessment
+from services.assessment_mode_service import build_assessment_contract, enforce_vision_claim_boundary
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +52,8 @@ async def analyze_satellite_image(
     image_mime: str = "image/jpeg",
     component_hint: str = "",
     satellite_context: str = "",
+    assessment_mode: str = "PUBLIC_SCREEN",
+    assessment_contract: dict | None = None,
 ) -> SatelliteDamagesAssessment:
     """
     Analyze a satellite image for structural damage.
@@ -69,6 +72,12 @@ async def analyze_satellite_image(
         prompt += f" Focus on the {component_hint} component."
     if satellite_context:
         prompt += f"\n\nSatellite context: {satellite_context}"
+    if assessment_mode == "PUBLIC_SCREEN":
+        prompt += (
+            "\n\nAssessment mode: PUBLIC_SCREEN. Do not estimate millimeter-scale dimensions, "
+            "power loss, or functional impact unless calibrated range/camera/scale metadata is provided. "
+            "When metadata is missing, provide qualitative observations and evidence gaps only."
+        )
 
     agent = _get_agent()
 
@@ -81,7 +90,17 @@ async def analyze_satellite_image(
         ) if agent else await _fallback(prompt, image_bytes, image_mime)
         if "error" in data and "raw_text" in data:
             raise ValueError("Agent response could not be parsed")
-        return SatelliteDamagesAssessment(**data)
+        assessment = SatelliteDamagesAssessment(**data)
+        return enforce_vision_claim_boundary(
+            assessment,
+            assessment_contract
+            or build_assessment_contract(
+                assessment_mode=assessment_mode,
+                capture_metadata={},
+                telemetry_summary={},
+                baseline_reference={},
+            ),
+        )
     except Exception as e:
         log.error("Vision analysis failed", exc_info=True)
         return SatelliteDamagesAssessment(

@@ -209,6 +209,7 @@ export function useSSE(analysis: UseAnalysisReturn) {
         if (context.assetType) formData.append("asset_type", context.assetType);
         if (context.inspectionEpoch) formData.append("inspection_epoch", context.inspectionEpoch);
         if (context.targetSubsystem) formData.append("target_subsystem", context.targetSubsystem);
+        if (context.assessmentMode) formData.append("assessment_mode", context.assessmentMode);
         if (context.captureMetadata) formData.append("capture_metadata", JSON.stringify(context.captureMetadata));
         if (context.telemetrySummary) formData.append("telemetry_summary", JSON.stringify(context.telemetrySummary));
         if (context.baselineReference) formData.append("baseline_reference", JSON.stringify(context.baselineReference));

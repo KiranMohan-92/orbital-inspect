@@ -20,15 +20,14 @@ export default function AnalysisMode() {
       assetType: state.assetType,
       inspectionEpoch: state.inspectionEpoch || undefined,
       targetSubsystem: state.targetSubsystem || undefined,
+      assessmentMode: state.assessmentMode,
     });
   };
 
   return (
     <div data-testid="analysis-mode" className="h-full flex flex-col orbital-bg overflow-hidden">
-      {/* 3-Panel Layout */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
-        {/* Panel A: Target Acquisition (300px) */}
-        <div data-testid="analysis-input-panel" className="w-[300px] flex-shrink-0 flex flex-col glass-panel overflow-hidden"
+      <div className="grid flex-1 min-h-0 overflow-y-auto lg:overflow-hidden grid-cols-1 lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)_minmax(340px,420px)]">
+        <div data-testid="analysis-input-panel" className="min-h-[520px] lg:min-h-0 flex flex-col glass-panel overflow-hidden"
           style={{ borderRight: "1px solid var(--bg-panel-border)" }}>
           <ErrorBoundary panelName="Target Acquisition">
             <SatelliteInput analysis={analysis} onAnalyze={handleAnalyze} onDemo={analyzeDemo} />
@@ -37,13 +36,12 @@ export default function AnalysisMode() {
 
         {/* Panel B: Visual Analysis (flex-1) */}
         <ErrorBoundary panelName="Visual Analysis">
-          <div data-testid="analysis-visual-panel" className="flex-1">
+          <div data-testid="analysis-visual-panel" className="min-h-[520px] lg:min-h-0 flex min-w-0">
             <VisualAnalysis analysis={analysis} />
           </div>
         </ErrorBoundary>
 
-        {/* Panel C: Intelligence Report (380px) */}
-        <div data-testid="analysis-report-panel" className="w-[380px] flex-shrink-0 flex flex-col glass-panel overflow-hidden"
+        <div data-testid="analysis-report-panel" className="min-h-[520px] lg:min-h-0 flex flex-col glass-panel overflow-hidden"
           style={{ borderLeft: "1px solid var(--bg-panel-border)" }}>
           <ErrorBoundary panelName="Intelligence Report">
             <IntelligenceReport analysis={analysis} />

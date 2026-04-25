@@ -38,6 +38,8 @@ export default function InsuranceRiskCard({ report }: Props) {
   const tierColor = TIER_COLORS[report.risk_tier] || "var(--text-secondary)";
   const isHighRisk = report.risk_tier === "CRITICAL" || report.risk_tier === "HIGH";
   const uwStyle = UW_STYLES[report.underwriting_recommendation as UnderwritingRecommendation] || UW_STYLES.FURTHER_INVESTIGATION;
+  const authority = (report as InsuranceRiskReport & { decision_authority?: string }).decision_authority || "SCREENING_ONLY";
+  const mode = (report as InsuranceRiskReport & { assessment_mode?: string }).assessment_mode || "PUBLIC_SCREEN";
 
   return (
     <div className="flex flex-col gap-4 font-body">
@@ -45,6 +47,15 @@ export default function InsuranceRiskCard({ report }: Props) {
       {/* Underwriting Recommendation — THE MONEY SHOT */}
       <div data-testid="underwriting-badge" className={`uw-badge text-center ${uwStyle.cls}`}>
         {uwStyle.label}
+      </div>
+
+      <div data-testid="decision-authority-badge" className="data-card text-center">
+        <p className="label-mono mb-1">{authority.replace(/_/g, " ")}</p>
+        <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+          {mode === "PUBLIC_SCREEN"
+            ? "Risk tier is a public-data screening priority, not an underwriting determination."
+            : "Decision authority is bounded by supplied evidence and review workflow."}
+        </p>
       </div>
 
       {/* Risk Tier */}
@@ -80,7 +91,7 @@ export default function InsuranceRiskCard({ report }: Props) {
 
       {/* Insurance Metrics — the data underwriters need */}
       <div>
-        <p className="label-mono mb-2">INSURANCE METRICS</p>
+        <p className="label-mono mb-2">{authority === "SCREENING_ONLY" ? "SCREENING METRICS" : "INSURANCE METRICS"}</p>
         <div className="grid grid-cols-2 gap-2">
           {[
             { label: "REMAINING LIFE", value: report.estimated_remaining_life_years != null ? `${report.estimated_remaining_life_years.toFixed(1)} yr` : "—" },

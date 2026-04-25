@@ -1,7 +1,7 @@
 """Satellite domain models for Orbital Inspect."""
 
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Literal, Optional
 from datetime import datetime, timezone
 from enum import Enum
 from models.provenance import (
@@ -33,6 +33,26 @@ class SatelliteType(str, Enum):
     OTHER = "other"
 
 
+class AssessmentMode(str, Enum):
+    PUBLIC_SCREEN = "PUBLIC_SCREEN"
+    ENHANCED_TECHNICAL = "ENHANCED_TECHNICAL"
+    UNDERWRITING_GRADE = "UNDERWRITING_GRADE"
+
+
+class DecisionAuthority(str, Enum):
+    SCREENING_ONLY = "SCREENING_ONLY"
+    TECHNICAL_ASSESSMENT = "TECHNICAL_ASSESSMENT"
+    UNDERWRITING_REVIEW = "UNDERWRITING_REVIEW"
+
+
+class EvidenceGap(BaseModel):
+    id: str
+    label: str
+    status: Literal["missing", "insufficient", "present"] = "missing"
+    description: str
+    required_for: AssessmentMode = AssessmentMode.UNDERWRITING_GRADE
+
+
 class SatelliteTarget(BaseModel):
     """Target satellite for condition assessment."""
     id: str
@@ -50,7 +70,7 @@ class SatelliteTarget(BaseModel):
     age_years: float | None = None
     mass_kg: float | None = None
     power_watts: float | None = None
-    expected_components: list[str] = []
+    expected_components: list[str] = Field(default_factory=list)
     insured: bool | None = None
     insured_value_usd: float | None = None
 
@@ -62,7 +82,7 @@ class ClassificationResult(BaseModel):
     satellite_type: str = "other"
     bus_platform: str | None = None
     orbital_regime: str = "UNKNOWN"
-    expected_components: list[str] = []
+    expected_components: list[str] = Field(default_factory=list)
     design_life_years: float | None = None
     estimated_age_years: float | None = None
     operator: str | None = None
@@ -88,30 +108,43 @@ class SatelliteDamageItem(BaseModel):
     id: int
     type: str                           # micrometeorite_crater, cell_degradation, thermal_blanket_damage, etc.
     description: str
-    bounding_box: list[int]             # [y_min, x_min, y_max, x_max] normalized 0-1000
+    bounding_box: list[int] = Field(min_length=4, max_length=4)  # [y_min, x_min, y_max, x_max] normalized 0-1000
     label: str                          # Short label for overlay (max 5 words)
-    severity: str                       # MINOR | MODERATE | SEVERE | CRITICAL
-    confidence: float                   # 0.0-1.0
+    severity: Literal["MINOR", "MODERATE", "SEVERE", "CRITICAL"]
+    confidence: float = Field(ge=0.0, le=1.0)
     uncertain: bool = False
-    estimated_power_impact_pct: float = 0.0  # Estimated power loss from this damage
+    estimated_power_impact_pct: float | None = None  # Only populated when measurement metadata supports it.
+
+    @field_validator("bounding_box")
+    @classmethod
+    def _validate_bounding_box(cls, value: list[int]) -> list[int]:
+        if any(coord < 0 or coord > 1000 for coord in value):
+            raise ValueError("bounding_box coordinates must be normalized 0-1000")
+        y_min, x_min, y_max, x_max = value
+        if y_min > y_max or x_min > x_max:
+            raise ValueError("bounding_box minimum coordinates must not exceed maximum coordinates")
+        return value
 
 
 class SatelliteDamagesAssessment(BaseModel):
     """Output of the Satellite Vision Agent."""
-    damages: list[SatelliteDamageItem] = []
+    damages: list[SatelliteDamageItem] = Field(default_factory=list)
     overall_pattern: str = ""           # e.g., "cumulative micrometeorite bombardment"
-    overall_severity: str = "MINOR"
-    overall_confidence: float = 0.0
-    total_power_impact_pct: float = 0.0
+    overall_severity: Literal["MINOR", "MODERATE", "SEVERE", "CRITICAL"] = "MINOR"
+    overall_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    total_power_impact_pct: float | None = None
     healthy_areas_noted: str = ""
     component_assessed: str = ""        # Which component was analyzed (solar_array, antenna, bus)
     degraded: bool = False
+    measurement_metadata: dict = Field(default_factory=dict)
+    unsupported_claims_blocked: list[str] = Field(default_factory=list)
+    required_evidence_gaps: list[EvidenceGap] = Field(default_factory=list)
 
 
 class OrbitalStressor(BaseModel):
     """Environmental stressor in the orbital environment."""
     name: str
-    severity: str                       # LOW | MEDIUM | HIGH
+    severity: Literal["LOW", "MEDIUM", "HIGH"]
     measured_value: str = ""
     description: str = ""
     source: str = ""
@@ -127,10 +160,10 @@ class OrbitalEnvironmentAnalysis(BaseModel):
     radiation_dose_rate: str = ""       # rad/year
     thermal_cycling_range: str = ""     # e.g., "-150°C to +150°C"
     atomic_oxygen_flux: str = ""        # atoms/cm²/s
-    stressors: list[OrbitalStressor] = []
-    accelerating_factors: list[str] = []
-    mitigating_factors: list[str] = []
-    data_sources: list[str] = []
+    stressors: list[OrbitalStressor] = Field(default_factory=list)
+    accelerating_factors: list[str] = Field(default_factory=list)
+    mitigating_factors: list[str] = Field(default_factory=list)
+    data_sources: list[str] = Field(default_factory=list)
     degraded: bool = False
 
 
@@ -150,18 +183,18 @@ class SatelliteFailureModeAnalysis(BaseModel):
     """Output of the Satellite Failure Mode Agent."""
     failure_mode: str = ""
     mechanism: str = ""
-    root_cause_chain: list[str] = []
+    root_cause_chain: list[str] = Field(default_factory=list)
     progression_rate: str = "MODERATE"
     power_degradation_estimate_pct: float = 0.0
     remaining_life_revision_years: float | None = None
     time_to_critical: str = ""
-    historical_precedents: list[SatellitePrecedent] = []
+    historical_precedents: list[SatellitePrecedent] = Field(default_factory=list)
     degraded: bool = False
-    probability_components: list[ProbabilityComponent] = []
+    probability_components: list[ProbabilityComponent] = Field(default_factory=list)
 
 
 class RiskMatrixDimension(BaseModel):
-    score: int                          # 1-5
+    score: int = Field(ge=1, le=5)
     reasoning: str = ""
 
 
@@ -169,12 +202,12 @@ class RiskMatrix(BaseModel):
     severity: RiskMatrixDimension
     probability: RiskMatrixDimension
     consequence: RiskMatrixDimension
-    composite: int                      # 1-125
+    composite: int = Field(ge=1, le=125)
 
 
 class ConsistencyCheck(BaseModel):
     passed: bool = True
-    anomalies: list[str] = []
+    anomalies: list[str] = Field(default_factory=list)
     confidence_adjustment: str = ""
 
 
@@ -188,9 +221,16 @@ class UnderwritingRecommendation(str, Enum):
 
 class InsuranceRiskReport(BaseModel):
     """Output of the Insurance Risk Agent — the key differentiator."""
+    model_config = ConfigDict(use_enum_values=True)
+
     consistency_check: ConsistencyCheck
     risk_matrix: RiskMatrix
-    risk_tier: str                      # LOW | MEDIUM | MEDIUM-HIGH | HIGH | CRITICAL
+    risk_tier: Literal["LOW", "MEDIUM", "MEDIUM-HIGH", "HIGH", "CRITICAL", "UNKNOWN"]
+    assessment_mode: AssessmentMode = AssessmentMode.PUBLIC_SCREEN
+    decision_authority: DecisionAuthority = DecisionAuthority.SCREENING_ONLY
+    report_title: str = "Public Risk Screen"
+    unsupported_claims_blocked: list[str] = Field(default_factory=list)
+    required_evidence_gaps: list[EvidenceGap] = Field(default_factory=list)
 
     # Insurance-specific metrics
     estimated_remaining_life_years: float | None = None
@@ -199,16 +239,16 @@ class InsuranceRiskReport(BaseModel):
     replacement_cost_usd: float | None = None
     depreciated_value_usd: float | None = None
     revenue_at_risk_annual_usd: float | None = None
-    total_loss_probability: float | None = None  # 0.0-1.0 over remaining life
+    total_loss_probability: float | None = Field(default=None, ge=0.0, le=1.0)
 
-    underwriting_recommendation: str = "FURTHER_INVESTIGATION"
+    underwriting_recommendation: UnderwritingRecommendation = UnderwritingRecommendation.FURTHER_INVESTIGATION
     recommendation_rationale: str = ""
-    recommended_actions: list[dict] = []
+    recommended_actions: list[dict] = Field(default_factory=list)
     worst_case_scenario: str = ""
     summary: str = ""
     degraded: bool = False
-    evidence_gaps: list[str] = []
-    report_completeness: str = "COMPLETE"
+    evidence_gaps: list[str] = Field(default_factory=list)
+    report_completeness: Literal["COMPLETE", "PARTIAL", "FAILED"] = "COMPLETE"
 
     # Deutsch Layer: Provenance & Calibration (all Optional, backward compatible)
     confidence_calibration: ConfidenceCalibration | None = None
@@ -225,6 +265,8 @@ class InsuranceRiskReport(BaseModel):
 class SatelliteConditionReport(BaseModel):
     """Full Satellite Condition Report — the product deliverable."""
     target: SatelliteTarget
+    assessment_mode: AssessmentMode = AssessmentMode.PUBLIC_SCREEN
+    decision_authority: DecisionAuthority = DecisionAuthority.SCREENING_ONLY
     classification: ClassificationResult
     vision: SatelliteDamagesAssessment | None = None
     environment: OrbitalEnvironmentAnalysis | None = None

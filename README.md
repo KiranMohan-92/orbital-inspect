@@ -9,9 +9,9 @@
 
 # Orbital Inspect
 
-**AI-powered satellite inspection and risk intelligence platform for orbital asset operators, insurers, and defense primes.**
+**Public-source satellite risk intelligence and evidence-triage platform for orbital asset operators, insurers, and defense primes.**
 
-Upload a satellite image. Get a complete underwriting intelligence report in under 45 seconds. Track degradation across your entire fleet. Know when to act before it's too late.
+Upload satellite imagery. Get a public-data risk screen with source quality, evidence gaps, and review-required actions in under 45 seconds. Track degradation across your fleet and know what evidence is needed next.
 
 ```
                         ┌─────────────────────────────────────────────────────┐
@@ -45,7 +45,7 @@ Orbital Inspect answers that question with AI, real data, and provable methodolo
 | What You Need | What We Do |
 |---|---|
 | **Inspect a satellite** | 5-agent AI pipeline analyzes imagery + 7 free data sources |
-| **Underwrite the risk** | Composite risk scoring with fail-closed safety guarantees |
+| **Screen the risk** | Composite screening priority with fail-closed underwriting authority boundaries |
 | **Monitor a fleet** | Continuous ingestion of orbital, conjunction, and weather data |
 | **Predict degradation** | Linear regression trends with time-to-threshold predictions |
 | **Prove reliability** | SLO dashboard: 99.5% pipeline completion, p95 < 45s |
@@ -316,7 +316,7 @@ Upload a satellite image with operator context. Five specialized Gemini-powered 
 Monitor 6,000+ satellites with sub-second portfolio queries. Periodic fleet ingestion pulls TLE data, conjunction events, and space weather for every tracked asset. Cached portfolio summaries prevent database bottlenecks. Batch analysis endpoint processes up to 100 assets per request.
 
 ### Predictive Intelligence
-For assets with 3+ historical analyses, Orbital Inspect computes degradation trajectories using linear regression on composite risk scores. Predicts scores at 30 and 90 days. Calculates time-to-threshold for the "UNINSURABLE" level (85/100). Classifies degradation velocity as stable, slow, moderate, rapid, or critical.
+For assets with 3+ historical analyses, Orbital Inspect computes degradation trajectories using linear regression on composite screening scores. Predicts scores at 30 and 90 days. Calculates time-to-escalation thresholds for analyst review. Classifies degradation velocity as stable, slow, moderate, rapid, or critical.
 
 ### Provable Reliability
 Four SLO targets measured from real data: pipeline completion rate (99.5%), p95 latency (<45s), evidence freshness (<4h), and webhook delivery (99%). Error budget tracking shows how much margin remains before a target is breached.
@@ -466,7 +466,7 @@ docker compose -f docker-compose.yml -f docker-compose.observability.yml --profi
 
 ## Free Data Sources
 
-Orbital Inspect operates entirely on **freely available public data** -- no contracts, no API keys, no vendor lock-in.
+Orbital Inspect's default `PUBLIC_SCREEN` mode operates on **freely available public data** for triage and evidence-gap analysis. It does not claim definitive inspection or underwriting-grade loss probability without operator telemetry, calibrated imagery, geometry/covariance data, actuarial priors, and human review.
 
 | Source | Data | Endpoint | Update Frequency |
 |--------|------|----------|-----------------|

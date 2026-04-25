@@ -296,6 +296,8 @@ async def get_analysis_evidence(
                 "evidence_gaps": getattr(analysis, "evidence_gaps", []) or [],
                 "linked_evidence_count": bundle_summary.get("linked_evidence_count", len(items)),
                 "sources_available": bundle_summary.get("sources_available", []),
+                "evidence_quality": bundle_summary.get("evidence_quality", {}),
+                "assessment_contract": bundle_summary.get("assessment_contract", {}),
                 "prior_analyses_count": bundle_summary.get("prior_analyses_count", 0),
                 "counts_by_role": _count_by(items, "evidence_role"),
                 "counts_by_domain": _count_by(items, "source_domain"),

@@ -1,5 +1,7 @@
 import os
+import shutil
 from pathlib import Path
+from uuid import uuid4
 
 os.environ.setdefault("GEMINI_API_KEY", "test-dummy-key")
 
@@ -39,25 +41,30 @@ class _FakeS3Client:
         return {"Body": _FakeBody(self.objects[(Bucket, Key)])}
 
 
-def test_local_storage_backend_round_trips_bytes(tmp_path):
-    backend = LocalStorageBackend(tmp_path)
+def test_local_storage_backend_round_trips_bytes():
+    runtime_dir = Path(__file__).resolve().parents[1] / ".test-runtime" / f"storage-{uuid4().hex}"
+    runtime_dir.mkdir(parents=True, exist_ok=False)
+    backend = LocalStorageBackend(runtime_dir)
 
-    stored = backend.store_bytes(
-        category="uploads",
-        filename="sample.jpg",
-        data=b"image-bytes",
-        content_type="image/jpeg",
-        metadata={"analysis_id": "analysis-1"},
-        object_name="analysis-1-primary",
-    )
+    try:
+        stored = backend.store_bytes(
+            category="uploads",
+            filename="sample.jpg",
+            data=b"image-bytes",
+            content_type="image/jpeg",
+            metadata={"analysis_id": "analysis-1"},
+            object_name="analysis-1-primary",
+        )
 
-    assert stored.uri.startswith("file://")
-    assert stored.key == "uploads/analysis-1-primary.jpg"
-    assert stored.checksum_sha256
-    assert stored.local_path
-    assert Path(stored.local_path).exists()
-    assert Path(stored.local_path).read_bytes() == b"image-bytes"
-    assert backend.read_bytes(stored.uri) == b"image-bytes"
+        assert stored.uri.startswith("file://")
+        assert stored.key == "uploads/analysis-1-primary.jpg"
+        assert stored.checksum_sha256
+        assert stored.local_path
+        assert Path(stored.local_path).exists()
+        assert Path(stored.local_path).read_bytes() == b"image-bytes"
+        assert backend.read_bytes(stored.uri) == b"image-bytes"
+    finally:
+        shutil.rmtree(runtime_dir, ignore_errors=True)
 
 
 def test_s3_compatible_storage_backend_creates_bucket_and_stores_object():

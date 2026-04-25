@@ -24,6 +24,7 @@ def apply_decision_governance(
     evidence_completeness_pct: float | None,
     degraded: bool,
     failure_reasons: list[str],
+    decision_authority: str | None = None,
 ) -> tuple[dict, dict]:
     result = deepcopy(insurance_result or {})
     blocked_reasons: list[str] = []
@@ -39,6 +40,10 @@ def apply_decision_governance(
         blocked_reasons.append("one or more pipeline stages degraded")
     if failure_reasons:
         blocked_reasons.append("pipeline recorded failure reasons")
+    if decision_authority == "SCREENING_ONLY":
+        blocked_reasons.append("decision authority is screening-only")
+    elif decision_authority == "TECHNICAL_ASSESSMENT":
+        blocked_reasons.append("decision authority is technical assessment, not underwriting review")
 
     if blocked_reasons:
         result["underwriting_recommendation"] = "FURTHER_INVESTIGATION"
@@ -57,5 +62,6 @@ def apply_decision_governance(
         "human_review_required": settings.REQUIRE_HUMAN_REVIEW_FOR_DECISIONS,
         "decision_blocked_reason": "; ".join(blocked_reasons) if blocked_reasons else None,
         "minimum_evidence_completeness_pct": settings.MIN_EVIDENCE_COMPLETENESS_FOR_DECISION,
+        "decision_authority": decision_authority,
     }
     return result, governance

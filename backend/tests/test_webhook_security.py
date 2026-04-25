@@ -14,6 +14,7 @@ from api.webhooks import WebhookCreate, create_webhook
 from auth.dependencies import CurrentUser
 from config import settings
 from services.secret_service import decrypt_webhook_secret, encrypt_webhook_secret, hash_secret
+from services.webhook_security import validate_webhook_url
 from services.webhook_service import dispatch_registered_webhooks, sign_payload
 
 
@@ -88,12 +89,12 @@ async def test_create_webhook_persists_encrypted_secret_in_production(webhook_ke
     repo = AsyncMock()
     repo.create = AsyncMock(return_value=SimpleNamespace(
         id="webhook-1",
-        url="https://hooks.example.com/orbital",
+        url="https://93.184.216.34/orbital",
         events=["analysis.completed"],
         active=True,
     ))
     body = WebhookCreate(
-        url="https://hooks.example.com/orbital",
+        url="https://93.184.216.34/orbital",
         secret="hook-secret",
         events=["analysis.completed"],
     )
@@ -108,6 +109,33 @@ async def test_create_webhook_persists_encrypted_secret_in_production(webhook_ke
     assert persisted["secret_hash"] == hash_secret("hook-secret")
     assert persisted["secret_ciphertext"] != "hook-secret"
     assert decrypt_webhook_secret(persisted["secret_ciphertext"]) == "hook-secret"
+
+
+def test_webhook_url_requires_https_in_production(monkeypatch):
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+    monkeypatch.setattr(settings, "DEMO_MODE", False)
+
+    with pytest.raises(ValueError, match="HTTPS"):
+        validate_webhook_url("http://93.184.216.34/orbital")
+
+
+def test_webhook_url_blocks_private_ipv6(monkeypatch):
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+    monkeypatch.setattr(settings, "DEMO_MODE", False)
+
+    with pytest.raises(ValueError, match="Private/internal"):
+        validate_webhook_url("https://[::1]/orbital")
+
+
+def test_webhook_url_blocks_dns_resolution_to_private_address(monkeypatch):
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+    monkeypatch.setattr(settings, "DEMO_MODE", False)
+
+    with patch("services.webhook_security.resolve_webhook_targets", return_value=[
+        __import__("ipaddress").ip_address("10.0.0.5")
+    ]):
+        with pytest.raises(ValueError, match="Private/internal"):
+            validate_webhook_url("https://hooks.example.com/orbital")
 
 
 @pytest.mark.asyncio

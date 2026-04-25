@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     API_KEY_PREFIX: str = "oi"
     WEBHOOK_SECRET_ENCRYPTION_KEY: str | None = None
     WEBHOOK_SECRET_PREVIOUS_KEYS: list[str] = []
+    WEBHOOK_ALLOWED_HOSTS: list[str] = []
 
     @model_validator(mode="after")
     def validate_jwt_secret(self):
@@ -76,6 +77,10 @@ class Settings(BaseSettings):
             raise ValueError("AUTH_ENABLED must be true in staging and production environments")
         if self.APP_ENV in {"staging", "production"} and not self.WEBHOOK_SECRET_ENCRYPTION_KEY:
             raise ValueError("WEBHOOK_SECRET_ENCRYPTION_KEY must be set in staging and production environments")
+        if self.APP_ENV in {"staging", "production"} and self.RATE_LIMIT_FAIL_OPEN:
+            raise ValueError("RATE_LIMIT_FAIL_OPEN must be false in staging and production environments")
+        if self.APP_ENV in {"staging", "production"} and not self.REDIS_REQUIRED:
+            raise ValueError("REDIS_REQUIRED must be true in staging and production environments")
         if self.AUTH_ENABLED and self.JWT_SECRET == "dev-secret-change-in-production":
             raise ValueError(
                 "JWT_SECRET must be set to a strong random value when AUTH_ENABLED=true. "

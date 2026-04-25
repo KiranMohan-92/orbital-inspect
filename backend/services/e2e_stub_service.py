@@ -13,6 +13,8 @@ import asyncio
 from typing import AsyncGenerator
 
 from models.events import AgentEvent
+from services.assessment_mode_service import enforce_report_authority, enforce_vision_claim_boundary
+from models.satellite import InsuranceRiskReport, SatelliteDamagesAssessment
 from services.sse_service import format_sse_done, format_sse_error, format_sse_event
 
 
@@ -207,6 +209,7 @@ async def run_e2e_stub_pipeline(
     analysis_id: str,
     norad_id: str | None,
     additional_context: str,
+    assessment_contract: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """Emit deterministic SSE events for the requested E2E scenario."""
     scenario = _scenario_key(additional_context)
@@ -247,7 +250,13 @@ async def run_e2e_stub_pipeline(
             )
         )
     else:
-        yield await emit(AgentEvent.complete("satellite_vision", _vision_payload()))
+        vision_payload = _vision_payload()
+        if assessment_contract:
+            vision_payload = enforce_vision_claim_boundary(
+                SatelliteDamagesAssessment(**vision_payload),
+                assessment_contract,
+            ).model_dump(mode="json")
+        yield await emit(AgentEvent.complete("satellite_vision", vision_payload))
 
     yield await emit(AgentEvent.thinking("orbital_environment", THINKING_MESSAGES["orbital_environment"]))
     yield await emit(AgentEvent.complete("orbital_environment", _environment_payload()))
@@ -270,33 +279,46 @@ async def run_e2e_stub_pipeline(
         return
 
     if scenario == "partial":
+        partial_payload = _insurance_payload(
+            risk_tier="MEDIUM",
+            composite=34,
+            recommendation="FURTHER_INVESTIGATION",
+            summary="Incomplete evidence requires further investigation before underwriting.",
+            degraded=True,
+            evidence_gaps=["satellite_vision"],
+            report_completeness="PARTIAL",
+        )
+        if assessment_contract:
+            partial_payload = enforce_report_authority(
+                InsuranceRiskReport(**partial_payload),
+                assessment_contract,
+            ).model_dump(mode="json")
         yield await emit(
             AgentEvent.complete(
                 "insurance_risk",
-                _insurance_payload(
-                    risk_tier="MEDIUM",
-                    composite=34,
-                    recommendation="FURTHER_INVESTIGATION",
-                    summary="Incomplete evidence requires further investigation before underwriting.",
-                    degraded=True,
-                    evidence_gaps=["satellite_vision"],
-                    report_completeness="PARTIAL",
-                ),
+                partial_payload,
                 degraded=True,
             )
         )
         yield format_sse_done("completed_partial")
         return
 
+    success_payload = _insurance_payload(
+        risk_tier="LOW",
+        composite=16,
+        recommendation="INSURABLE_STANDARD",
+        summary="Deterministic E2E success scenario indicates low underwriting impact.",
+    )
+    if assessment_contract:
+        success_payload = enforce_report_authority(
+            InsuranceRiskReport(**success_payload),
+            assessment_contract,
+        ).model_dump(mode="json")
     yield await emit(
         AgentEvent.complete(
             "insurance_risk",
-            _insurance_payload(
-                risk_tier="LOW",
-                composite=16,
-                recommendation="INSURABLE_STANDARD",
-                summary="Deterministic E2E success scenario indicates low underwriting impact.",
-            ),
+            success_payload,
+            degraded=bool(success_payload.get("degraded", False)),
         )
     )
     yield format_sse_done("completed")

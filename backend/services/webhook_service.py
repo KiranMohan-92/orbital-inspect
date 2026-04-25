@@ -13,6 +13,9 @@ import uuid
 import httpx
 from datetime import datetime, timezone
 
+from config import settings
+from services.webhook_security import validate_webhook_url
+
 log = logging.getLogger(__name__)
 
 _TIMEOUT = httpx.Timeout(10.0, read=15.0)
@@ -63,6 +66,7 @@ async def dispatch_webhook(
     last_excerpt: str | None = None
     for attempt in range(max_retries):
         try:
+            validate_webhook_url(url, resolve_dns=not settings.DEMO_MODE)
             async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
                 resp = await client.post(url, content=body, headers=headers)
                 last_status_code = resp.status_code

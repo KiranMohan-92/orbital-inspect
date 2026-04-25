@@ -40,7 +40,7 @@ worker:
     repository: orbital-inspect/api   # same image, different command
     tag: "0.2.0"
     pullPolicy: IfNotPresent
-  replicaCount: 1
+  replicaCount: 2
   command:
     - python
     - -m
@@ -59,7 +59,7 @@ frontend:
     repository: orbital-inspect/frontend
     tag: "0.2.0"
     pullPolicy: IfNotPresent
-  replicaCount: 1
+  replicaCount: 2
   resources:
     requests:
       cpu: "50m"
@@ -68,10 +68,14 @@ frontend:
       cpu: "200m"
       memory: "256Mi"
   service:
-    port: 80
+    port: 8080
 
 # ── Global image pull secrets ──────────────────────────────────────────────────
 imagePullSecrets: []
+
+podDisruptionBudgets:
+  enabled: true
+  maxUnavailable: 1
 
 # ── Application environment ────────────────────────────────────────────────────
 app:
@@ -100,7 +104,7 @@ postgresql:
   existingSecret: "orbital-inspect-db"
   # Used only if existingSecret is not set (not recommended for production)
   url: ""
-  autoInit: true
+  autoInit: false
 
 # ── Redis (external) ──────────────────────────────────────────────────────────
 redis:
@@ -108,7 +112,7 @@ redis:
   existingSecret: "orbital-inspect-redis"
   # Used only if existingSecret is not set
   url: ""
-  required: false
+  required: true
 
 # ── S3 / MinIO storage ────────────────────────────────────────────────────────
 storage:
@@ -154,7 +158,7 @@ rateLimit:
   backend: "redis"     # memory | redis
   analysisPerHour: 20
   reportPerHour: 60
-  failOpen: true
+  failOpen: false
 
 # ── Caching ───────────────────────────────────────────────────────────────────
 cache:
