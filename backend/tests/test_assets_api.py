@@ -304,3 +304,99 @@ async def test_get_asset_timeline_returns_newest_analysis_first(client, seeded_a
     ]
     assert payload["analyses"][0]["recommended_action"] == "continue_operations"
     assert payload["analyses"][1]["recommended_action"] == "monitor"
+
+
+@pytest.mark.asyncio
+async def test_get_asset_detail_classifies_runtime_public_source_types(client, session_factory):
+    async with session_factory() as session:
+        org = Organization(name="Asset API Public Domain Org")
+        session.add(org)
+        await session.commit()
+        await session.refresh(org)
+
+        asset_repo = AssetRepository(session)
+        evidence_repo = EvidenceRepository(session)
+        asset = await asset_repo.resolve_or_create(
+            org_id=org.id,
+            norad_id="70001",
+            asset_type="satellite",
+            name="PublicDomainSat",
+        )
+
+        for source_type, provider in (
+            ("satnogs", "SatNOGS"),
+            ("noaa_swpc", "NOAA SWPC"),
+            ("ordem", "NASA ORDEM 4.0"),
+        ):
+            await evidence_repo.create_record(
+                org_id=org.id,
+                asset_id=asset.id,
+                source_type=source_type,
+                evidence_role="runtime",
+                provider=provider,
+                payload_json={"source_type": source_type},
+            )
+
+    response = await client.get(f"/api/assets/{asset.id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["evidence_summary"]["total_records"] == 3
+    assert payload["evidence_summary"]["counts_by_domain"]["public"] == 3
+    items_by_source = {item["source_type"]: item for item in payload["recent_evidence"]}
+    assert items_by_source["satnogs"]["source_domain"] == "public"
+    assert items_by_source["noaa_swpc"]["source_domain"] == "public"
+    assert items_by_source["ordem"]["source_domain"] == "public"
+
+
+@pytest.mark.asyncio
+async def test_get_asset_detail_counts_partner_evidence_without_double_counting(
+    client, session_factory
+):
+    async with session_factory() as session:
+        org = Organization(name="Asset API Partner Domain Org")
+        session.add(org)
+        await session.commit()
+        await session.refresh(org)
+
+        asset_repo = AssetRepository(session)
+        evidence_repo = EvidenceRepository(session)
+        asset = await asset_repo.resolve_or_create(
+            org_id=org.id,
+            norad_id="70002",
+            asset_type="satellite",
+            name="PartnerDomainSat",
+        )
+
+        await evidence_repo.create_record(
+            org_id=org.id,
+            asset_id=asset.id,
+            source_type="celestrak",
+            evidence_role="runtime",
+            provider="CelesTrak",
+            payload_json={"variant": "public"},
+        )
+        await evidence_repo.create_record(
+            org_id=org.id,
+            asset_id=asset.id,
+            source_type="celestrak",
+            evidence_role="runtime",
+            provider="partner:Acme Space",
+            payload_json={"variant": "partner"},
+        )
+
+    response = await client.get(f"/api/assets/{asset.id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["evidence_summary"]["total_records"] == 2
+    assert payload["evidence_summary"]["counts_by_domain"]["public"] == 1
+    assert payload["evidence_summary"]["counts_by_domain"]["partner"] == 1
+    assert sum(payload["evidence_summary"]["counts_by_domain"].values()) == 2
+    partner_items = [
+        item for item in payload["recent_evidence"] if item["provider"] == "partner:Acme Space"
+    ]
+    assert len(partner_items) == 1
+    assert partner_items[0]["source_domain"] == "partner"

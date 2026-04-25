@@ -20,6 +20,9 @@ PUBLIC_SOURCES = {
     "debris_environment",
     "reference_profile",
     "rf_activity",
+    "noaa_swpc",
+    "ordem",
+    "satnogs",
 }
 OPERATOR_SUPPLIED_SOURCES = {
     "imagery",
@@ -58,21 +61,37 @@ def _confidence_bucket(confidence: float | None) -> str:
     return "low"
 
 
-def _source_domain(record) -> str:
-    tags = {str(tag).lower() for tag in (record.tags or [])}
-    source_type = str(record.source_type or "").lower()
-    provider = str(record.provider or "").lower()
-    if record.evidence_role == "offline_eval":
+def _classify_source_domain(
+    *,
+    source_type: str | None,
+    provider: str | None = None,
+    evidence_role: str | None = None,
+    tags: list[Any] | None = None,
+) -> str:
+    tag_values = {str(tag).lower() for tag in (tags or [])}
+    source_lower = str(source_type or "").lower()
+    provider_lower = str(provider or "").lower()
+
+    if evidence_role == "offline_eval":
         return "offline_eval"
-    if "partner" in tags or provider.startswith("partner:"):
+    if "partner" in tag_values or provider_lower.startswith("partner:"):
         return "partner"
-    if source_type in OPERATOR_SUPPLIED_SOURCES:
+    if source_lower in OPERATOR_SUPPLIED_SOURCES:
         return "operator_supplied"
-    if source_type in INTERNAL_SOURCES:
+    if source_lower in INTERNAL_SOURCES:
         return "internal"
-    if source_type in PUBLIC_SOURCES:
+    if source_lower in PUBLIC_SOURCES:
         return "public"
     return "unknown"
+
+
+def _source_domain(record) -> str:
+    return _classify_source_domain(
+        source_type=record.source_type,
+        provider=record.provider,
+        evidence_role=record.evidence_role,
+        tags=record.tags,
+    )
 
 
 def _source_label(record) -> str:
@@ -324,49 +343,30 @@ async def get_asset_detail(
                 org_id=user.org_id if user else None,
             )
         )
-        # Derive domain counts from source_type counts using the domain mapping.
-        # Note: partner evidence is identified by provider prefix, not source_type,
-        # so we also need a provider-aware pass. For the DB-aggregated path we
-        # approximate: source_types not in any known set are "unknown" here, and
-        # the recent_evidence items carry the full _source_domain classification.
+        # Domain counts need source_type + provider because partner evidence is
+        # identified by provider prefix rather than source_type alone.
+        from sqlalchemy import func, or_, select
+        from db.models import EvidenceRecord as ER
+
+        domain_filters = [
+            ER.asset_id == asset.id,
+            or_(ER.evidence_role != "offline_eval", ER.evidence_role.is_(None)),
+        ]
+        if user and user.org_id:
+            domain_filters.append(ER.org_id == user.org_id)
+
+        domain_rows = await session.execute(
+            select(ER.source_type, ER.provider, func.count())
+            .where(*domain_filters)
+            .group_by(ER.source_type, ER.provider)
+        )
         counts_by_domain: dict[str, int] = {}
-        for source_type, count in counts_by_source_type.items():
-            st_lower = source_type.lower() if source_type else ""
-            if st_lower in PUBLIC_SOURCES:
-                domain = "public"
-            elif st_lower in OPERATOR_SUPPLIED_SOURCES:
-                domain = "operator_supplied"
-            elif st_lower in INTERNAL_SOURCES:
-                domain = "internal"
-            else:
-                domain = "unknown"
-            counts_by_domain[domain] = counts_by_domain.get(domain, 0) + count
-        # Correct for partner evidence: any provider starting with "partner:"
-        # should be reclassified from its source_type bucket to "partner".
-        partner_providers = [p for p in providers if p.lower().startswith("partner:")]
-        if partner_providers:
-            # Re-count partner records via a targeted query
-            from sqlalchemy import select, func, or_
-            from db.models import EvidenceRecord as ER
-            partner_filter = [
-                ER.asset_id == asset.id,
-                or_(ER.evidence_role != "offline_eval", ER.evidence_role.is_(None)),
-                ER.provider.ilike("partner:%"),
-            ]
-            if user and user.org_id:
-                partner_filter.append(ER.org_id == user.org_id)
-            partner_result = await session.execute(
-                select(func.count()).select_from(ER).where(*partner_filter)
+        for source_type, provider, count in domain_rows.all():
+            domain = _classify_source_domain(
+                source_type=source_type,
+                provider=provider,
             )
-            partner_count = partner_result.scalar() or 0
-            if partner_count > 0:
-                counts_by_domain["partner"] = partner_count
-                # Subtract from the bucket they were originally classified into
-                for source_type, count in counts_by_source_type.items():
-                    st_lower = source_type.lower() if source_type else ""
-                    orig_domain = "public" if st_lower in PUBLIC_SOURCES else "operator_supplied" if st_lower in OPERATOR_SUPPLIED_SOURCES else "internal" if st_lower in INTERNAL_SOURCES else "unknown"
-                    if orig_domain in counts_by_domain and counts_by_domain[orig_domain] > 0:
-                        break  # Partner reclassification is approximate — keep it simple
+            counts_by_domain[domain] = counts_by_domain.get(domain, 0) + count
 
         current_analysis = getattr(asset, "current_analysis", None)
         return {

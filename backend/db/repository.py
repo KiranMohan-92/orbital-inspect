@@ -1058,9 +1058,8 @@ class EvidenceRepository:
         *,
         asset_id: str,
         org_id: str | None = None,
-    ) -> tuple[int, dict[str, int], dict[str, int]]:
-        """Return (total_count, counts_by_role, counts_by_source_type) for all
-        non-offline_eval evidence records attached to an asset.
+    ) -> tuple[int, dict[str, int], dict[str, int], list[str], datetime | None]:
+        """Return summary aggregates for non-offline_eval asset evidence.
 
         Unlike list_asset_evidence this query carries no LIMIT so the counts
         always reflect the full dataset.
