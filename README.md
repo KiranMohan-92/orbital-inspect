@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI"/>
   <img src="https://img.shields.io/badge/Gemini-3.1-4285F4?style=flat-square&logo=google&logoColor=white" alt="Gemini 3.1"/>
   <img src="https://img.shields.io/badge/License-BSL_1.1-blue?style=flat-square" alt="BSL 1.1"/>
-  <img src="https://img.shields.io/badge/Tests-221_passed-brightgreen?style=flat-square" alt="221 Tests"/>
+  <img src="https://img.shields.io/badge/Backend-244_passed-brightgreen?style=flat-square" alt="244 backend tests"/>
 </p>
 
 # Orbital Inspect
@@ -38,13 +38,13 @@ Upload satellite imagery. Get a public-data risk screen with source quality, evi
 
 ## Why Orbital Inspect?
 
-The space economy is worth **$630B** and growing. Every satellite operator, insurer, and defense prime needs answers to the same question: **Is this asset safe to operate, insure, or extend?**
+The space economy is worth **$630B** and growing. Every satellite operator, insurer, and defense prime needs answers to the same question: **what public evidence exists, what is missing, and what needs review before an operational or underwriting decision?**
 
 Orbital Inspect answers that question with AI, real data, and provable methodology.
 
 | What You Need | What We Do |
 |---|---|
-| **Inspect a satellite** | 5-agent AI pipeline analyzes imagery + 7 free data sources |
+| **Screen a satellite** | 5-agent AI pipeline analyzes imagery + public evidence sources |
 | **Screen the risk** | Composite screening priority with fail-closed underwriting authority boundaries |
 | **Monitor a fleet** | Continuous ingestion of orbital, conjunction, and weather data |
 | **Predict degradation** | Linear regression trends with time-to-threshold predictions |
@@ -106,7 +106,7 @@ Open `http://localhost:5173`, launch a built-in demo case, let the pipeline fini
 
 ### Recording notes
 
-- Lead with the operator question: "Can we keep this asset in service, insure it, or escalate now?"
+- Lead with the operator question: "What does public evidence show, what is missing, and what needs human review before action?"
 - Keep the first demo reproducible by using the built-in cases before showing custom upload flows.
 - Narrate the fail-closed design explicitly because it is the main trust differentiator.
 - Use the portfolio view as the close so the story ends on operational leverage, not a single-screen analysis.
@@ -249,7 +249,7 @@ Open `http://localhost:5173`, launch a built-in demo case, let the pipeline fini
                      │  Stage 5: INSURANCE RISK SYNTHESIS        │    │  Decision    │
                      │  - Multi-factor risk matrix               │    │  - Approve   │
                      │  - If ANY gap -> FURTHER_INVESTIGATION    │    │  - Block     │
-                     │  - Financial exposure estimation          │    │  - Override  │
+                     │  - Unsupported claims blocked/null        │    │  - Override  │
                      └──────────────────────────────────────────┘    └──────────────┘
 
                      ┌──────────────────────────────────────────┐
@@ -484,13 +484,13 @@ All data is persisted with source URL, provider identity, confidence score, and 
 ## Testing
 
 ```bash
-# Backend (221 tests)
+# Backend (244 tests in the latest local verification)
 cd backend && python -m pytest tests/ -q
 
 # Frontend unit (16 tests)
 cd frontend && npm test
 
-# Frontend E2E (11 tests, Playwright)
+# Frontend E2E (Playwright)
 cd frontend && npm run test:e2e
 
 # Deployment smoke test (13 checks)
@@ -501,9 +501,9 @@ bash ops/scripts/smoke_test.sh http://localhost:8000
 
 | Suite | Result | Coverage |
 |-------|--------|----------|
-| Backend pytest | 221 passed | Auth, pipeline, evidence, decisions, webhooks, migrations |
+| Backend pytest | 244 passed | Auth, pipeline, evidence, decisions, webhooks, migrations |
 | Frontend Vitest | 16 passed | Components, hooks, utilities |
-| Playwright E2E | 11 passed | Full-stack: submit, stream, decide, report, portfolio |
+| Playwright E2E | Not run for PR #1 | Full-stack: submit, stream, decide, report, portfolio |
 | Smoke test | 13 passed | Health, API routing, backward compat, error envelope, demo |
 
 ---
@@ -550,7 +550,7 @@ orbital-inspect/
     db/                  # SQLAlchemy models, repository, batch models
     services/            # 44 business services
     workers/             # ARQ background job workers
-    tests/               # 28 test modules (221 tests)
+    tests/               # Backend pytest suite
     alembic/             # Database migration history
     middleware/          # Request logging, security headers
     scripts/             # Utilities (OpenAPI export, backfill, seeding)

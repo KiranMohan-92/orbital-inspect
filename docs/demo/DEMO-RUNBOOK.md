@@ -54,7 +54,7 @@ This command boots the E2E-backed local stack, runs a deterministic capture flow
 
 ### 0:00 to 0:20
 
-"Orbital Inspect answers a simple but expensive question for operators, insurers, and defense teams: is this asset safe to operate, insure, or extend, and how confident are we in that answer?"
+"Orbital Inspect answers a simple but expensive question for operators, insurers, and defense teams: what does public evidence show, what is missing, and what needs human review before anyone treats this as an operational or underwriting decision?"
 
 ### 0:20 to 0:45
 
@@ -70,7 +70,7 @@ This command boots the E2E-backed local stack, runs a deterministic capture flow
 
 ### 2:05 to 2:30
 
-"Now I generate the PDF report. That converts the analysis into an artifact that can move into underwriting, operations review, or a formal audit trail."
+"Now I generate the Public Risk Screen report. That converts the analysis into an artifact that can move into operations review, underwriting evidence collection, or a formal audit trail without claiming public data is enough for a final underwriting decision."
 
 ### 2:30 to 3:00
 
@@ -81,7 +81,7 @@ This command boots the E2E-backed local stack, runs a deterministic capture flow
 | Audience | Emphasize | De-emphasize |
 |---|---|---|
 | **Satellite operators** | anomaly triage, degradation tracking, attention queue, operator context | deep insurance language |
-| **Insurers / underwriters** | risk tier, evidence completeness, PDF report, auditable review actions | low-level frontend details |
+| **Insurers / underwriters** | screening priority, missing evidence, PDF report, auditable review actions | low-level frontend details |
 | **Defense / national security** | deployment flexibility, classification controls, audit trail, no SaaS dependency | commercial-market framing |
 | **Technical evaluators** | public data fusion, fail-closed pipeline, SSE flow, deployment path | marketing language |
 
