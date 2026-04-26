@@ -1,9 +1,9 @@
-# Verification Gates — When Cross-Model Review is Required
+# Verification Gates - When Cross-Model Review Is Required
 # These gates define mandatory checkpoints in the development workflow.
 
 gates:
 
-  # ─── Automatic Triggers ─────────────────────────────────────────
+  # Automatic Triggers
   large_change:
     trigger: ">200 lines changed in a single commit or PR"
     reviewer: auditor
@@ -26,11 +26,11 @@ gates:
     description: "Security changes require two-model review"
 
   llm_output_handling:
-    trigger: "Changes to gemini_service.py, parse_json_response, or agent error paths"
+    trigger: "Changes to gemini_service.py, parse_json_response, prompts, or agent error paths"
     reviewer: auditor
     type: "failure-mode-review"
     blocking: true
-    description: "LLM output handling is the highest-risk code path — silent failures here propagate to underwriting"
+    description: "LLM output handling is a high-risk path; silent failures can propagate to risk decisions"
 
   schema_migration:
     trigger: "New alembic migration or changes to db/models.py"
@@ -44,9 +44,16 @@ gates:
     reviewer: [auditor, verifier]
     type: "domain-review"
     blocking: true
-    description: "Insurance logic is the product — all changes require multi-model review"
+    description: "Insurance logic changes require multi-model review"
 
-  # ─── Milestone Triggers ─────────────────────────────────────────
+  report_mode_authority:
+    trigger: "Changes to assessment modes, report titles, decision authority, evidence gaps, or public/underwriting boundaries"
+    reviewer: [auditor, verifier]
+    type: "product-boundary-review"
+    blocking: true
+    description: "Public-risk-screen and underwriting-grade authority boundaries require explicit review"
+
+  # Milestone Triggers
   pre_release:
     trigger: "Version bump or deployment to staging/production"
     reviewer: [builder, auditor, verifier]
@@ -61,7 +68,6 @@ gates:
     blocking: false
     description: "Auditor re-scores all dimensions to measure improvement"
 
-# ─── Enforcement ──────────────────────────────────────────────────
 enforcement:
   mode: "ci-blocking"  # Options: advisory | ci-blocking
   log_to: "AGENTS.md"
