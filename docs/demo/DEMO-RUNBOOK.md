@@ -50,6 +50,17 @@ npm run demo:assets
 
 This command boots the E2E-backed local stack, runs a deterministic capture flow, and rewrites the PNG assets used by the README demo section.
 
+## Premium motion demo
+
+The HyperFrames composition in [`docs/demo/hyperframes/public-risk-screen`](hyperframes/public-risk-screen) is a 32-second high-motion product film for the revised Public Risk Screen positioning.
+
+```bash
+cd docs/demo/hyperframes/public-risk-screen
+npx.cmd hyperframes preview --port 3017
+```
+
+Open `http://localhost:3017/#project/public-risk-screen`. To render the MP4, install FFmpeg and then run the render command documented in that directory's README.
+
 ## Three-minute talk track
 
 ### 0:00 to 0:20
