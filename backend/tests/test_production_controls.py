@@ -1,4 +1,5 @@
 import os
+from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -82,6 +83,34 @@ def test_settings_require_auth_in_staging():
         )
 
 
+def test_settings_reject_rate_limit_fail_open_in_production():
+    with pytest.raises(ValueError, match="RATE_LIMIT_FAIL_OPEN must be false"):
+        Settings(
+            GEMINI_API_KEY="test-key",
+            APP_ENV="production",
+            DEMO_MODE=False,
+            AUTH_ENABLED=True,
+            JWT_SECRET="production-secret",
+            WEBHOOK_SECRET_ENCRYPTION_KEY="webhook-secret",
+            REDIS_REQUIRED=True,
+            RATE_LIMIT_FAIL_OPEN=True,
+        )
+
+
+def test_settings_require_redis_in_production():
+    with pytest.raises(ValueError, match="REDIS_REQUIRED must be true"):
+        Settings(
+            GEMINI_API_KEY="test-key",
+            APP_ENV="production",
+            DEMO_MODE=False,
+            AUTH_ENABLED=True,
+            JWT_SECRET="production-secret",
+            WEBHOOK_SECRET_ENCRYPTION_KEY="webhook-secret",
+            REDIS_REQUIRED=False,
+            RATE_LIMIT_FAIL_OPEN=False,
+        )
+
+
 def test_default_local_database_path_uses_untracked_backend_data_dir():
     local_settings = Settings(
         GEMINI_API_KEY="test-key",
@@ -91,6 +120,31 @@ def test_default_local_database_path_uses_untracked_backend_data_dir():
 
     assert local_settings.DATABASE_URL.endswith("/backend/data/orbital_inspect.db")
     assert local_settings.data_dir_path.as_posix().endswith("/backend/data")
+
+
+def test_production_image_sanitizer_rejects_invalid_image_bytes(monkeypatch):
+    monkeypatch.setattr(settings, "DEMO_MODE", False)
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+
+    with pytest.raises(main.HTTPException):
+        main._sanitize_image_upload(b"not-an-image")
+
+
+def test_production_image_sanitizer_strips_metadata_and_returns_decoded_image(monkeypatch):
+    from PIL import Image
+
+    monkeypatch.setattr(settings, "DEMO_MODE", False)
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+
+    source = BytesIO()
+    Image.new("RGB", (2, 2), color="white").save(source, format="JPEG", exif=b"metadata")
+
+    sanitized, content_type = main._sanitize_image_upload(source.getvalue())
+
+    assert content_type == "image/jpeg"
+    with Image.open(BytesIO(sanitized)) as img:
+      assert img.size == (2, 2)
+      assert not img.getexif()
 
 
 @pytest.mark.asyncio

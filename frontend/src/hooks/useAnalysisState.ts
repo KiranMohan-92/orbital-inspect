@@ -26,6 +26,7 @@ export interface AnalysisFullState {
   assetType: AssetType;
   inspectionEpoch: string;
   targetSubsystem: string;
+  assessmentMode: "PUBLIC_SCREEN" | "ENHANCED_TECHNICAL" | "UNDERWRITING_GRADE";
   additionalContext: string;
   analysisStatus: AnalysisStatus;
   errorMessage: string | null;
@@ -45,6 +46,7 @@ export function buildInitialAnalysisState(): AnalysisFullState {
     assetType: "satellite",
     inspectionEpoch: "",
     targetSubsystem: "",
+    assessmentMode: "PUBLIC_SCREEN",
     additionalContext: "",
     analysisStatus: "idle",
     errorMessage: null,
@@ -65,6 +67,7 @@ export type AnalysisAction =
   | { type: "SET_ASSET_TYPE"; assetType: AssetType }
   | { type: "SET_INSPECTION_EPOCH"; inspectionEpoch: string }
   | { type: "SET_TARGET_SUBSYSTEM"; targetSubsystem: string }
+  | { type: "SET_ASSESSMENT_MODE"; assessmentMode: AnalysisFullState["assessmentMode"] }
   | { type: "SET_ADDITIONAL_CONTEXT"; additionalContext: string }
   | { type: "START_ANALYSIS" }
   | { type: "SET_ANALYSIS_ID"; analysisId: string }
@@ -89,6 +92,7 @@ export function analysisStateReducer(state: AnalysisFullState, action: AnalysisA
         assetType: state.assetType,
         inspectionEpoch: state.inspectionEpoch,
         targetSubsystem: state.targetSubsystem,
+        assessmentMode: state.assessmentMode,
         additionalContext: state.additionalContext,
       };
     case "SET_NORAD_ID":
@@ -103,6 +107,8 @@ export function analysisStateReducer(state: AnalysisFullState, action: AnalysisA
       return { ...state, inspectionEpoch: action.inspectionEpoch };
     case "SET_TARGET_SUBSYSTEM":
       return { ...state, targetSubsystem: action.targetSubsystem };
+    case "SET_ASSESSMENT_MODE":
+      return { ...state, assessmentMode: action.assessmentMode };
     case "SET_ADDITIONAL_CONTEXT":
       return { ...state, additionalContext: action.additionalContext };
     case "START_ANALYSIS":
@@ -174,6 +180,7 @@ export function useAnalysisState() {
     setAssetType: useCallback((assetType: AssetType) => dispatch({ type: "SET_ASSET_TYPE", assetType }), []),
     setInspectionEpoch: useCallback((inspectionEpoch: string) => dispatch({ type: "SET_INSPECTION_EPOCH", inspectionEpoch }), []),
     setTargetSubsystem: useCallback((targetSubsystem: string) => dispatch({ type: "SET_TARGET_SUBSYSTEM", targetSubsystem }), []),
+    setAssessmentMode: useCallback((assessmentMode: AnalysisFullState["assessmentMode"]) => dispatch({ type: "SET_ASSESSMENT_MODE", assessmentMode }), []),
     setAdditionalContext: useCallback((additionalContext: string) => dispatch({ type: "SET_ADDITIONAL_CONTEXT", additionalContext }), []),
     startAnalysis: useCallback(() => dispatch({ type: "START_ANALYSIS" }), []),
     setAnalysisId: useCallback((analysisId: string) => dispatch({ type: "SET_ANALYSIS_ID", analysisId }), []),

@@ -1,0 +1,66 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="160" y1="60" x2="1440" y2="840" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#050816"/>
+      <stop offset="1" stop-color="#0A1532"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="286" y1="182" x2="1322" y2="724" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111B3D"/>
+      <stop offset="1" stop-color="#091126"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="269" y1="151" x2="1315" y2="151" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#57C7FF"/>
+      <stop offset="1" stop-color="#6E7CFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" rx="32" fill="url(#bg)"/>
+  <circle cx="1330" cy="162" r="164" fill="#10255A" fill-opacity="0.34"/>
+  <circle cx="298" cy="782" r="220" fill="#113B6A" fill-opacity="0.22"/>
+  <rect x="72" y="64" width="1456" height="772" rx="28" fill="#071022" stroke="#24345E"/>
+  <text x="118" y="138" fill="#8FA5D6" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" letter-spacing="4">PRODUCT DEMO STORYBOARD</text>
+  <text x="118" y="202" fill="#F6F8FF" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="700">Orbital Inspect</text>
+  <text x="118" y="248" fill="#B5C4EA" font-family="Arial, Helvetica, sans-serif" font-size="26">Known incident -&gt; 5-agent evidence chain -&gt; human decision -&gt; fleet triage</text>
+  <rect x="118" y="286" width="214" height="42" rx="21" fill="#0D2047" stroke="#2F4D87"/>
+  <text x="152" y="313" fill="#A7BCED" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">DEMO MODE READY</text>
+  <rect x="350" y="286" width="234" height="42" rx="21" fill="#0D2047" stroke="#2F4D87"/>
+  <text x="382" y="313" fill="#A7BCED" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">PDF REPORT EXPORT</text>
+  <rect x="602" y="286" width="220" height="42" rx="21" fill="#0D2047" stroke="#2F4D87"/>
+  <text x="634" y="313" fill="#A7BCED" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">PORTFOLIO TRIAGE</text>
+
+  <rect x="118" y="376" width="404" height="342" rx="24" fill="url(#panel)" stroke="#29406F"/>
+  <rect x="142" y="398" width="356" height="12" rx="6" fill="url(#accent)" fill-opacity="0.8"/>
+  <text x="142" y="444" fill="#F7FAFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">1. Launch a Known Incident</text>
+  <text x="142" y="482" fill="#B7C6EC" font-family="Arial, Helvetica, sans-serif" font-size="22">Use the built-in demo selector.</text>
+  <rect x="142" y="522" width="356" height="66" rx="16" fill="#0A1430" stroke="#2B4D8D"/>
+  <text x="168" y="562" fill="#69C9FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="24">ISS - Debris Strike</text>
+  <rect x="142" y="606" width="356" height="66" rx="16" fill="#0A1430" stroke="#2B4D8D"/>
+  <text x="168" y="646" fill="#69C9FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="24">SENTINEL-1A - Impact</text>
+  <text x="142" y="701" fill="#91A8D8" font-family="Arial, Helvetica, sans-serif" font-size="19">Recognizable incidents make the story credible before the models speak.</text>
+
+  <rect x="548" y="376" width="504" height="342" rx="24" fill="url(#panel)" stroke="#29406F"/>
+  <rect x="572" y="398" width="456" height="12" rx="6" fill="url(#accent)" fill-opacity="0.8"/>
+  <text x="572" y="444" fill="#F7FAFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">2. Stream the Evidence Chain</text>
+  <text x="572" y="482" fill="#B7C6EC" font-family="Arial, Helvetica, sans-serif" font-size="22">Let the five stages advance in public.</text>
+  <rect x="572" y="520" width="456" height="148" rx="18" fill="#081124" stroke="#27457B"/>
+  <text x="602" y="560" fill="#7FD4FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="21">[1] ORBITAL CLASSIFICATION</text>
+  <text x="602" y="592" fill="#7FD4FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="21">[2] SATELLITE VISION</text>
+  <text x="602" y="624" fill="#7FD4FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="21">[3] ORBITAL ENVIRONMENT</text>
+  <text x="602" y="656" fill="#7FD4FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="21">[4] FAILURE MODE ANALYSIS</text>
+  <text x="602" y="688" fill="#7FD4FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="21">[5] INSURANCE RISK SYNTHESIS</text>
+  <text x="572" y="701" fill="#91A8D8" font-family="Arial, Helvetica, sans-serif" font-size="19">The product feels rigorous because the work is visible while it happens.</text>
+
+  <rect x="1078" y="376" width="404" height="342" rx="24" fill="url(#panel)" stroke="#29406F"/>
+  <rect x="1102" y="398" width="356" height="12" rx="6" fill="url(#accent)" fill-opacity="0.8"/>
+  <text x="1102" y="444" fill="#F7FAFF" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">3. Convert Insight to Action</text>
+  <text x="1102" y="482" fill="#B7C6EC" font-family="Arial, Helvetica, sans-serif" font-size="22">Decision review, report export, fleet queue.</text>
+  <rect x="1102" y="522" width="356" height="74" rx="16" fill="#0B1733" stroke="#244D73"/>
+  <text x="1126" y="561" fill="#A0F3D1" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="24">RECOMMENDED: FURTHER_INVESTIGATION</text>
+  <rect x="1102" y="614" width="168" height="52" rx="14" fill="#173C63" stroke="#2E6AA2"/>
+  <text x="1135" y="647" fill="#E8F2FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">EXPORT PDF</text>
+  <rect x="1290" y="614" width="168" height="52" rx="14" fill="#123A35" stroke="#2E8B71"/>
+  <text x="1322" y="647" fill="#E8F2FF" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">PORTFOLIO</text>
+  <text x="1102" y="701" fill="#91A8D8" font-family="Arial, Helvetica, sans-serif" font-size="19">End on the operating system, not on the upload form.</text>
+
+  <rect x="118" y="752" width="1364" height="52" rx="18" fill="#09152D" stroke="#223B69"/>
+  <text x="154" y="785" fill="#A6B8E3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">What the viewer should remember: fast signal, explicit evidence, fail-closed trust, human review, fleet-scale leverage.</text>
+</svg>

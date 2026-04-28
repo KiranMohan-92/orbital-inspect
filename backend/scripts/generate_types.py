@@ -12,14 +12,23 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from models.satellite import (
-    OrbitalRegime, SatelliteType, UnderwritingRecommendation,
+    AssessmentMode, DecisionAuthority, OrbitalRegime, SatelliteType, UnderwritingRecommendation,
     SatelliteTarget, ClassificationResult, SatelliteDamageItem,
     SatelliteDamagesAssessment, OrbitalStressor, OrbitalEnvironmentAnalysis,
     SatellitePrecedent, SatelliteFailureModeAnalysis,
     RiskMatrixDimension, RiskMatrix, ConsistencyCheck,
-    InsuranceRiskReport, SatelliteConditionReport,
+    EvidenceGap, InsuranceRiskReport, SatelliteConditionReport,
 )
 from models.events import AgentEvent
+from models.provenance import (
+    ConfidenceCalibration,
+    FieldProvenance,
+    FinancialEstimate,
+    LossProbabilityDerivation,
+    ProbabilityComponent,
+    SensitivityAnalysis,
+    SensitivityParameter,
+)
 
 
 def python_type_to_ts(python_type: str, field_info: dict | bool) -> str:
@@ -112,6 +121,8 @@ def generate_all() -> str:
     models_with_enums = [
         ("OrbitalRegime", OrbitalRegime),
         ("SatelliteType", SatelliteType),
+        ("AssessmentMode", AssessmentMode),
+        ("DecisionAuthority", DecisionAuthority),
         ("UnderwritingRecommendation", UnderwritingRecommendation),
     ]
 
@@ -139,10 +150,18 @@ def generate_all() -> str:
         OrbitalStressor,
         OrbitalEnvironmentAnalysis,
         SatellitePrecedent,
+        ProbabilityComponent,
         SatelliteFailureModeAnalysis,
         RiskMatrixDimension,
         RiskMatrix,
         ConsistencyCheck,
+        EvidenceGap,
+        ConfidenceCalibration,
+        FieldProvenance,
+        FinancialEstimate,
+        LossProbabilityDerivation,
+        SensitivityParameter,
+        SensitivityAnalysis,
         InsuranceRiskReport,
         SatelliteConditionReport,
         AgentEvent,

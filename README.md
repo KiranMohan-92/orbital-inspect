@@ -4,14 +4,14 @@
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI"/>
   <img src="https://img.shields.io/badge/Gemini-3.1-4285F4?style=flat-square&logo=google&logoColor=white" alt="Gemini 3.1"/>
   <img src="https://img.shields.io/badge/License-BSL_1.1-blue?style=flat-square" alt="BSL 1.1"/>
-  <img src="https://img.shields.io/badge/Tests-221_passed-brightgreen?style=flat-square" alt="221 Tests"/>
+  <img src="https://img.shields.io/badge/Backend-244_passed-brightgreen?style=flat-square" alt="244 backend tests"/>
 </p>
 
 # Orbital Inspect
 
-**AI-powered satellite inspection and risk intelligence platform for orbital asset operators, insurers, and defense primes.**
+**Public-source satellite risk intelligence and evidence-triage platform for orbital asset operators, insurers, and defense primes.**
 
-Upload a satellite image. Get a complete underwriting intelligence report in under 45 seconds. Track degradation across your entire fleet. Know when to act before it's too late.
+Upload satellite imagery. Get a public-data risk screen with source quality, evidence gaps, and review-required actions in under 45 seconds. Track degradation across your fleet and know what evidence is needed next.
 
 ```
                         ┌─────────────────────────────────────────────────────┐
@@ -38,18 +38,80 @@ Upload a satellite image. Get a complete underwriting intelligence report in und
 
 ## Why Orbital Inspect?
 
-The space economy is worth **$630B** and growing. Every satellite operator, insurer, and defense prime needs answers to the same question: **Is this asset safe to operate, insure, or extend?**
+The space economy is worth **$630B** and growing. Every satellite operator, insurer, and defense prime needs answers to the same question: **what public evidence exists, what is missing, and what needs review before an operational or underwriting decision?**
 
 Orbital Inspect answers that question with AI, real data, and provable methodology.
 
 | What You Need | What We Do |
 |---|---|
-| **Inspect a satellite** | 5-agent AI pipeline analyzes imagery + 7 free data sources |
-| **Underwrite the risk** | Composite risk scoring with fail-closed safety guarantees |
+| **Screen a satellite** | 5-agent AI pipeline analyzes imagery + public evidence sources |
+| **Screen the risk** | Composite screening priority with fail-closed underwriting authority boundaries |
 | **Monitor a fleet** | Continuous ingestion of orbital, conjunction, and weather data |
 | **Predict degradation** | Linear regression trends with time-to-threshold predictions |
 | **Prove reliability** | SLO dashboard: 99.5% pipeline completion, p95 < 45s |
 | **Deploy anywhere** | Helm chart, air-gap compatible, no SaaS dependencies |
+
+---
+
+## Product Demo
+
+<p align="center">
+  <img src="docs/demo/assets/orbital-inspect-demo-hero.png" alt="Orbital Inspect live product demo showing analysis, decision workflow, and fleet triage surfaces." width="100%"/>
+</p>
+
+<p align="center">
+  <strong>Best first demo:</strong> start with a known orbital incident, stream the 5-agent evidence chain, convert it into an auditable human decision, then zoom out to fleet triage.
+</p>
+
+Orbital Inspect should be demoed as a decision intelligence platform, not a generic AI image analyzer. The README demo story is designed to prove four things quickly: the system reaches signal fast, shows evidence instead of hand-waving, keeps a human in control of the final action, and scales from a single anomaly to an operational fleet queue.
+
+| In 3 to 5 minutes, prove this | Demo surface |
+|---|---|
+| **Speed to signal** | Pre-configured demo cases, live SSE analysis, visible stage progression |
+| **Evidence over vibes** | Visual inspection overlays, evidence lineage, per-stage outputs |
+| **Human control** | Review actions, fail-closed escalation, signed PDF export |
+| **Fleet relevance** | Portfolio filters, degradation trends, open attention queue |
+
+### Recommended walkthrough
+
+1. Start with `ISS — Debris Strike` or `SENTINEL-1A — Impact` from the demo selector so the audience sees a recognizable orbital event immediately.
+2. Let the live 5-agent pipeline run onscreen and narrate the handoff: orbital classification, visual damage assessment, environmental hazard analysis, failure mode analysis, and insurance risk synthesis.
+3. Pause on the intelligence panel and call out the exact trust mechanism: if evidence is incomplete or a stage fails, the system escalates to `FURTHER_INVESTIGATION` instead of inventing certainty.
+4. Generate the PDF artifact to show the output is operational, portable, and reviewable outside the UI.
+5. Switch to `PORTFOLIO` and show that the same product can rank risk, filter decision states, and surface the open attention queue across a fleet.
+
+### Demo gallery
+
+The images below are real local captures generated from the running product. The SVG files in the same directory remain available as editable storyboard fallbacks.
+
+| Analyze Surface | Decision + Report | Portfolio Surface |
+|---|---|---|
+| ![Analyze surface](docs/demo/assets/orbital-inspect-demo-analyze.png) | ![Decision and report surface](docs/demo/assets/orbital-inspect-demo-decision.png) | ![Portfolio surface](docs/demo/assets/orbital-inspect-demo-portfolio.png) |
+
+### Run the local demo
+
+```bash
+# Terminal 1
+cd backend
+DEMO_MODE=true GEMINI_API_KEY=test-dummy-key \
+  python -m uvicorn main:app --host 0.0.0.0 --port 8000
+
+# Terminal 2
+cd frontend
+npm install
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+Open `http://localhost:5173`, launch a built-in demo case, let the pipeline finish, generate the report, then switch to `PORTFOLIO`.
+
+### Recording notes
+
+- Lead with the operator question: "What does public evidence show, what is missing, and what needs human review before action?"
+- Keep the first demo reproducible by using the built-in cases before showing custom upload flows.
+- Narrate the fail-closed design explicitly because it is the main trust differentiator.
+- Use the portfolio view as the close so the story ends on operational leverage, not a single-screen analysis.
+- Refresh the local README captures with `cd frontend && npm run demo:assets`.
+- For the full talk track, shot list, and asset replacement plan, see [`docs/demo/DEMO-RUNBOOK.md`](docs/demo/DEMO-RUNBOOK.md).
 
 ---
 
@@ -187,7 +249,7 @@ Orbital Inspect answers that question with AI, real data, and provable methodolo
                      │  Stage 5: INSURANCE RISK SYNTHESIS        │    │  Decision    │
                      │  - Multi-factor risk matrix               │    │  - Approve   │
                      │  - If ANY gap -> FURTHER_INVESTIGATION    │    │  - Block     │
-                     │  - Financial exposure estimation          │    │  - Override  │
+                     │  - Unsupported claims blocked/null        │    │  - Override  │
                      └──────────────────────────────────────────┘    └──────────────┘
 
                      ┌──────────────────────────────────────────┐
@@ -254,7 +316,7 @@ Upload a satellite image with operator context. Five specialized Gemini-powered 
 Monitor 6,000+ satellites with sub-second portfolio queries. Periodic fleet ingestion pulls TLE data, conjunction events, and space weather for every tracked asset. Cached portfolio summaries prevent database bottlenecks. Batch analysis endpoint processes up to 100 assets per request.
 
 ### Predictive Intelligence
-For assets with 3+ historical analyses, Orbital Inspect computes degradation trajectories using linear regression on composite risk scores. Predicts scores at 30 and 90 days. Calculates time-to-threshold for the "UNINSURABLE" level (85/100). Classifies degradation velocity as stable, slow, moderate, rapid, or critical.
+For assets with 3+ historical analyses, Orbital Inspect computes degradation trajectories using linear regression on composite screening scores. Predicts scores at 30 and 90 days. Calculates time-to-escalation thresholds for analyst review. Classifies degradation velocity as stable, slow, moderate, rapid, or critical.
 
 ### Provable Reliability
 Four SLO targets measured from real data: pipeline completion rate (99.5%), p95 latency (<45s), evidence freshness (<4h), and webhook delivery (99%). Error budget tracking shows how much margin remains before a target is breached.
@@ -404,7 +466,7 @@ docker compose -f docker-compose.yml -f docker-compose.observability.yml --profi
 
 ## Free Data Sources
 
-Orbital Inspect operates entirely on **freely available public data** -- no contracts, no API keys, no vendor lock-in.
+Orbital Inspect's default `PUBLIC_SCREEN` mode operates on **freely available public data** for triage and evidence-gap analysis. It does not claim definitive inspection or underwriting-grade loss probability without operator telemetry, calibrated imagery, geometry/covariance data, actuarial priors, and human review.
 
 | Source | Data | Endpoint | Update Frequency |
 |--------|------|----------|-----------------|
@@ -422,13 +484,13 @@ All data is persisted with source URL, provider identity, confidence score, and 
 ## Testing
 
 ```bash
-# Backend (221 tests)
+# Backend (244 tests in the latest local verification)
 cd backend && python -m pytest tests/ -q
 
 # Frontend unit (16 tests)
 cd frontend && npm test
 
-# Frontend E2E (11 tests, Playwright)
+# Frontend E2E (Playwright)
 cd frontend && npm run test:e2e
 
 # Deployment smoke test (13 checks)
@@ -439,9 +501,9 @@ bash ops/scripts/smoke_test.sh http://localhost:8000
 
 | Suite | Result | Coverage |
 |-------|--------|----------|
-| Backend pytest | 221 passed | Auth, pipeline, evidence, decisions, webhooks, migrations |
+| Backend pytest | 244 passed | Auth, pipeline, evidence, decisions, webhooks, migrations |
 | Frontend Vitest | 16 passed | Components, hooks, utilities |
-| Playwright E2E | 11 passed | Full-stack: submit, stream, decide, report, portfolio |
+| Playwright E2E | Not run for PR #1 | Full-stack: submit, stream, decide, report, portfolio |
 | Smoke test | 13 passed | Health, API routing, backward compat, error envelope, demo |
 
 ---
@@ -488,7 +550,7 @@ orbital-inspect/
     db/                  # SQLAlchemy models, repository, batch models
     services/            # 44 business services
     workers/             # ARQ background job workers
-    tests/               # 28 test modules (221 tests)
+    tests/               # Backend pytest suite
     alembic/             # Database migration history
     middleware/          # Request logging, security headers
     scripts/             # Utilities (OpenAPI export, backfill, seeding)

@@ -28,6 +28,7 @@ describe('buildInitialAnalysisState', () => {
     expect(state.assetType).toBe('satellite');
     expect(state.inspectionEpoch).toBe('');
     expect(state.targetSubsystem).toBe('');
+    expect(state.assessmentMode).toBe('PUBLIC_SCREEN');
     expect(state.additionalContext).toBe('');
     expect(state.analysisStatus).toBe('idle');
     expect(state.errorMessage).toBeNull();
@@ -58,6 +59,7 @@ describe('analysisStateReducer', () => {
       assetType: 'compute_platform' as const,
       inspectionEpoch: '2026-04-02T12:00Z',
       targetSubsystem: 'solar_array',
+      assessmentMode: 'ENHANCED_TECHNICAL' as const,
       additionalContext: 'On-orbit compute bus',
     };
     const file = { name: 'sat.jpg' } as File;
@@ -76,6 +78,7 @@ describe('analysisStateReducer', () => {
     expect(next.assetType).toBe('compute_platform');
     expect(next.inspectionEpoch).toBe('2026-04-02T12:00Z');
     expect(next.targetSubsystem).toBe('solar_array');
+    expect(next.assessmentMode).toBe('ENHANCED_TECHNICAL');
     expect(next.additionalContext).toBe('On-orbit compute bus');
   });
 
@@ -109,6 +112,10 @@ describe('analysisStateReducer', () => {
       targetSubsystem: 'bus',
     });
     state = analysisStateReducer(state, {
+      type: 'SET_ASSESSMENT_MODE',
+      assessmentMode: 'ENHANCED_TECHNICAL',
+    });
+    state = analysisStateReducer(state, {
       type: 'SET_ADDITIONAL_CONTEXT',
       additionalContext: 'Deployed array inspection',
     });
@@ -120,6 +127,7 @@ describe('analysisStateReducer', () => {
     expect(state.assetType).toBe('solar_array');
     expect(state.inspectionEpoch).toBe('2026-04-02T12:00Z');
     expect(state.targetSubsystem).toBe('bus');
+    expect(state.assessmentMode).toBe('ENHANCED_TECHNICAL');
     expect(state.additionalContext).toBe('Deployed array inspection');
     expect(state.analysisId).toBe('analysis-123');
   });
@@ -134,7 +142,7 @@ describe('analysisStateReducer', () => {
       agents: {
         ...buildInitialAnalysisState().agents,
         orbital_classification: {
-          status: 'complete',
+          status: 'complete' as const,
           message: 'done',
           payload: { ok: true },
           timestamp: 123,

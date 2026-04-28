@@ -20,6 +20,11 @@ from typing import AsyncGenerator
 from models.events import AgentEvent
 from services.resilience import resilient_call, gemini_breaker, CircuitBreakerOpen
 from services.sse_service import format_sse_event, format_sse_done, format_sse_error
+from services.assessment_mode_service import (
+    build_assessment_contract,
+    enforce_report_authority,
+    enforce_vision_claim_boundary,
+)
 from config import settings
 
 log = logging.getLogger(__name__)
@@ -46,6 +51,8 @@ async def run_satellite_pipeline(
     norad_id: str | None = None,
     additional_context: str = "",
     analysis_id: str | None = None,
+    assessment_mode: str = "PUBLIC_SCREEN",
+    assessment_contract: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Execute the full 5-agent satellite inspection pipeline.
@@ -56,6 +63,12 @@ async def run_satellite_pipeline(
     # Generate analysis_id and sequence counter for SSE v2
     analysis_id = analysis_id or uuid.uuid4().hex
     seq = 0
+    assessment_contract = assessment_contract or build_assessment_contract(
+        assessment_mode=assessment_mode,
+        capture_metadata={},
+        telemetry_summary={},
+        baseline_reference={},
+    )
 
     if settings.E2E_TEST_MODE:
         from services.e2e_stub_service import run_e2e_stub_pipeline
@@ -64,6 +77,7 @@ async def run_satellite_pipeline(
             analysis_id=analysis_id,
             norad_id=norad_id,
             additional_context=additional_context,
+            assessment_contract=assessment_contract,
         ):
             yield event
         return
@@ -153,12 +167,15 @@ async def run_satellite_pipeline(
                 image_bytes=image_bytes,
                 image_mime=image_mime,
                 satellite_context=sat_context,
+                assessment_mode=assessment_contract["assessment_mode"],
+                assessment_contract=assessment_contract,
             ),
             timeout_seconds=settings.AGENT_TIMEOUT_SECONDS,
             max_retries=2,
             circuit_breaker=gemini_breaker,
         )
-        vision_dict = vision.model_dump()
+        vision = enforce_vision_claim_boundary(vision, assessment_contract)
+        vision_dict = vision.model_dump(mode="json")
         if vision.degraded:
             degraded_agents.add("satellite_vision")
             evidence_gaps.append("satellite_vision")
@@ -268,12 +285,15 @@ async def run_satellite_pipeline(
                 vision_context=json.dumps(vision_dict, default=str),
                 environment_context=json.dumps(environment_dict, default=str),
                 failure_mode_context=json.dumps(failure_mode_dict, default=str) + evidence_gap_context,
+                assessment_mode=assessment_contract["assessment_mode"],
+                assessment_contract=assessment_contract,
             ),
             timeout_seconds=settings.AGENT_TIMEOUT_SECONDS,
             max_retries=2,
             circuit_breaker=gemini_breaker,
         )
-        insurance_risk_dict = insurance_risk.model_dump()
+        insurance_risk = enforce_report_authority(insurance_risk, assessment_contract)
+        insurance_risk_dict = insurance_risk.model_dump(mode="json")
 
         # Force partial report metadata when evidence is missing
         if evidence_gaps:

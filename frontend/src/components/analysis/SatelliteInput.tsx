@@ -18,6 +18,7 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
     setAssetType,
     setInspectionEpoch,
     setTargetSubsystem,
+    setAssessmentMode,
     setAdditionalContext,
     reset,
   } = analysis;
@@ -58,19 +59,23 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
       <div className="flex-1 overflow-y-auto dark-scrollbar px-4 py-4 space-y-5">
         {/* Upload Zone */}
         {!hasImage ? (
-          <div
+          <button
+            type="button"
             data-testid="upload-zone"
-            className={`rounded-lg p-8 flex flex-col items-center gap-4 cursor-pointer transition-all ${
+            className={`w-full rounded-lg p-8 flex flex-col items-center gap-4 cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent ${
               isDragOver ? "scale-[1.01]" : ""
             }`}
             style={{
               border: `1.5px dashed ${isDragOver ? "var(--accent-orbital)" : "var(--bg-panel-border)"}`,
               background: isDragOver ? "var(--accent-orbital-dim)" : "transparent",
+              color: "inherit",
             }}
             onClick={() => fileInputRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={handleDrop}
+            disabled={isAnalyzing}
+            aria-label="Upload satellite imagery"
           >
             {/* Crosshair icon */}
             <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -86,8 +91,8 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
                 NASA, ESA, HEO Inspect, or operator photos
               </p>
             </div>
-            <input ref={fileInputRef} data-testid="upload-input" type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
-          </div>
+            <input ref={fileInputRef} data-testid="upload-input" type="file" accept="image/*" onChange={handleFileInput} className="sr-only" aria-label="Satellite imagery file" />
+          </button>
         ) : (
           <div className="rounded-lg overflow-hidden relative" style={{ border: "1px solid var(--bg-panel-border)" }}>
             <img src={state.imagePreviewUrl!} alt="Satellite" className="w-full h-36 object-cover" />
@@ -108,6 +113,24 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
         )}
 
         {/* NORAD Catalog ID */}
+        <div>
+          <label className="label-mono block mb-2">ASSESSMENT MODE</label>
+          <select
+            data-testid="assessment-mode-select"
+            value={state.assessmentMode}
+            onChange={(e) => setAssessmentMode(e.target.value as typeof state.assessmentMode)}
+            className="orbital-input w-full font-mono-data"
+            disabled={isAnalyzing}
+          >
+            <option value="PUBLIC_SCREEN">Public Risk Screen</option>
+            <option value="ENHANCED_TECHNICAL">Enhanced Technical</option>
+            <option value="UNDERWRITING_GRADE">Underwriting Grade</option>
+          </select>
+          <p className="text-xs mt-1.5" style={{ color: "var(--text-tertiary)" }}>
+            Public mode is screening only. Underwriting grade requires operator telemetry, calibrated imagery, geometry, covariance, and actuarial priors.
+          </p>
+        </div>
+
         <div>
           <label className="label-mono block mb-2">ASSET TYPE</label>
           <select

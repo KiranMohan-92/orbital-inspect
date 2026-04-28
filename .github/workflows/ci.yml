@@ -7,6 +7,17 @@ on:
   pull_request:
 
 jobs:
+  verification-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python scripts/check_verification_gates.py --base origin/${{ github.base_ref || 'main' }}
+
   backend:
     runs-on: ubuntu-latest
     services:
@@ -62,6 +73,40 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run build
       - run: npm test
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Python dependency audit
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip-audit -r requirements.txt
+      - name: Frontend dependency audit
+        working-directory: frontend
+        run: |
+          npm ci
+          npm audit --audit-level=high
+      - name: Generate SBOMs
+        run: |
+          python -m pip install cyclonedx-bom
+          cyclonedx-py requirements backend/requirements.txt -o backend-sbom.json
+          npx --yes @cyclonedx/cyclonedx-npm --output-file frontend-sbom.json --package-lock-only --ignore-npm-errors --prefix frontend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sboms
+          path: |
+            backend-sbom.json
+            frontend-sbom.json
 
   observability:
     runs-on: ubuntu-latest

@@ -4,7 +4,8 @@ import os
 os.environ.setdefault("GEMINI_API_KEY", "test-dummy-key")
 
 import pytest
-from models.evidence import EvidenceBundle, EvidenceItem, EvidenceSource
+from pydantic import ValidationError
+from models.evidence import EvidenceBundle, EvidenceItem, EvidenceQualityStatus, EvidenceSource
 
 
 def test_evidence_item_creation():
@@ -46,6 +47,40 @@ def test_evidence_bundle_no_duplicate_sources():
     bundle.add_item(EvidenceItem(source=EvidenceSource.TLE_HISTORY, description="1"))
     bundle.add_item(EvidenceItem(source=EvidenceSource.TLE_HISTORY, description="2"))
     assert bundle.sources_available.count("tle_history") == 1
+
+
+def test_evidence_quality_gap_is_not_counted_as_available_source():
+    bundle = EvidenceBundle()
+    bundle.add_quality_gap(
+        source=EvidenceSource.SPACE_WEATHER,
+        status=EvidenceQualityStatus.FETCH_FAILED,
+        description="NOAA unavailable",
+        error="timeout",
+    )
+
+    assert bundle.total_items == 1
+    assert "space_weather" not in bundle.sources_available
+    summary = bundle.quality_summary({"imagery", "space_weather"})
+    assert summary["quality_score"] == 0.0
+    assert summary["failed_source_count"] == 1
+    assert "space_weather" in summary["missing_required_sources"]
+
+
+def test_evidence_quality_summary_scores_present_required_sources():
+    bundle = EvidenceBundle()
+    bundle.add_item(EvidenceItem(source=EvidenceSource.IMAGERY, confidence=0.98))
+    bundle.add_item(EvidenceItem(source=EvidenceSource.TLE_HISTORY, confidence=0.95))
+
+    summary = bundle.quality_summary({"imagery", "tle_history", "space_weather"})
+
+    assert summary["quality_score"] == pytest.approx(66.7)
+    assert summary["present_required_sources"] == ["imagery", "tle_history"]
+    assert summary["missing_required_sources"] == ["space_weather"]
+
+
+def test_evidence_item_rejects_out_of_range_confidence():
+    with pytest.raises(ValidationError):
+        EvidenceItem(source=EvidenceSource.IMAGERY, confidence=1.2)
 
 
 def test_evidence_bundle_to_agent_context():

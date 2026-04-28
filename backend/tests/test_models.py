@@ -1,5 +1,6 @@
 """Tests for satellite domain models."""
 import pytest
+from pydantic import ValidationError
 from models.satellite import (
     ClassificationResult,
     InsuranceRiskReport,
@@ -13,6 +14,7 @@ from models.satellite import (
     SatelliteDamagesAssessment,
     OrbitalEnvironmentAnalysis,
     SatelliteFailureModeAnalysis,
+    SatelliteDamageItem,
 )
 
 
@@ -106,6 +108,36 @@ def test_risk_matrix_dimension_defaults():
     dim = RiskMatrixDimension(score=1)
     assert dim.score == 1
     assert dim.reasoning == ""
+
+
+def test_risk_matrix_dimension_rejects_out_of_range_scores():
+    with pytest.raises(ValidationError):
+        RiskMatrixDimension(score=0)
+    with pytest.raises(ValidationError):
+        RiskMatrixDimension(score=6)
+
+
+def test_damage_item_rejects_invalid_bounding_box_and_confidence():
+    with pytest.raises(ValidationError):
+        SatelliteDamageItem(
+            id=1,
+            type="impact",
+            description="invalid",
+            bounding_box=[0, 0, 1200, 10],
+            label="impact",
+            severity="SEVERE",
+            confidence=0.8,
+        )
+    with pytest.raises(ValidationError):
+        SatelliteDamageItem(
+            id=1,
+            type="impact",
+            description="invalid",
+            bounding_box=[0, 0, 10, 10],
+            label="impact",
+            severity="SEVERE",
+            confidence=1.2,
+        )
 
 
 # ─── Enums ──────────────────────────────────────────────────────────────────

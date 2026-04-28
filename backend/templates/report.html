@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>SATELLITE CONDITION REPORT — {{ report_id }}</title>
+<title>{{ report_title | upper }} — {{ report_id }}</title>
 <style>
 /* ============================================================
    ORBITAL INSPECT — NASA TECHNICAL REPORT FORMAT
@@ -729,7 +729,7 @@ td, th {
     <div class="cover-org-line">Orbital Inspect — Satellite Condition Intelligence Platform</div>
     <div class="cover-separator"></div>
 
-    <div class="cover-title">SATELLITE CONDITION REPORT</div>
+    <div class="cover-title">{{ report_title | upper }}</div>
     <div class="cover-subtitle">
       {% if classification.get('satellite_type') %}
         {{ classification.get('satellite_type') | title }} &nbsp;/&nbsp;
@@ -760,6 +760,10 @@ td, th {
         <span class="value">{{ classification.get('orbital_regime', 'N/A') }}</span>
       </div>
       <div class="cover-meta-row">
+        <span class="label">Authority</span>
+        <span class="value">{{ decision_authority | replace('_', ' ') }}</span>
+      </div>
+      <div class="cover-meta-row">
         <span class="label">Risk Tier</span>
         <span class="value" style="color: {{ insurance_risk.get('risk_tier', '') | severity_color }};">
           {{ insurance_risk.get('risk_tier', 'N/A') }}
@@ -786,8 +790,8 @@ td, th {
     <div class="cover-dist-statement">
       DISTRIBUTION STATEMENT A: Approved for public release; distribution is unlimited.<br>
       This automated assessment is produced by Orbital Inspect using AI-powered visual analysis
-      and publicly available orbital environment databases. It supplements but does not replace
-      professional underwriting judgment.
+      and publicly available orbital environment databases. Public-screen outputs support triage and
+      evidence-gap analysis; they do not replace calibrated operator evidence or professional underwriting judgment.
     </div>
   </div>
 
@@ -822,7 +826,7 @@ td, th {
     <!-- UW recommendation + gauge side by side -->
     <div class="exec-summary-grid avoid-break">
       <div class="exec-uw-panel">
-        <div style="font-family:'Courier New',Courier,monospace;font-size:8pt;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:8px;">Underwriting Recommendation</div>
+        <div style="font-family:'Courier New',Courier,monospace;font-size:8pt;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;margin-bottom:8px;">Decision Boundary</div>
         <span class="uw-badge"
           style="background:{{ insurance_risk.get('underwriting_recommendation','') | uw_color }}20;
                  color:{{ insurance_risk.get('underwriting_recommendation','') | uw_color }};
@@ -1779,6 +1783,15 @@ td, th {
       incomplete or unavailable outputs: {{ evidence_gaps | join(', ') }}.
       Underwriting recommendations in a partial report are set to FURTHER_INVESTIGATION by default
       and must not be used as a final underwriting determination without supplementary analysis.
+    </div>
+    {% endif %}
+
+    {% if required_evidence_gaps %}
+    <div class="partial-warning">
+      <strong>PUBLIC RISK SCREEN BOUNDARY:</strong> Underwriting authority is blocked until these evidence classes are supplied:
+      {% for gap in required_evidence_gaps %}
+        {{ gap.get('label', gap.get('id', 'evidence')) }}{% if not loop.last %}, {% endif %}
+      {% endfor %}.
     </div>
     {% endif %}
 

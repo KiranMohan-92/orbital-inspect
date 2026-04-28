@@ -15,6 +15,7 @@ from services.gemini_service import (
     parse_json_response,
 )
 from models.satellite import InsuranceRiskReport
+from services.assessment_mode_service import build_assessment_contract, enforce_report_authority
 from models.provenance import (
     DataSourceType, ConfidenceCalibration, FinancialEstimate,
     LossProbabilityDerivation, SensitivityAnalysis, FieldProvenance,
@@ -55,6 +56,8 @@ async def assess_insurance_risk(
     vision_context: str = "",
     environment_context: str = "",
     failure_mode_context: str = "",
+    assessment_mode: str = "PUBLIC_SCREEN",
+    assessment_contract: dict | None = None,
 ) -> InsuranceRiskReport:
     """
     Generate an actuarial-grade insurance risk assessment.
@@ -94,6 +97,16 @@ async def assess_insurance_risk(
         # Server-side consistency enforcement
         report = _enforce_consistency(report)
         report = _validate_provenance(report)
+        report = enforce_report_authority(
+            report,
+            assessment_contract
+            or build_assessment_contract(
+                assessment_mode=assessment_mode,
+                capture_metadata={},
+                telemetry_summary={},
+                baseline_reference={},
+            ),
+        )
         return report
     except Exception as e:
         log.error("Insurance risk assessment failed", exc_info=True)

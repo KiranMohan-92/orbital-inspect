@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Orbital Inspect - Public Risk Screen</title>
+  <style>
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      background: #070B12;
+      color: #EDF4F8;
+      overflow: hidden;
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    [data-composition-id="orbital-public-risk-screen"] {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: #070B12;
+      isolation: isolate;
+    }
+
+    .scene {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #070B12;
+      opacity: 0;
+      z-index: 0;
+    }
+
+    #scene-1 {
+      opacity: 1;
+      z-index: 1;
+    }
+
+    .scene:not(#scene-1) {
+      clip-path: inset(0 0 0 100%);
+    }
+
+    .scene-content {
+      position: relative;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      padding: 86px 104px;
+      gap: 30px;
+      box-sizing: border-box;
+    }
+
+    .grid {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.26;
+      background-image:
+        linear-gradient(rgba(117, 167, 255, 0.12) 1px, rgba(7, 11, 18, 0) 1px),
+        linear-gradient(90deg, rgba(117, 167, 255, 0.10) 1px, rgba(7, 11, 18, 0) 1px);
+      background-size: 96px 96px;
+      transform: perspective(900px) rotateX(58deg) translateY(220px) scale(1.35);
+      transform-origin: center bottom;
+    }
+
+    .grain {
+      position: absolute;
+      inset: 0;
+      z-index: 8;
+      pointer-events: none;
+      opacity: 0.11;
+      mix-blend-mode: screen;
+      background-image:
+        radial-gradient(circle at 17% 23%, rgba(237, 244, 248, 0.12) 0 1px, rgba(237, 244, 248, 0) 1px),
+        radial-gradient(circle at 71% 59%, rgba(237, 244, 248, 0.10) 0 1px, rgba(237, 244, 248, 0) 1px);
+      background-size: 7px 7px, 11px 11px;
+    }
+
+    .orbital-glow {
+      position: absolute;
+      width: 860px;
+      height: 860px;
+      border-radius: 50%;
+      filter: blur(2px);
+      border: 1px solid rgba(124, 242, 183, 0.24);
+      box-shadow:
+        0 0 90px rgba(117, 167, 255, 0.18),
+        inset 0 0 110px rgba(124, 242, 183, 0.08);
+    }
+
+    .orbit-a {
+      right: -160px;
+      top: -210px;
+      transform: rotate(18deg) scaleY(0.38);
+    }
+
+    .orbit-b {
+      left: -260px;
+      bottom: -330px;
+      transform: rotate(-24deg) scaleY(0.32);
+      border-color: rgba(117, 167, 255, 0.20);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      gap: 12px;
+      padding: 11px 15px;
+      border: 1px solid rgba(124, 242, 183, 0.30);
+      border-radius: 999px;
+      color: #7CF2B7;
+      background: rgba(124, 242, 183, 0.08);
+      font-size: 22px;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .pulse-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #7CF2B7;
+      box-shadow: 0 0 24px rgba(124, 242, 183, 0.85);
+    }
+
+    h1,
+    h2 {
+      margin: 0;
+      font-family: "Fraunces", Georgia, serif;
+      font-weight: 900;
+      line-height: 0.9;
+      color: #EDF4F8;
+      letter-spacing: 0.01em;
+    }
+
+    h1 {
+      max-width: 1020px;
+      font-size: 142px;
+    }
+
+    h2 {
+      max-width: 980px;
+      font-size: 104px;
+    }
+
+    .lead {
+      max-width: 910px;
+      margin: 0;
+      color: #B8C7D1;
+      font-size: 32px;
+      line-height: 1.35;
+      font-weight: 400;
+    }
+
+    .kicker {
+      color: #9BB0BE;
+      font-size: 24px;
+      line-height: 1.45;
+      max-width: 780px;
+    }
+
+    .hero-layout,
+    .split-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      align-items: center;
+      gap: 72px;
+      width: 100%;
+      height: 100%;
+    }
+
+    .screenshot-frame {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(237, 244, 248, 0.14);
+      border-radius: 28px;
+      background: #101824;
+      box-shadow:
+        0 34px 120px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(117, 167, 255, 0.10);
+    }
+
+    .screenshot-frame img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .hero-frame {
+      height: 620px;
+      transform: rotate(-2.5deg);
+    }
+
+    .mini-stack {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 22px;
+    }
+
+    .mini-frame {
+      height: 250px;
+      border-radius: 22px;
+    }
+
+    .glass {
+      border: 1px solid rgba(237, 244, 248, 0.14);
+      border-radius: 26px;
+      background:
+        linear-gradient(145deg, rgba(16, 24, 36, 0.90), rgba(8, 13, 22, 0.88)),
+        #101824;
+      box-shadow:
+        0 30px 90px rgba(0, 0, 0, 0.38),
+        inset 0 1px 0 rgba(237, 244, 248, 0.06);
+    }
+
+    .ribbon {
+      position: absolute;
+      left: 104px;
+      right: 104px;
+      bottom: 64px;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      color: #DCE8EF;
+      font-size: 21px;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+
+    .ribbon strong {
+      color: #7CF2B7;
+      font-weight: 700;
+    }
+
+    .ledger {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      max-width: 860px;
+    }
+
+    .ledger-item {
+      padding: 24px;
+      min-height: 116px;
+    }
+
+    .ledger-label {
+      color: #9BB0BE;
+      font-size: 18px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+
+    .ledger-value {
+      font-size: 30px;
+      color: #EDF4F8;
+      line-height: 1.18;
+      font-weight: 700;
+    }
+
+    .ledger-value.good {
+      color: #7CF2B7;
+    }
+
+    .ledger-value.warn {
+      color: #EDF4F8;
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .stage {
+      min-height: 154px;
+      padding: 22px 18px;
+      border-radius: 22px;
+    }
+
+    .stage-num {
+      color: #75A7FF;
+      font-size: 20px;
+      margin-bottom: 24px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stage-title {
+      color: #EDF4F8;
+      font-size: 23px;
+      line-height: 1.1;
+      font-weight: 700;
+    }
+
+    .stage-note {
+      margin-top: 10px;
+      color: #9BB0BE;
+      font-size: 17px;
+      line-height: 1.25;
+    }
+
+    .gap-board {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+      width: 100%;
+    }
+
+    .gap {
+      position: relative;
+      overflow: hidden;
+      padding: 26px;
+      min-height: 160px;
+    }
+
+    .gap:before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: #F1B55C;
+    }
+
+    .gap-title {
+      color: #EDF4F8;
+      font-size: 20px;
+      line-height: 1.15;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 18px;
+    }
+
+    .gap-copy {
+      color: #C8D3DA;
+      font-size: 22px;
+      line-height: 1.3;
+    }
+
+    .decision-card {
+      padding: 38px;
+      max-width: 720px;
+    }
+
+    .decision-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 22px;
+      margin-bottom: 34px;
+      align-items: center;
+    }
+
+    .authority {
+      color: #7CF2B7;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .recommendation {
+      padding: 20px 24px;
+      border-radius: 18px;
+      color: #EDF4F8;
+      background: #8C4F16;
+      font-size: 26px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      padding: 19px 0;
+      border-top: 1px solid rgba(237, 244, 248, 0.12);
+      font-size: 24px;
+    }
+
+    .metric-row span:first-child {
+      color: #9BB0BE;
+    }
+
+    .metric-row span:last-child {
+      color: #EDF4F8;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ops-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 22px;
+      width: 100%;
+    }
+
+    .ops-card {
+      min-height: 240px;
+      padding: 30px;
+    }
+
+    .ops-icon {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #EDF4F8;
+      background: #14583C;
+      font-size: 30px;
+      font-weight: 900;
+      margin-bottom: 28px;
+    }
+
+    .ops-title {
+      color: #EDF4F8;
+      font-size: 31px;
+      font-weight: 800;
+      margin-bottom: 15px;
+    }
+
+    .ops-copy {
+      color: #B8C7D1;
+      font-size: 23px;
+      line-height: 1.32;
+    }
+
+    .final {
+      text-align: center;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .final h2 {
+      max-width: 1220px;
+      font-size: 118px;
+    }
+
+    .final .lead {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .brand-lockup {
+      position: absolute;
+      left: 104px;
+      top: 64px;
+      z-index: 7;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: #EDF4F8;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 2px solid #7CF2B7;
+      box-shadow: 0 0 28px rgba(124, 242, 183, 0.45);
+    }
+
+    .scan {
+      position: absolute;
+      z-index: 6;
+      left: -25%;
+      top: 0;
+      width: 22%;
+      height: 100%;
+      transform: skewX(-16deg);
+      background: linear-gradient(90deg, rgba(117, 167, 255, 0), rgba(117, 167, 255, 0.18), rgba(124, 242, 183, 0.16), rgba(117, 167, 255, 0));
+      mix-blend-mode: screen;
+      pointer-events: none;
+    }
+
+    .transition-flash {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      background: #EDF4F8;
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div
+    data-composition-id="orbital-public-risk-screen"
+    data-start="0"
+    data-duration="32"
+    data-width="1920"
+    data-height="1080"
+    data-track-index="0"
+  >
+    <div class="brand-lockup">
+      <div class="brand-mark"></div>
+      Orbital Inspect
+    </div>
+    <div class="grain" data-layout-ignore></div>
+    <div class="transition-flash" data-layout-ignore></div>
+
+    <section id="scene-1" class="scene">
+      <div class="grid" data-layout-ignore></div>
+      <div class="orbital-glow orbit-a" data-layout-ignore></div>
+      <div class="orbital-glow orbit-b" data-layout-ignore></div>
+      <div class="scan" data-layout-ignore></div>
+      <div class="scene-content hero-layout">
+        <div>
+          <div class="eyebrow"><span class="pulse-dot"></span> Public Data Mode</div>
+          <h1>Public Risk Screen</h1>
+          <p class="lead">Satellite evidence triage that shows source quality, gaps, and review-required actions before underwriting claims are allowed.</p>
+        </div>
+        <div class="screenshot-frame hero-frame">
+          <img src="assets/orbital-inspect-demo-hero.png" alt="Orbital Inspect product interface" />
+        </div>
+      </div>
+      <div class="ribbon glass"><span><strong>Decision authority:</strong> SCREENING_ONLY</span><span>unsupported claims blocked</span></div>
+    </section>
+
+    <section id="scene-2" class="scene">
+      <div class="grid" data-layout-ignore></div>
+      <div class="orbital-glow orbit-a" data-layout-ignore></div>
+      <div class="scene-content">
+        <div class="eyebrow"><span class="pulse-dot"></span> Evidence Chain</div>
+        <h2>Every stage leaves a trail.</h2>
+        <p class="lead">LLM synthesis is bounded by schemas, source freshness, artifact hashes, confidence, and explicit negative evidence records.</p>
+        <div class="pipeline">
+          <div class="stage glass"><div class="stage-num">01</div><div class="stage-title">Classify</div><div class="stage-note">asset context and orbit regime</div></div>
+          <div class="stage glass"><div class="stage-num">02</div><div class="stage-title">Vision</div><div class="stage-note">only supported visual observations</div></div>
+          <div class="stage glass"><div class="stage-num">03</div><div class="stage-title">Environment</div><div class="stage-note">public source quality ledger</div></div>
+          <div class="stage glass"><div class="stage-num">04</div><div class="stage-title">Failure Mode</div><div class="stage-note">bounded mechanisms and gaps</div></div>
+          <div class="stage glass"><div class="stage-num">05</div><div class="stage-title">Risk Screen</div><div class="stage-note">screening priority, not insurability truth</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="scene-3" class="scene">
+      <div class="grid" data-layout-ignore></div>
+      <div class="scene-content split-layout">
+        <div>
+          <div class="eyebrow"><span class="pulse-dot"></span> Claim Boundary</div>
+          <h2>No fake precision.</h2>
+          <p class="lead">Public mode nulls unsupported power impact, total-loss probability, physical dimensions, and financial exposure unless the required measurement chain exists.</p>
+        </div>
+        <div class="decision-card glass">
+          <div class="decision-top">
+            <div class="authority">SCREENING_ONLY</div>
+            <div class="recommendation">Further Investigation</div>
+          </div>
+          <div class="metric-row"><span>Total loss probability</span><span>null</span></div>
+          <div class="metric-row"><span>Power impact</span><span>null</span></div>
+          <div class="metric-row"><span>Financial value</span><span>null</span></div>
+          <div class="metric-row"><span>Risk score range</span><span>1..5</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="scene-4" class="scene">
+      <div class="grid" data-layout-ignore></div>
+      <div class="scene-content">
+        <div class="eyebrow"><span class="pulse-dot"></span> Next Data Needed</div>
+        <h2>Gaps are first-class output.</h2>
+        <div class="gap-board">
+          <div class="gap glass"><div class="gap-title">Telemetry</div><div class="gap-copy">Operator power, thermal, attitude, and anomaly logs.</div></div>
+          <div class="gap glass"><div class="gap-title">Calibrated Imagery</div><div class="gap-copy">Camera model, range, scale, timestamp, and processing chain.</div></div>
+          <div class="gap glass"><div class="gap-title">Geometry</div><div class="gap-copy">Spacecraft area, mass, shielding, materials, and exposed components.</div></div>
+          <div class="gap glass"><div class="gap-title">Covariance</div><div class="gap-copy">CDM quality, maneuverability, propagated state, and epoch freshness.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="scene-5" class="scene">
+      <div class="grid" data-layout-ignore></div>
+      <div class="scene-content split-layout">
+        <div class="mini-stack">
+          <div class="screenshot-frame mini-frame"><img src="assets/orbital-inspect-demo-analyze.png" alt="Analysis surface" /></div>
+          <div class="screenshot-frame mini-frame"><img src="assets/orbital-inspect-demo-decision.png" alt="Decision report surface" /></div>
+          <div class="screenshot-frame mini-frame"><img src="assets/orbital-inspect-demo-portfolio.png" alt="Portfolio surface" /></div>
+        </div>
+        <div>
+          <div class="eyebrow"><span class="pulse-dot"></span> Operator Workstation</div>
+          <h2>Built for review, not autopilot.</h2>
+          <p class="lead">Responsive analysis regions, accessible uploads, evidence freshness, degraded stages, and review-required reasons sit beside the recommendation.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="scene-6" class="scene">
+      <div class="grid" data-layout-ignore></div>
+      <div class="scene-content">
+        <div class="eyebrow"><span class="pulse-dot"></span> Production Controls</div>
+        <h2>Fail closed by default.</h2>
+        <div class="ops-grid">
+          <div class="ops-card glass"><div class="ops-icon">1</div><div class="ops-title">Schema gates</div><div class="ops-copy">Scores, confidence, recommendations, provenance, and bounding boxes are hard-bounded.</div></div>
+          <div class="ops-card glass"><div class="ops-icon">2</div><div class="ops-title">Security gates</div><div class="ops-copy">Webhook SSRF defenses resolve DNS, block private ranges, and require HTTPS outside demo.</div></div>
+          <div class="ops-card glass"><div class="ops-icon">3</div><div class="ops-title">Review gates</div><div class="ops-copy">Security, LLM output, insurance logic, and report authority changes are CI-blocking.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="scene-7" class="scene">
+      <div class="grid" data-layout-ignore></div>
+      <div class="orbital-glow orbit-a" data-layout-ignore></div>
+      <div class="scene-content final">
+        <div class="eyebrow"><span class="pulse-dot"></span> Orbital Inspect</div>
+        <h2>Screen fast. Decide only with evidence.</h2>
+        <p class="lead">Public-source risk intelligence for mission teams, insurers, and defense reviewers who need traceability before confidence.</p>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const DURATION = 32;
+    const tl = gsap.timeline({ paused: true });
+
+    const reveal = (scene, previousScene, at, layer) => {
+      tl.set(scene, { opacity: 1, zIndex: layer, clipPath: "inset(0 0 0 100%)" }, at - 0.01);
+      tl.fromTo(scene, { clipPath: "inset(0 0 0 100%)" }, { clipPath: "inset(0 0 0 0%)", duration: 0.62, ease: "expo.inOut" }, at);
+      tl.fromTo(".transition-flash", { opacity: 0 }, { opacity: 0.12, duration: 0.09, yoyo: true, repeat: 1, ease: "power4.out" }, at + 0.12);
+      tl.set(previousScene, { opacity: 0, zIndex: 0 }, at + 0.64);
+    };
+
+    tl.to(".orbit-a", { rotation: 378, duration: DURATION, ease: "none" }, 0);
+    tl.to(".orbit-b", { rotation: -384, duration: DURATION, ease: "none" }, 0);
+    tl.to(".scan", { x: 2400, duration: 3.2, repeat: 9, ease: "power1.inOut" }, 0.3);
+    tl.to(".pulse-dot", { scale: 1.75, opacity: 0.55, duration: 0.72, repeat: 43, yoyo: true, ease: "sine.inOut" }, 0.2);
+
+    tl.from("#scene-1 .eyebrow", { y: 34, opacity: 0, duration: 0.58, ease: "power3.out" }, 0.2);
+    tl.from("#scene-1 h1", { y: 72, opacity: 0, scale: 0.97, duration: 0.82, ease: "expo.out" }, 0.44);
+    tl.from("#scene-1 .lead", { y: 46, opacity: 0, duration: 0.55, ease: "back.out(1.2)" }, 0.92);
+    tl.from("#scene-1 .hero-frame", { x: 96, y: 34, opacity: 0, rotation: 1.5, scale: 0.94, duration: 0.88, ease: "power4.out" }, 0.64);
+    tl.from("#scene-1 .ribbon", { y: 48, opacity: 0, duration: 0.54, ease: "circ.out" }, 1.35);
+
+    reveal("#scene-2", "#scene-1", 4.35, 2);
+    tl.from("#scene-2 .eyebrow", { x: -48, opacity: 0, duration: 0.45, ease: "power2.out" }, 4.92);
+    tl.from("#scene-2 h2", { y: 58, opacity: 0, duration: 0.66, ease: "expo.out" }, 5.12);
+    tl.from("#scene-2 .lead", { y: 34, opacity: 0, duration: 0.50, ease: "back.out(1.4)" }, 5.46);
+    tl.from("#scene-2 .stage", { y: 60, opacity: 0, scale: 0.94, duration: 0.52, stagger: 0.08, ease: "power4.out" }, 5.78);
+
+    reveal("#scene-3", "#scene-2", 9.15, 3);
+    tl.from("#scene-3 .eyebrow", { y: -30, opacity: 0, duration: 0.44, ease: "sine.out" }, 9.72);
+    tl.from("#scene-3 h2", { x: -72, opacity: 0, duration: 0.70, ease: "expo.out" }, 9.94);
+    tl.from("#scene-3 .lead", { y: 42, opacity: 0, duration: 0.52, ease: "back.out(1.1)" }, 10.36);
+    tl.from("#scene-3 .decision-card", { x: 88, opacity: 0, scale: 0.96, duration: 0.74, ease: "power4.out" }, 10.06);
+    tl.from("#scene-3 .metric-row", { x: 46, opacity: 0, duration: 0.40, stagger: 0.09, ease: "circ.out" }, 10.82);
+
+    reveal("#scene-4", "#scene-3", 13.6, 4);
+    tl.from("#scene-4 .eyebrow", { x: 50, opacity: 0, duration: 0.44, ease: "power2.out" }, 14.18);
+    tl.from("#scene-4 h2", { y: 64, opacity: 0, scale: 0.98, duration: 0.66, ease: "expo.out" }, 14.4);
+    tl.from("#scene-4 .gap", { y: 70, opacity: 0, rotationX: -9, duration: 0.58, stagger: 0.10, ease: "back.out(1.3)" }, 14.86);
+
+    reveal("#scene-5", "#scene-4", 18.15, 5);
+    tl.from("#scene-5 .mini-frame", { x: -90, opacity: 0, scale: 0.94, duration: 0.58, stagger: 0.13, ease: "power4.out" }, 18.78);
+    tl.from("#scene-5 .eyebrow", { y: 34, opacity: 0, duration: 0.44, ease: "sine.out" }, 19.1);
+    tl.from("#scene-5 h2", { x: 72, opacity: 0, duration: 0.72, ease: "expo.out" }, 19.32);
+    tl.from("#scene-5 .lead", { y: 42, opacity: 0, duration: 0.50, ease: "back.out(1.2)" }, 19.86);
+
+    reveal("#scene-6", "#scene-5", 22.65, 6);
+    tl.from("#scene-6 .eyebrow", { y: -32, opacity: 0, duration: 0.42, ease: "power2.out" }, 23.2);
+    tl.from("#scene-6 h2", { y: 62, opacity: 0, duration: 0.68, ease: "expo.out" }, 23.42);
+    tl.from("#scene-6 .ops-card", { y: 80, opacity: 0, scale: 0.95, duration: 0.58, stagger: 0.12, ease: "back.out(1.25)" }, 23.86);
+    tl.from("#scene-6 .ops-icon", { scale: 0.4, rotation: -22, opacity: 0, duration: 0.42, stagger: 0.12, ease: "elastic.out(1, 0.7)" }, 24.12);
+
+    reveal("#scene-7", "#scene-6", 27.1, 7);
+    tl.from("#scene-7 .eyebrow", { y: 38, opacity: 0, duration: 0.48, ease: "power2.out" }, 27.72);
+    tl.from("#scene-7 h2", { y: 76, opacity: 0, scale: 0.97, duration: 0.82, ease: "expo.out" }, 27.98);
+    tl.from("#scene-7 .lead", { y: 44, opacity: 0, duration: 0.56, ease: "back.out(1.2)" }, 28.7);
+    tl.to("#scene-7 .scene-content", { opacity: 0, y: -24, duration: 0.72, ease: "power2.in" }, 31.1);
+    tl.to(".brand-lockup", { opacity: 0, duration: 0.5, ease: "sine.in" }, 31.3);
+
+    window.__timelines["orbital-public-risk-screen"] = tl;
+  </script>
+</body>
+</html>
