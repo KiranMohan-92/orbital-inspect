@@ -47,6 +47,16 @@ When making changes in these areas, flag that cross-model review is recommended:
 - **Insurance risk logic**: risk matrix, underwriting recommendations, provenance
 - **Schema changes**: alembic migrations, db/models.py
 
+### Agent Evolution Evals
+
+Run the deterministic guardrail suite after changing agent workflow, prompts, verification gates, or self-evolution rules:
+
+```
+python scripts/run_agent_evals.py --suite .agents/evals/orbital_inspect_guardrails.json
+```
+
+Do not promote learned instincts, autonomous workflows, or external-agent review paths unless the relevant evals pass and high-risk review artifacts exist.
+
 ### Code Conventions
 - Python: async/await, structlog for logging, Pydantic models for all data
 - Frontend: TypeScript strict mode, no `any` types, Tailwind for styling
