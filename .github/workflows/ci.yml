@@ -48,7 +48,8 @@ jobs:
         working-directory: backend
     env:
       GEMINI_API_KEY: test-dummy-key
-      DEMO_MODE: "false"
+      APP_ENV: test
+      DEMO_MODE: "true"
       AUTH_ENABLED: "false"
       DATABASE_AUTO_INIT: "true"
       DATABASE_URL: postgresql+asyncpg://orbital:orbital_dev_password@127.0.0.1:5432/orbital_inspect_test

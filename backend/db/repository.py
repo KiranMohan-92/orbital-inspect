@@ -29,6 +29,19 @@ from db.models import (
 )
 
 
+def _db_utcnow() -> datetime:
+    """Return UTC as a naive datetime for the current timestamp-without-timezone schema."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _coerce_db_datetime(value):
+    if value is None or not isinstance(value, datetime):
+        return value
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 class AnalysisRepository:
     """CRUD operations for satellite analyses."""
 
@@ -1475,6 +1488,7 @@ class WebhookRepository:
             secret_ciphertext=secret_ciphertext,
             events=events,
             active=active,
+            created_at=_db_utcnow(),
         )
         self.session.add(webhook)
         await self.session.commit()
@@ -1583,7 +1597,8 @@ class WebhookDeliveryRepository:
             attempt_count=attempt_count,
             response_excerpt=response_excerpt,
             request_body_checksum=request_body_checksum,
-            delivered_at=delivered_at,
+            delivered_at=_coerce_db_datetime(delivered_at),
+            created_at=_db_utcnow(),
         )
         self.session.add(delivery)
         await self.session.commit()

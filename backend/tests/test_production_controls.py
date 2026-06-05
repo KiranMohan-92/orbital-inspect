@@ -111,7 +111,10 @@ def test_settings_require_redis_in_production():
         )
 
 
-def test_default_local_database_path_uses_untracked_backend_data_dir():
+def test_default_local_database_path_uses_untracked_backend_data_dir(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("DATA_DIR", raising=False)
+
     local_settings = Settings(
         GEMINI_API_KEY="test-key",
         DEMO_MODE=True,
