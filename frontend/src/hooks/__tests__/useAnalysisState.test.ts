@@ -9,7 +9,7 @@ const mockRevokeObjectURL = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
-  global.URL.revokeObjectURL = mockRevokeObjectURL;
+  globalThis.URL.revokeObjectURL = mockRevokeObjectURL;
 });
 
 afterEach(() => {

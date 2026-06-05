@@ -110,7 +110,7 @@ jobs:
         run: |
           python -m pip install cyclonedx-bom
           cyclonedx-py requirements backend/requirements.txt -o backend-sbom.json
-          npx --yes @cyclonedx/cyclonedx-npm --output-file frontend-sbom.json --package-lock-only --ignore-npm-errors --prefix frontend
+          npx --yes @cyclonedx/cyclonedx-npm --output-file frontend-sbom.json --package-lock-only --ignore-npm-errors frontend/package.json
       - uses: actions/upload-artifact@v4
         with:
           name: sboms
