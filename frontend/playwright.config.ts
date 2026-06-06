@@ -16,6 +16,7 @@ const useServiceBackedDb =
   process.env.ORBITAL_INSPECT_E2E_USE_POSTGRES === '1' || process.env.CI === 'true';
 const useExistingServers = process.env.ORBITAL_CAPTURE_EXISTING_SERVERS === '1';
 const includeCaptureTests = process.env.ORBITAL_INCLUDE_CAPTURE_TESTS === '1';
+const chromiumExecutable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
 const e2eDbUrl =
   process.env.ORBITAL_INSPECT_E2E_DATABASE_URL ||
   (useServiceBackedDb
@@ -109,10 +110,8 @@ export default defineConfig({
     headless: true,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
-      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE }
-      : undefined,
+    video: chromiumExecutable ? 'off' : 'retain-on-failure',
+    launchOptions: chromiumExecutable ? { executablePath: chromiumExecutable } : undefined,
   },
   webServer: useExistingServers ? undefined : webServers,
 });
