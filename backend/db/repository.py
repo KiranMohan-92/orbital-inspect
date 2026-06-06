@@ -42,6 +42,10 @@ def _coerce_db_datetime(value):
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def _coerce_db_values(values: dict) -> dict:
+    return {key: _coerce_db_datetime(value) for key, value in values.items()}
+
+
 class AnalysisRepository:
     """CRUD operations for satellite analyses."""
 
@@ -98,7 +102,7 @@ class AnalysisRepository:
             model_manifest=model_manifest or {},
             human_review_required=human_review_required,
             status="queued",
-            queued_at=datetime.now(timezone.utc),
+            queued_at=_db_utcnow(),
         )
         self.session.add(analysis)
         await self.session.commit()
@@ -132,14 +136,15 @@ class AnalysisRepository:
         """Update analysis status and optional fields."""
         values = {"status": status}
         if status == "dispatched":
-            values.setdefault("queued_at", datetime.now(timezone.utc))
+            values.setdefault("queued_at", _db_utcnow())
         elif status == "running":
-            values["started_at"] = datetime.now(timezone.utc)
+            values["started_at"] = _db_utcnow()
         elif status == "retrying":
-            values["last_retry_at"] = datetime.now(timezone.utc)
+            values["last_retry_at"] = _db_utcnow()
         elif status in ("completed", "completed_partial", "failed", "rejected"):
-            values["completed_at"] = datetime.now(timezone.utc)
+            values["completed_at"] = _db_utcnow()
         values.update(kwargs)
+        values = _coerce_db_values(values)
 
         await self.session.execute(
             update(Analysis).where(Analysis.id == analysis_id).values(**values)
@@ -149,6 +154,7 @@ class AnalysisRepository:
     async def update_fields(self, analysis_id: str, **values) -> None:
         if not values:
             return
+        values = _coerce_db_values(values)
         await self.session.execute(
             update(Analysis).where(Analysis.id == analysis_id).values(**values)
         )
@@ -215,8 +221,8 @@ class AnalysisRepository:
             "recurrence_count": recurrence_count,
             "decision_override_reason": decision_override_reason,
             "decision_approved_by": decision_approved_by,
-            "decision_approved_at": decision_approved_at,
-            "decision_last_evaluated_at": datetime.now(timezone.utc),
+            "decision_approved_at": _coerce_db_datetime(decision_approved_at),
+            "decision_last_evaluated_at": _db_utcnow(),
         }
         await self.session.execute(
             update(Analysis).where(Analysis.id == analysis_id).values(**values)
@@ -663,7 +669,7 @@ class AssetRepository:
             values["current_analysis_id"] = current_analysis_id
         if not values:
             return
-        values["updated_at"] = datetime.now(timezone.utc)
+        values["updated_at"] = _db_utcnow()
         await self.session.execute(update(Asset).where(Asset.id == asset_id).values(**values))
         await self.session.commit()
 
@@ -689,13 +695,15 @@ class AssetRepository:
         current_ts = (
             getattr(current, "completed_at", None)
             or getattr(current, "created_at", None)
-            or datetime.min.replace(tzinfo=timezone.utc)
+            or datetime.min
         )
         candidate_ts = (
             getattr(analysis, "completed_at", None)
             or getattr(analysis, "created_at", None)
-            or datetime.min.replace(tzinfo=timezone.utc)
+            or datetime.min
         )
+        current_ts = _coerce_db_datetime(current_ts)
+        candidate_ts = _coerce_db_datetime(candidate_ts)
         if candidate_ts >= current_ts:
             await self.update_metadata(asset_id, current_analysis_id=analysis.id)
 
@@ -916,7 +924,7 @@ class EvidenceRepository:
             evidence_role=evidence_role,
             provider=provider,
             external_ref=external_ref,
-            captured_at=captured_at,
+            captured_at=_coerce_db_datetime(captured_at),
             payload_json=payload_json or {},
             artifact_uri=artifact_uri,
             source_url=source_url,
@@ -964,7 +972,7 @@ class EvidenceRepository:
         if existing:
             existing.evidence_role = evidence_role
             existing.provider = provider
-            existing.captured_at = captured_at or existing.captured_at
+            existing.captured_at = _coerce_db_datetime(captured_at) or existing.captured_at
             existing.payload_json = payload_json or existing.payload_json or {}
             existing.artifact_uri = artifact_uri or existing.artifact_uri
             existing.source_url = source_url or existing.source_url
@@ -973,7 +981,7 @@ class EvidenceRepository:
             existing.confidence = confidence if confidence is not None else existing.confidence
             existing.geometry_metadata = geometry_metadata or existing.geometry_metadata or {}
             existing.tags = tags or existing.tags or []
-            existing.ingested_at = datetime.now(timezone.utc)
+            existing.ingested_at = _db_utcnow()
             await self.session.commit()
             await self.session.refresh(existing)
             return existing
@@ -1185,6 +1193,7 @@ class EvidenceRepository:
         reference_sources_json: list | None = None,
         last_verified_at=None,
     ) -> AssetReferenceProfile:
+        last_verified_at = _coerce_db_datetime(last_verified_at)
         result = await self.session.execute(
             select(AssetReferenceProfile)
             .where(AssetReferenceProfile.asset_id == asset_id)
@@ -1265,7 +1274,7 @@ class EvidenceRepository:
             .where(IngestRun.id == run_id)
             .values(
                 status=status,
-                completed_at=datetime.now(timezone.utc),
+                completed_at=_db_utcnow(),
                 records_created=records_created,
                 records_updated=records_updated,
                 error_summary=error_summary,
@@ -1430,8 +1439,9 @@ class ReportRepository:
         status: str,
         **kwargs,
     ) -> None:
-        values = {"status": status, "updated_at": datetime.now(timezone.utc)}
+        values = {"status": status, "updated_at": _db_utcnow()}
         values.update(kwargs)
+        values = _coerce_db_values(values)
         await self.session.execute(
             update(Report).where(Report.id == report_id).values(**values)
         )
@@ -1455,8 +1465,8 @@ class ReportRepository:
             "artifact_content_type": artifact_content_type,
             "artifact_size_bytes": artifact_size_bytes,
             "artifact_checksum_sha256": artifact_checksum_sha256,
-            "retention_until": retention_until,
-            "updated_at": datetime.now(timezone.utc),
+            "retention_until": _coerce_db_datetime(retention_until),
+            "updated_at": _db_utcnow(),
         }
         if pdf_path is not None:
             values["pdf_path"] = pdf_path

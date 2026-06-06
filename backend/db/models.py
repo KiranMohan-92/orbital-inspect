@@ -30,6 +30,10 @@ def _uuid() -> str:
     return uuid.uuid4().hex
 
 
+def _utcnow_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class Organization(Base):
     """Multi-tenant organization."""
     __tablename__ = "organizations"
@@ -40,7 +44,7 @@ class Organization(Base):
     api_key_hash = Column(String(128), nullable=True)
     rate_limit_per_hour = Column(Integer, default=50)
     active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     analyses = relationship("Analysis", back_populates="organization")
     assets = relationship("Asset", back_populates="organization")
@@ -71,11 +75,11 @@ class Asset(Base):
     operator_name = Column(String(255), nullable=True)
     status = Column(String(32), default="active")
     current_analysis_id = Column(String(32), ForeignKey("analyses.id"), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=_utcnow_naive,
+        onupdate=_utcnow_naive,
     )
 
     organization = relationship("Organization", back_populates="assets")
@@ -107,11 +111,11 @@ class AssetAlias(Base):
     alias_type = Column(String(32), nullable=False)  # norad | external_id | display_name | operator_label
     alias_value = Column(String(255), nullable=False)
     is_primary = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=_utcnow_naive,
+        onupdate=_utcnow_naive,
     )
 
     asset = relationship("Asset", back_populates="aliases")
@@ -133,11 +137,11 @@ class AssetSubsystem(Base):
     display_name = Column(String(255), nullable=True)
     subsystem_type = Column(String(100), nullable=True)
     status = Column(String(32), default="active")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=_utcnow_naive,
+        onupdate=_utcnow_naive,
     )
 
 
@@ -167,11 +171,11 @@ class AssetReferenceProfile(Base):
     subsystem_baseline_json = Column(JSON, default=dict)
     reference_sources_json = Column(JSON, default=list)
     last_verified_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=_utcnow_naive,
+        onupdate=_utcnow_naive,
     )
 
     asset = relationship("Asset", back_populates="reference_profile")
@@ -197,7 +201,7 @@ class EvidenceRecord(Base):
     provider = Column(String(100), nullable=True)
     external_ref = Column(String(255), nullable=True)
     captured_at = Column(DateTime, nullable=True)
-    ingested_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    ingested_at = Column(DateTime, default=_utcnow_naive)
     payload_json = Column(JSON, default=dict)
     artifact_uri = Column(String(500), nullable=True)
     source_url = Column(String(1000), nullable=True)
@@ -231,7 +235,7 @@ class AnalysisEvidenceLink(Base):
     analysis_id = Column(String(32), ForeignKey("analyses.id"), nullable=False)
     evidence_id = Column(String(32), ForeignKey("evidence_records.id"), nullable=False)
     used_for = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     analysis = relationship("Analysis", back_populates="evidence_links")
     evidence_record = relationship("EvidenceRecord", back_populates="analysis_links")
@@ -250,7 +254,7 @@ class IngestRun(Base):
     org_id = Column(String(32), ForeignKey("organizations.id"), nullable=True)
     source_type = Column(String(50), nullable=False)
     status = Column(String(32), default="started")
-    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    started_at = Column(DateTime, default=_utcnow_naive)
     completed_at = Column(DateTime, nullable=True)
     records_created = Column(Integer, default=0)
     records_updated = Column(Integer, default=0)
@@ -282,11 +286,11 @@ class DatasetRegistry(Base):
     record_count = Column(Integer, nullable=True)
     checksum_sha256 = Column(String(64), nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=_utcnow_naive,
+        onupdate=_utcnow_naive,
     )
 
     organization = relationship("Organization", back_populates="datasets")
@@ -364,7 +368,7 @@ class Analysis(Base):
     recurrence_count = Column(Integer, default=0)
 
     # Timestamps
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
     queued_at = Column(DateTime, nullable=True)
     started_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
@@ -398,7 +402,7 @@ class AnalysisEvent(Base):
     payload = Column(JSON, default=dict)
     sequence = Column(Integer, default=0)
     degraded = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     analysis = relationship("Analysis", back_populates="events")
 
@@ -438,8 +442,8 @@ class Report(Base):
     reviewer_comments = Column(JSON, default=list)
 
     # Timestamps
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
+    updated_at = Column(DateTime, default=_utcnow_naive, onupdate=_utcnow_naive)
 
     analysis = relationship("Analysis", back_populates="report")
 
@@ -460,7 +464,7 @@ class DeadLetterJob(Base):
     attempts = Column(Integer, default=1)
     error_message = Column(Text, nullable=False)
     payload_json = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     analysis = relationship("Analysis", back_populates="dead_letters")
 
@@ -479,7 +483,7 @@ class WebhookEndpoint(Base):
     secret_ciphertext = Column(Text, default="")
     events = Column(JSON, default=list)
     active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
     deliveries = relationship("WebhookDelivery", back_populates="webhook")
 
 
@@ -499,7 +503,7 @@ class WebhookDelivery(Base):
     response_excerpt = Column(Text, nullable=True)
     request_body_checksum = Column(String(64), nullable=True)
     delivered_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     webhook = relationship("WebhookEndpoint", back_populates="deliveries")
 
@@ -520,6 +524,6 @@ class AuditLog(Base):
     resource_id = Column(String(64), nullable=False)
     metadata_json = Column(JSON, default=dict)
     analysis_id = Column(String(32), ForeignKey("analyses.id"), nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     analysis = relationship("Analysis", back_populates="audit_logs")
