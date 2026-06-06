@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     ANALYSIS_JOB_MAX_RETRIES: int = 3
     ANALYSIS_RETRY_BACKOFF_BASE_SECONDS: int = 5
     REDIS_REQUIRED: bool = False
+    E2E_ORG_ID: str = "org-e2e"
+    E2E_ORG_NAME: str = "Orbital Inspect E2E"
 
     # Auth
     AUTH_ENABLED: bool | None = None

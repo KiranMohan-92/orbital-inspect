@@ -7,6 +7,7 @@ Isolates SQLAlchemy queries from business logic. All methods are async.
 import hashlib
 from datetime import datetime, timezone
 from sqlalchemy import select, update, func, delete, and_, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 from db.models import (
@@ -1541,6 +1542,37 @@ class OrganizationRepository:
     async def get(self, org_id: str) -> Organization | None:
         result = await self.session.execute(select(Organization).where(Organization.id == org_id))
         return result.scalar_one_or_none()
+
+    async def ensure(
+        self,
+        *,
+        org_id: str,
+        name: str,
+        tier: str = "standard",
+        rate_limit_per_hour: int = 50,
+    ) -> Organization:
+        existing = await self.get(org_id)
+        if existing:
+            return existing
+
+        org = Organization(
+            id=org_id,
+            name=name,
+            tier=tier,
+            rate_limit_per_hour=rate_limit_per_hour,
+            active=True,
+        )
+        self.session.add(org)
+        try:
+            await self.session.commit()
+        except IntegrityError:
+            await self.session.rollback()
+            existing = await self.get(org_id)
+            if existing:
+                return existing
+            raise
+        await self.session.refresh(org)
+        return org
 
     async def update_api_key_hash(self, org_id: str, api_key_hash: str) -> None:
         await self.session.execute(

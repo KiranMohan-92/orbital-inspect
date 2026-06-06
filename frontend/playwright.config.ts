@@ -25,6 +25,7 @@ const e2eDbUrl =
 const useMockBackend = process.env.ORBITAL_MOCK_E2E === '1';
 const e2eJwtSecret =
   process.env.ORBITAL_INSPECT_E2E_JWT_SECRET || 'orbital-inspect-e2e-jwt-secret-2026';
+const e2eOrgId = process.env.ORBITAL_INSPECT_E2E_ORG_ID || 'org-e2e';
 
 function createHs256Jwt(secret: string, payload: Record<string, unknown>): string {
   const header = { alg: 'HS256', typ: 'JWT' };
@@ -39,7 +40,7 @@ function buildE2eToken(role: 'analyst' | 'admin'): string {
   const now = Math.floor(Date.now() / 1000);
   return createHs256Jwt(e2eJwtSecret, {
     sub: `${role}-e2e-user`,
-    org_id: 'org-e2e',
+    org_id: e2eOrgId,
     role,
     iat: now,
     exp: now + 3600,
@@ -64,6 +65,7 @@ process.env.ORBITAL_INSPECT_E2E_STORAGE_BACKEND =
 process.env.ORBITAL_INSPECT_E2E_DATABASE_AUTO_INIT = 'true';
 process.env.ORBITAL_INSPECT_E2E_AUTH_ENABLED = 'true';
 process.env.ORBITAL_INSPECT_E2E_JWT_SECRET = e2eJwtSecret;
+process.env.ORBITAL_INSPECT_E2E_ORG_ID = e2eOrgId;
 process.env.VITE_API_BASE_URL = process.env.VITE_API_BASE_URL || backendUrl;
 process.env.VITE_API_BEARER_TOKEN = process.env.VITE_API_BEARER_TOKEN || buildE2eToken('analyst');
 process.env.ORBITAL_INSPECT_E2E_ADMIN_TOKEN =
