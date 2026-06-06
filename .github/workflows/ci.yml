@@ -218,6 +218,7 @@ jobs:
       ORBITAL_INSPECT_E2E_STORAGE_SECRET_ACCESS_KEY: orbital_storage_password
       ORBITAL_INSPECT_E2E_STORAGE_FORCE_PATH_STYLE: "true"
       ORBITAL_INSPECT_E2E_STORAGE_CREATE_BUCKET: "true"
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE: /usr/bin/google-chrome
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -244,7 +245,8 @@ jobs:
       - run: pip install -r ../backend/requirements.txt
         working-directory: backend
       - run: npm ci
-      - name: Install Playwright Chromium
-        timeout-minutes: 20
-        run: npx playwright install chromium --with-deps
+      - name: Verify runner Chrome
+        run: |
+          test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE"
+          "$PLAYWRIGHT_CHROMIUM_EXECUTABLE" --version
       - run: npm run test:e2e
