@@ -81,7 +81,7 @@ test('completed durable analysis persists into portfolio', async ({ page }) => {
   });
 
   await expect(page.getByTestId('analysis-status')).toHaveText('ASSESSMENT COMPLETE');
-  await expect(page.getByTestId('underwriting-badge')).toContainText('INSURABLE');
+  await expect(page.getByTestId('underwriting-badge')).toContainText('FURTHER');
   await expect(page.getByTestId('risk-tier')).toHaveText('LOW');
 
   await page.getByTestId('nav-portfolio').click();

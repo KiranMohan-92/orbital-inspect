@@ -1,6 +1,7 @@
 import os
 import queue
 import threading
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import AsyncMock, patch
@@ -13,6 +14,7 @@ os.environ.setdefault("GEMINI_API_KEY", "test-dummy-key")
 from api.webhooks import WebhookCreate, create_webhook
 from auth.dependencies import CurrentUser
 from config import settings
+from db.repository import WebhookDeliveryRepository
 from services.secret_service import decrypt_webhook_secret, encrypt_webhook_secret, hash_secret
 from services.webhook_security import validate_webhook_url
 from services.webhook_service import dispatch_registered_webhooks, sign_payload
@@ -24,6 +26,20 @@ class _MockSessionContext:
 
     async def __aexit__(self, exc_type, exc, tb):
         return False
+
+
+class _CaptureSession:
+    def __init__(self):
+        self.added = None
+
+    def add(self, item):
+        self.added = item
+
+    async def commit(self):
+        return None
+
+    async def refresh(self, item):
+        return None
 
 
 class _WebhookRequestHandler(BaseHTTPRequestHandler):
@@ -80,6 +96,27 @@ def test_encrypt_decrypt_webhook_secret_roundtrip(webhook_key):
 
     assert ciphertext != secret
     assert decrypt_webhook_secret(ciphertext) == secret
+
+
+@pytest.mark.asyncio
+async def test_webhook_delivery_repository_normalizes_aware_datetimes_for_db():
+    session = _CaptureSession()
+    repo = WebhookDeliveryRepository(session)
+
+    await repo.create(
+        webhook_id="webhook-1",
+        event_type="analysis.completed",
+        success=True,
+        status_code=202,
+        attempt_count=1,
+        response_excerpt="accepted",
+        request_body_checksum="abc123",
+        delivered_at=datetime.now(timezone.utc),
+    )
+
+    assert session.added is not None
+    assert session.added.delivered_at.tzinfo is None
+    assert session.added.created_at.tzinfo is None
 
 
 @pytest.mark.asyncio

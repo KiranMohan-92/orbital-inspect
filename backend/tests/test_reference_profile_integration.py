@@ -1,4 +1,5 @@
 import os
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -118,7 +119,8 @@ async def test_post_analysis_complete_persists_asset_reference_profile_and_alias
         used_for="orbital_context",
     )
 
-    await post_analysis_complete(analysis_id=analysis.id, session=session)
+    with patch("services.post_analysis_service.dispatch_registered_webhooks", AsyncMock()):
+        await post_analysis_complete(analysis_id=analysis.id, session=session)
 
     refreshed = await analysis_repo.get(analysis.id)
     profile = (

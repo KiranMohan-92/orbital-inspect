@@ -18,6 +18,15 @@ jobs:
           python-version: '3.13'
       - run: python scripts/check_verification_gates.py --base origin/${{ github.base_ref || 'main' }}
 
+  agent-evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python scripts/run_agent_evals.py --suite .agents/evals/orbital_inspect_guardrails.json
+
   backend:
     runs-on: ubuntu-latest
     services:
@@ -39,7 +48,8 @@ jobs:
         working-directory: backend
     env:
       GEMINI_API_KEY: test-dummy-key
-      DEMO_MODE: "false"
+      APP_ENV: test
+      DEMO_MODE: "true"
       AUTH_ENABLED: "false"
       DATABASE_AUTO_INIT: "true"
       DATABASE_URL: postgresql+asyncpg://orbital:orbital_dev_password@127.0.0.1:5432/orbital_inspect_test
@@ -100,7 +110,7 @@ jobs:
         run: |
           python -m pip install cyclonedx-bom
           cyclonedx-py requirements backend/requirements.txt -o backend-sbom.json
-          npx --yes @cyclonedx/cyclonedx-npm --output-file frontend-sbom.json --package-lock-only --ignore-npm-errors --prefix frontend
+          npx --yes @cyclonedx/cyclonedx-npm --output-file frontend-sbom.json --package-lock-only --ignore-npm-errors frontend/package.json
       - uses: actions/upload-artifact@v4
         with:
           name: sboms
@@ -178,6 +188,7 @@ jobs:
 
   browser-e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16-alpine
@@ -207,6 +218,7 @@ jobs:
       ORBITAL_INSPECT_E2E_STORAGE_SECRET_ACCESS_KEY: orbital_storage_password
       ORBITAL_INSPECT_E2E_STORAGE_FORCE_PATH_STYLE: "true"
       ORBITAL_INSPECT_E2E_STORAGE_CREATE_BUCKET: "true"
+      PLAYWRIGHT_CHROMIUM_EXECUTABLE: /usr/bin/google-chrome
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -233,5 +245,8 @@ jobs:
       - run: pip install -r ../backend/requirements.txt
         working-directory: backend
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Verify runner Chrome
+        run: |
+          test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE"
+          "$PLAYWRIGHT_CHROMIUM_EXECUTABLE" --version
       - run: npm run test:e2e

@@ -1,0 +1,49 @@
+CCSDS_CDM_VERS = 1.0
+CREATION_DATE = 2026-05-31T00:00:00.000
+ORIGINATOR = ORBITAL-INSPECT-SPIKE
+MESSAGE_ID = OI-SPIKE-000001
+
+COMMENT Relative metadata block (object2 relative to object1, RTN frame)
+TCA = 2026-06-01T12:34:56.789
+MISS_DISTANCE = 184.0 [m]
+RELATIVE_SPEED = 14820.0 [m/s]
+RELATIVE_POSITION_R = 40.0 [m]
+RELATIVE_POSITION_T = 30.0 [m]
+RELATIVE_POSITION_N = 178.0 [m]
+COLLISION_PROBABILITY = 0.0
+
+COMMENT ---- OBJECT1 (primary / operational) ----
+OBJECT = OBJECT1
+OBJECT_DESIGNATOR = 25544
+OBJECT_NAME = PRIMARY-OPS-SAT
+X = 6800.123 [km]
+Y = 100.456 [km]
+Z = -250.789 [km]
+X_DOT = 0.512 [km/s]
+Y_DOT = 7.481 [km/s]
+Z_DOT = 0.233 [km/s]
+COMMENT RTN position covariance lower-triangle (km^2)
+CR_R = 4.0e-04
+CT_R = 1.0e-04
+CT_T = 9.0e-03
+CN_R = 0.5e-04
+CN_T = 2.0e-04
+CN_N = 6.0e-03
+
+COMMENT ---- OBJECT2 (secondary / debris) ----
+OBJECT = OBJECT2
+OBJECT_DESIGNATOR = 39208
+OBJECT_NAME = SECONDARY-DEBRIS
+X = 6800.140 [km]
+Y = 100.420 [km]
+Z = -250.610 [km]
+X_DOT = -0.488 [km/s]
+Y_DOT = -7.341 [km/s]
+Z_DOT = 0.205 [km/s]
+COMMENT RTN position covariance lower-triangle (km^2)
+CR_R = 9.0e-04
+CT_R = 2.0e-04
+CT_T = 2.5e-02
+CN_R = 1.0e-04
+CN_T = 5.0e-04
+CN_N = 1.6e-02

@@ -9,7 +9,7 @@ os.environ.setdefault("GEMINI_API_KEY", "test-dummy-key")
 
 from db.base import Base
 from db.models import Analysis, Asset, Organization
-from db.repository import AnalysisRepository, AssetRepository, EvidenceRepository
+from db.repository import AnalysisRepository, AssetRepository, EvidenceRepository, OrganizationRepository
 
 
 @pytest_asyncio.fixture
@@ -23,6 +23,26 @@ async def session() -> AsyncSession:
     async with session_factory() as session:
         yield session
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_organization_repository_ensure_is_idempotent(session: AsyncSession):
+    org_repo = OrganizationRepository(session)
+
+    first = await org_repo.ensure(
+        org_id="org-e2e",
+        name="Orbital Inspect E2E",
+        rate_limit_per_hour=20,
+    )
+    second = await org_repo.ensure(
+        org_id="org-e2e",
+        name="Should Not Replace Existing",
+        rate_limit_per_hour=5,
+    )
+
+    assert first.id == second.id
+    assert second.name == "Orbital Inspect E2E"
+    assert second.rate_limit_per_hour == 20
 
 
 @pytest.mark.asyncio

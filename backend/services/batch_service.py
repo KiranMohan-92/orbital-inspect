@@ -7,11 +7,17 @@ Callers are responsible for dispatching individual items and reporting results.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from sqlalchemy import select, update
 
 from db.batch_models import BatchJob
 
 _MAX_BATCH_SIZE = 100
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class BatchService:
@@ -88,8 +94,6 @@ class BatchService:
 
     async def finalize_batch(self, batch_id: str) -> None:
         """Mark batch as completed or partial_failure based on counts."""
-        from datetime import datetime, timezone
-
         batch = await self.get_batch(batch_id)
         if batch is None:
             return
@@ -106,7 +110,7 @@ class BatchService:
             .where(BatchJob.id == batch_id)
             .values(
                 status=final_status,
-                completed_at=datetime.now(timezone.utc),
+                completed_at=_utcnow_naive(),
             )
         )
         await self.session.commit()

@@ -27,7 +27,7 @@ Multi-agent satellite insurance underwriting intelligence platform. A 5-agent pi
 | `ops/` | Production ops — Helm chart, observability stack, runbooks, architecture docs (see `ops/AGENTS.md`) |
 | `docs/` | Demo runbook and captured demo assets (see `docs/AGENTS.md`) |
 | `scripts/` | Repo-root tooling scripts (see `scripts/AGENTS.md`) |
-| `.agents/` | Multi-model workflow config — workflow.yaml, verification-gates.yaml (see `.agents/AGENTS.md`) |
+| `.agents/` | Multi-model workflow config — workflow.yaml, verification-gates.yaml, agent-evolution evals (see `.agents/AGENTS.md`) |
 | `data/` | Runtime data mounts (demo cache, uploads) — not documented, runtime-only |
 
 ## For AI Agents
@@ -141,14 +141,14 @@ _Self-assessed against the 5-layer upgrade framework (2026-04-06):_
 |-------|--------|-------|
 | 1. Attribution Consistency | Enforced via CLAUDE.md + .codex rules | 8/10 |
 | 2. Agent Config in Repo | .agents/ directory with workflow + gates | 8/10 |
-| 3. Verification Gates | Defined in .agents/verification-gates.yaml (advisory mode) | 6/10 |
-| 4. Audit Trail & Metrics | This document (AGENTS.md) | 7/10 |
+| 3. Verification Gates | CI-blocking gates plus deterministic agent-evolution evals | 8/10 |
+| 4. Audit Trail & Metrics | This document (AGENTS.md) plus eval reports/guardrails | 7/10 |
 | 5. Three-Model Mesh | Two active, Gemini onboarding | 5/10 |
-| **Overall** | **Structured, documented, partially automated** | **6.8/10** |
+| **Overall** | **Structured, documented, CI-gated, eval-seeded** | **7.4/10** |
 
 ### Next Steps to World-Class
 1. Get Gemini's first co-authored commit (promote from runtime model to active collaborator)
-2. Move verification gates from advisory to CI-blocking
+2. Expand agent-evolution eval cases from seed guardrails to production traces
 3. Add automated attribution checking in CI
 4. Run first three-model pre-release sign-off
-5. Track cross-model metrics automatically via git hooks
+5. Track cross-model metrics automatically via git hooks and eval reports

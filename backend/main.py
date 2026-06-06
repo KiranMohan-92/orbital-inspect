@@ -71,14 +71,22 @@ async def lifespan(app):
             from db.base import init_db
             from services.post_analysis_service import backfill_decisions
             from db.base import async_session_factory
+            from db.repository import OrganizationRepository
             await init_db()
             async with async_session_factory() as session:
+                if settings.E2E_TEST_MODE:
+                    await OrganizationRepository(session).ensure(
+                        org_id=settings.E2E_ORG_ID,
+                        name=settings.E2E_ORG_NAME,
+                        rate_limit_per_hour=settings.ANALYSIS_RATE_LIMIT_PER_HOUR,
+                    )
                 backfilled = await backfill_decisions(session=session, limit=5000)
             log.info(
                 "Database initialized",
                 extra={
                     "demo_mode": settings.DEMO_MODE,
                     "database_auto_init": settings.DATABASE_AUTO_INIT,
+                    "e2e_org_id": settings.E2E_ORG_ID if settings.E2E_TEST_MODE else None,
                     "backfilled_decisions": backfilled,
                 },
             )
