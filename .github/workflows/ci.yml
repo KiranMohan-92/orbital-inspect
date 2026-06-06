@@ -188,6 +188,7 @@ jobs:
 
   browser-e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16-alpine
@@ -243,5 +244,7 @@ jobs:
       - run: pip install -r ../backend/requirements.txt
         working-directory: backend
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Install Playwright Chromium
+        timeout-minutes: 20
+        run: npx playwright install chromium --with-deps
       - run: npm run test:e2e
