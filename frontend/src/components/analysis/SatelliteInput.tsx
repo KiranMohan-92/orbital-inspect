@@ -112,6 +112,14 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
           </div>
         )}
 
+        {/* Demo Cases — the zero-friction first-run path, kept beside the upload zone */}
+        {onDemo && !hasImage && (
+          <>
+            <DemoSelector onSelectDemo={onDemo} disabled={isAnalyzing} />
+            <hr className="orbital-divider" />
+          </>
+        )}
+
         {/* NORAD Catalog ID */}
         <div>
           <label className="label-mono block mb-2">ASSESSMENT MODE</label>
@@ -276,12 +284,12 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
           </div>
         </div>
 
-        {/* Divider */}
-        <hr className="orbital-divider" />
-
-        {/* Demo Cases */}
-        {onDemo && (
-          <DemoSelector onSelectDemo={onDemo} disabled={isAnalyzing} />
+        {/* Demo Cases — after an image is loaded they move below the form, out of the way */}
+        {onDemo && hasImage && (
+          <>
+            <hr className="orbital-divider" />
+            <DemoSelector onSelectDemo={onDemo} disabled={isAnalyzing} />
+          </>
         )}
       </div>
 
