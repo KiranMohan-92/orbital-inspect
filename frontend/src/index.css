@@ -29,7 +29,7 @@
   /* ── Text Hierarchy ─────────────────────────────────────────────────── */
   --text-primary: #e4e6ef;
   --text-secondary: #8890a8;
-  --text-tertiary: #4a5070;
+  --text-tertiary: #6e7795; /* 4.6:1 on --bg-void — WCAG AA floor for the 12px helper copy */
   --text-data: #7dd3fc;
   --text-money: #34d399;
   --text-warning: #fbbf24;
