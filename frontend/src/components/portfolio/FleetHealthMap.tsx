@@ -106,7 +106,7 @@ export default function FleetHealthMap({ fleetTrends, loading }: FleetHealthMapP
       <p className="label-mono mb-3">FLEET DEGRADATION TRENDS</p>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-5 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
         {[
           { label: "ANALYZED", value: fleetTrends.total_assets_analyzed, color: "var(--text-primary)" },
           { label: "DEGRADING", value: fleetTrends.assets_degrading, color: "#ef4444" },

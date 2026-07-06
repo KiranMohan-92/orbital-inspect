@@ -394,7 +394,7 @@ export default function PortfolioView() {
         <FleetHealthMap fleetTrends={fleetTrends} loading={loading} />
 
         {summary && (
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: "OPEN ATTENTION", value: summary.open_attention_queue ?? 0 },
               { label: "URGENT ASSETS", value: summary.urgent_assets ?? 0 },

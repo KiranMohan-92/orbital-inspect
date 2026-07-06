@@ -25,7 +25,7 @@ export default function FleetSummary({ totalSatellites, riskDistribution, underw
                  (underwritingDistribution["UNINSURABLE"] || 0);
 
   return (
-    <div className="grid grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {/* Total */}
       <div className="glass-panel rounded-lg p-4 text-center">
         <div className="font-mono-display text-2xl" style={{ color: "var(--accent-orbital)" }}>
