@@ -157,9 +157,6 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
             <option value="compute_platform">Compute Platform</option>
             <option value="other">Other Orbital Asset</option>
           </select>
-          <p className="text-xs mt-1.5" style={{ color: "var(--text-tertiary)" }}>
-            Keeps the data model ready for orbital infrastructure and in-space builds.
-          </p>
         </div>
 
         <div>
@@ -174,7 +171,7 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
             disabled={isAnalyzing}
           />
           <p className="text-xs mt-1.5" style={{ color: "var(--text-tertiary)" }}>
-            Used as the org-scoped canonical label when NORAD is absent or subsystem work is more specific than the object catalog.
+            Your name for this asset when it has no NORAD ID.
           </p>
         </div>
 
@@ -190,7 +187,7 @@ export default function SatelliteInput({ analysis, onAnalyze, onDemo }: Satellit
             disabled={isAnalyzing}
           />
           <p className="text-xs mt-1.5" style={{ color: "var(--text-tertiary)" }}>
-            Strongest non-NORAD identity key for servicers, station modules, arrays, radiators, and compute platforms.
+            Your internal tracking ID for this asset.
           </p>
         </div>
 
