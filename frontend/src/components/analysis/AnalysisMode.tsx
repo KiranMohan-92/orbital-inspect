@@ -10,6 +10,19 @@ export default function AnalysisMode() {
   const { state } = analysis;
   const { analyzeImage, analyzeDemo } = useSSE(analysis);
 
+  const handleDemo = async (demoId: string) => {
+    try {
+      const res = await fetch(`/demo_images/${encodeURIComponent(demoId)}.jpg`);
+      if (res.ok) {
+        const blob = await res.blob();
+        analysis.setImage(new File([blob], `${demoId}.jpg`, { type: blob.type || "image/jpeg" }));
+      }
+    } catch {
+      // Demo analysis still runs without a local preview image.
+    }
+    analyzeDemo(demoId);
+  };
+
   const handleAnalyze = () => {
     if (!state.image) return;
     analyzeImage(state.image, {
@@ -30,7 +43,7 @@ export default function AnalysisMode() {
         <div data-testid="analysis-input-panel" className="min-h-[520px] lg:min-h-0 flex flex-col glass-panel overflow-hidden"
           style={{ borderRight: "1px solid var(--bg-panel-border)" }}>
           <ErrorBoundary panelName="Target Acquisition">
-            <SatelliteInput analysis={analysis} onAnalyze={handleAnalyze} onDemo={analyzeDemo} />
+            <SatelliteInput analysis={analysis} onAnalyze={handleAnalyze} onDemo={handleDemo} />
           </ErrorBoundary>
         </div>
 

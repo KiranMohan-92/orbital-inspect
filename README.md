@@ -91,6 +91,9 @@ The images below are real local captures generated from the running product. The
 ### Run the local demo
 
 ```bash
+# One-time: install demo case images (public NASA/ESA imagery, shipped in-repo)
+./scripts/setup_demo_assets.sh
+
 # Terminal 1
 cd backend
 DEMO_MODE=true GEMINI_API_KEY=test-dummy-key \
