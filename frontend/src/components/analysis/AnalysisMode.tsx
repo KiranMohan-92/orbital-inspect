@@ -65,16 +65,16 @@ export default function AnalysisMode() {
       {/* Footer — Mission Status Bar */}
       <div className="h-9 flex-shrink-0 flex items-center justify-between px-4"
         style={{ background: "rgba(2,2,8,0.95)", borderTop: "1px solid var(--bg-panel-border)" }}>
-        <div className="flex items-center gap-3">
-          <span className="font-mono-display text-xs tracking-[0.15em]"
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="font-mono-display text-xs tracking-[0.15em] whitespace-nowrap"
             style={{ color: "var(--accent-orbital)", opacity: 0.7 }}>
             ORBITAL INSPECT
           </span>
           <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>v0.1</span>
         </div>
 
-        <div className="flex items-center gap-4">
-          <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+        <div className="flex items-center gap-4 flex-shrink-0">
+          <span className="text-xs hidden md:inline whitespace-nowrap" style={{ color: "var(--text-tertiary)" }}>
             ADK · Gemini Vision · 5 Agents · CelesTrak
           </span>
           {state.analysisStatus === "analyzing" && (
