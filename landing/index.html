@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Orbital Inspect — Satellite Risk Intelligence, Screened in 45 Seconds</title>
+<meta name="description" content="Public-source satellite risk intelligence and evidence triage for orbital asset operators, insurers, and defense primes. Screened in under 45 seconds." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg0:#020208; --bg1:#060610; --panel:#0a0a16;
+    --ink:#e4e6ef; --mut:#8890a8; --mut2:#6e7795;
+    --blue:#4d7cff; --cyan:#00d4ff; --vio:#8b5cf6;
+    --ok:#22c55e; --warn:#eab308; --hot:#f97316; --crit:#ef4444;
+    --hair:rgba(228,230,239,.09); --hair2:rgba(228,230,239,.16);
+    --serif:'Instrument Serif',Georgia,serif;
+    --sans:'IBM Plex Sans',system-ui,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg0);color:var(--ink);font-family:var(--sans);overflow-x:clip;}
+  ::selection{background:var(--cyan);color:#02131a}
+  a{color:inherit;text-decoration:none}
+  .mono{font-family:var(--mono)}
+
+  /* ---------- entrance choreography ---------- */
+  @keyframes heroReveal{0%{opacity:0;transform:translateY(28px);filter:blur(12px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
+  @keyframes fadeUp{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:translateY(0)}}
+  .anim{opacity:0;animation-fill-mode:both;animation-timing-function:cubic-bezier(.16,1,.3,1)}
+  .a-reveal{animation-name:heroReveal;animation-duration:1.1s}
+  .a-fade{animation-name:fadeUp;animation-duration:1s}
+  /* scroll reveals */
+  .rv{opacity:0;transform:translateY(26px);transition:opacity .9s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1)}
+  .rv.on{opacity:1;transform:none}
+
+  /* ---------- nav ---------- */
+  nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:18px clamp(18px,3.5vw,44px);transition:background .35s,box-shadow .35s;}
+  nav.scrolled{background:rgba(2,2,8,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 1px 0 var(--hair);}
+  .logo{display:flex;align-items:center;gap:11px}
+  .logo svg{width:30px;height:30px}
+  .logo b{font-family:var(--serif);font-weight:400;font-size:1.35rem;letter-spacing:.01em}
+  .navpill{position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:2px;padding:6px;border-radius:999px;
+    background:rgba(255,255,255,.01);background-blend-mode:luminosity;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    box-shadow:inset 0 1px 1px rgba(255,255,255,.1);overflow:hidden;}
+  .navpill::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1.2px;
+    background:linear-gradient(180deg,rgba(255,255,255,.4) 0%,rgba(255,255,255,.12) 22%,rgba(255,255,255,0) 42%,rgba(255,255,255,0) 62%,rgba(255,255,255,.12) 82%,rgba(255,255,255,.4) 100%);
+    -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;}
+  .navpill a{padding:7px 16px;border-radius:999px;font-size:.84rem;color:var(--mut);transition:color .25s,background .25s}
+  .navpill a:hover{color:var(--ink);background:rgba(255,255,255,.07)}
+  .navpill a.active{color:var(--ink)}
+  .navcta{background:var(--ink);color:#0a0a14;font-weight:600;font-size:.85rem;padding:10px 20px;border-radius:999px;transition:transform .2s}
+  .navcta:hover{transform:scale(1.03)}
+  @media(max-width:880px){.navpill,.navcta{display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{position:relative;height:100vh;height:100dvh;overflow:hidden;background:var(--bg0);}
+  .hero__base{position:absolute;inset:0;z-index:10}
+  #stars{position:absolute;inset:0;width:100%;height:100%}
+  .earthglow{position:absolute;left:-20%;right:-20%;bottom:-58vh;height:80vh;border-radius:50%;
+    background:radial-gradient(50% 50% at 50% 50%,rgba(77,124,255,.20) 0%,rgba(77,124,255,.06) 45%,transparent 70%);}
+  .earthlimb{position:absolute;left:-25%;right:-25%;bottom:-72vh;height:80vh;border-radius:50%;background:#04040c;box-shadow:0 -1px 0 rgba(0,212,255,.35),0 -14px 60px rgba(0,212,255,.12);}
+  .sat{position:absolute;left:63%;top:46%;width:clamp(220px,26vw,400px);transform:translate(-50%,-50%);}
+  .sat svg{width:100%;height:auto;display:block;animation:drift 14s ease-in-out infinite alternate}
+  @keyframes drift{0%{transform:translate(0,0) rotate(-1.2deg)}100%{transform:translate(0,-14px) rotate(1.2deg)}}
+
+  /* evidence layer — revealed by the screening beam */
+  .hero__evidence{position:absolute;inset:0;z-index:30;pointer-events:none;
+    -webkit-mask-image:radial-gradient(circle 290px at var(--mx,72%) var(--my,45%),#000 0 42%,rgba(0,0,0,.72) 60%,rgba(0,0,0,.16) 84%,transparent 100%);
+    mask-image:radial-gradient(circle 290px at var(--mx,72%) var(--my,45%),#000 0 42%,rgba(0,0,0,.72) 60%,rgba(0,0,0,.16) 84%,transparent 100%);}
+  .ev-grid{position:absolute;inset:0;
+    background-image:linear-gradient(rgba(0,212,255,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.14) 1px,transparent 1px);
+    background-size:56px 56px;}
+  .ev-tint{position:absolute;inset:0;background:radial-gradient(60% 60% at 63% 46%,rgba(0,212,255,.10),transparent 70%)}
+  .ann{position:absolute;font-family:var(--mono);font-size:clamp(.55rem,.8vw,.72rem);letter-spacing:.08em;color:var(--cyan);}
+  .ann .box{position:absolute;inset:0;border:1px solid rgba(0,212,255,.85);box-shadow:0 0 18px rgba(0,212,255,.25);}
+  .ann .box i{position:absolute;width:7px;height:7px;border:1.5px solid var(--cyan);}
+  .ann .box i:nth-child(1){top:-2px;left:-2px;border-right:0;border-bottom:0}
+  .ann .box i:nth-child(2){top:-2px;right:-2px;border-left:0;border-bottom:0}
+  .ann .box i:nth-child(3){bottom:-2px;left:-2px;border-right:0;border-top:0}
+  .ann .box i:nth-child(4){bottom:-2px;right:-2px;border-left:0;border-top:0}
+  .ann .tag{position:absolute;white-space:nowrap;background:rgba(2,2,8,.82);border:1px solid rgba(0,212,255,.4);padding:5px 8px;line-height:1.5;}
+  .ann .tag b{font-weight:500}
+  .ann .tag .ok{color:var(--ok)} .ann .tag .warn{color:var(--warn)} .ann .tag .hot{color:var(--hot)}
+  .ann .lead{position:absolute;background:rgba(0,212,255,.55);}
+  .scanline{position:absolute;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,212,255,.5),transparent);top:46%;animation:scan 7s ease-in-out infinite alternate;}
+  @keyframes scan{0%{top:30%}100%{top:64%}}
+
+  /* hero copy */
+  .hero__copy{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;
+    padding:0 clamp(20px,5vw,72px);pointer-events:none;}
+  .hero__copy>*{pointer-events:auto}
+  .eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.28em;color:var(--cyan);text-transform:uppercase;}
+  .hero h1{font-family:var(--serif);font-weight:400;font-size:clamp(2.9rem,7.2vw,6.4rem);line-height:.98;letter-spacing:-.015em;margin-top:22px;max-width:11ch;}
+  .hero h1 em{font-style:italic;color:var(--mut);}
+  .hero .sub{margin-top:26px;max-width:52ch;color:var(--mut);font-size:clamp(.95rem,1.15vw,1.08rem);line-height:1.65;}
+  .hero .sub b{color:var(--ink);font-weight:500}
+  .ctas{display:flex;flex-wrap:wrap;gap:14px;margin-top:36px;}
+  .btn{display:inline-block;border-radius:999px;font-weight:600;font-size:.92rem;padding:14px 28px;transition:transform .2s,box-shadow .25s,background .25s;cursor:pointer}
+  .btn-p{background:var(--blue);color:#fff;box-shadow:0 0 0 rgba(77,124,255,0)}
+  .btn-p:hover{transform:scale(1.03);box-shadow:0 8px 34px rgba(77,124,255,.35);background:#5d88ff}
+  .btn-g{border:1px solid var(--hair2);color:var(--ink)}
+  .btn-g:hover{transform:scale(1.03);background:rgba(255,255,255,.06)}
+  .beamhint{position:absolute;left:clamp(20px,5vw,72px);bottom:calc(26px + env(safe-area-inset-bottom));z-index:50;
+    font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mut2);}
+  .beamhint i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--cyan);margin-right:9px;vertical-align:1px;
+    box-shadow:0 0 12px var(--cyan);animation:pulse 2s ease-in-out infinite;}
+  @keyframes pulse{50%{opacity:.35}}
+
+  /* ---------- stat bar ---------- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);background:var(--bg1);}
+  .stat{padding:clamp(22px,3vw,38px) clamp(16px,2.5vw,34px);border-left:1px solid var(--hair);}
+  .stat:first-child{border-left:0}
+  .stat b{display:block;font-family:var(--serif);font-weight:400;font-size:clamp(1.9rem,3.4vw,3rem);letter-spacing:-.01em;white-space:nowrap}
+  .stat b .unit{display:inline;color:var(--mut);font-size:.6em}
+  .stat span{display:block;margin-top:8px;font-family:var(--mono);font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--mut2);}
+  @media(max-width:880px){.stats{grid-template-columns:1fr 1fr}.stat:nth-child(3){border-left:0}}
+
+  /* ---------- sections ---------- */
+  section{position:relative}
+  .wrap{max-width:1180px;margin:0 auto;padding:clamp(72px,10vw,130px) clamp(20px,5vw,44px);}
+  .sec-eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.28em;color:var(--cyan);text-transform:uppercase}
+  .sec-title{font-family:var(--serif);font-weight:400;font-size:clamp(2rem,4.4vw,3.6rem);line-height:1.04;letter-spacing:-.01em;margin-top:16px;max-width:22ch}
+  .sec-title em{font-style:italic;color:var(--mut)}
+  .sec-sub{margin-top:16px;color:var(--mut);max-width:60ch;line-height:1.65;font-size:.98rem}
+
+  /* pillars */
+  .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:52px;}
+  .pillar{border:1px solid var(--hair);border-radius:14px;background:linear-gradient(180deg,var(--panel),var(--bg1));padding:28px 26px 30px;
+    transition:transform .3s cubic-bezier(.16,1,.3,1),border-color .3s;}
+  .pillar:hover{transform:translateY(-4px);border-color:rgba(0,212,255,.35)}
+  .pillar .glyph{width:38px;height:38px;margin-bottom:20px}
+  .pillar h3{font-family:var(--mono);font-weight:500;font-size:.85rem;letter-spacing:.24em;color:var(--ink)}
+  .pillar h4{font-family:var(--serif);font-weight:400;font-size:1.5rem;margin-top:10px}
+  .pillar p{margin-top:12px;color:var(--mut);font-size:.9rem;line-height:1.65}
+  .pillar .foot{margin-top:18px;font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;color:var(--mut2)}
+  .pillar:nth-child(1) .foot b{color:var(--cyan)} .pillar:nth-child(2) .foot b{color:var(--vio)} .pillar:nth-child(3) .foot b{color:var(--ok)}
+  @media(max-width:880px){.pillars{grid-template-columns:1fr}}
+
+  /* pipeline rail */
+  .rail{margin-top:60px;position:relative;}
+  .rail::before{content:'';position:absolute;left:0;right:0;top:26px;height:1px;background:var(--hair);}
+  .rail .line{position:absolute;left:0;top:26px;height:1px;width:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));
+    transform:scaleX(0);transform-origin:0 50%;transition:transform 1.6s cubic-bezier(.16,1,.3,1);}
+  .rail.on .line{transform:scaleX(1)}
+  .stages{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+  .stage{padding-top:52px;position:relative;opacity:0;transform:translateY(18px);transition:opacity .8s cubic-bezier(.16,1,.3,1),transform .8s cubic-bezier(.16,1,.3,1);}
+  .rail.on .stage{opacity:1;transform:none}
+  .stage::before{content:'';position:absolute;top:21px;left:0;width:11px;height:11px;border-radius:50%;background:var(--bg0);border:1.5px solid var(--cyan);box-shadow:0 0 12px rgba(0,212,255,.4);}
+  .stage .n{font-family:var(--mono);font-size:.66rem;letter-spacing:.2em;color:var(--cyan)}
+  .stage h5{font-size:.95rem;font-weight:600;margin-top:8px;letter-spacing:.01em}
+  .stage p{margin-top:8px;font-size:.8rem;color:var(--mut);line-height:1.6}
+  .rail .sse{margin-top:44px;font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;color:var(--mut2);text-transform:uppercase}
+  .rail .sse b{color:var(--ok);font-weight:500}
+  @media(max-width:880px){.stages{grid-template-columns:1fr 1fr}.rail::before,.rail .line{display:none}.stage{padding-top:0;padding-left:26px}.stage::before{top:4px}}
+
+  /* trust / fail-closed */
+  .trust{background:var(--bg1);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);}
+  .trust blockquote{font-family:var(--serif);font-weight:400;font-size:clamp(1.7rem,3.6vw,3rem);line-height:1.14;letter-spacing:-.01em;max-width:26ch;margin-top:26px;}
+  .trust blockquote .fc{font-family:var(--mono);font-size:.5em;letter-spacing:.1em;color:var(--crit);border:1px solid rgba(239,68,68,.45);padding:6px 12px;border-radius:6px;vertical-align:.35em;white-space:nowrap;}
+  .trust blockquote em{font-style:italic;color:var(--mut)}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin-top:40px;}
+  .chip{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;padding:9px 14px;border:1px solid var(--hair2);border-radius:6px;color:var(--mut);}
+  .chip.hot{border-color:rgba(239,68,68,.4);color:var(--crit)}
+  .chip.warn{border-color:rgba(234,179,8,.4);color:var(--warn)}
+  .trust ul{margin-top:34px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;list-style:none;}
+  .trust li{border-left:1px solid var(--hair2);padding-left:16px;font-size:.85rem;color:var(--mut);line-height:1.6}
+  .trust li b{display:block;color:var(--ink);font-weight:500;margin-bottom:4px}
+  @media(max-width:880px){.trust ul{grid-template-columns:1fr}}
+
+  /* final CTA + footer */
+  .final{text-align:center}
+  .final .sec-title{margin-left:auto;margin-right:auto}
+  .final .ctas{justify-content:center}
+  footer{border-top:1px solid var(--hair);padding:34px clamp(20px,5vw,44px);display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;
+    font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;color:var(--mut2);}
+  footer .pos{font-style:italic;font-family:var(--serif);font-size:.95rem;letter-spacing:0;color:var(--mut)}
+
+  @media (prefers-reduced-motion: reduce){
+    .anim,.rv{animation:none !important;transition:none !important;opacity:1 !important;transform:none !important;filter:none !important}
+    .rail .line{transition:none;transform:scaleX(1)} .rail .stage{opacity:1;transform:none}
+    .sat svg,.scanline,.beamhint i{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="logo anim a-fade" style="animation-delay:0s" href="#">
+    <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <circle cx="16" cy="16" r="6.5" stroke="#e4e6ef" stroke-width="1.6"/>
+      <ellipse cx="16" cy="16" rx="14" ry="5.5" stroke="#00d4ff" stroke-width="1.2" transform="rotate(-18 16 16)"/>
+      <circle cx="27.5" cy="10.5" r="2" fill="#4d7cff"/>
+    </svg>
+    <b>Orbital Inspect</b>
+  </a>
+  <div class="navpill anim a-fade" style="animation-delay:.1s">
+    <a class="active" href="#">Platform</a><a href="#pipeline">Pipeline</a><a href="#trust">Trust</a><a href="#cta">Pricing</a>
+  </div>
+  <a class="navcta anim a-fade" style="animation-delay:.15s" href="#cta">Book a demo</a>
+</nav>
+
+<header class="hero" id="hero">
+  <div class="hero__base">
+    <canvas id="stars"></canvas>
+    <div class="earthglow"></div>
+    <div class="earthlimb"></div>
+    <div class="sat" aria-hidden="true">
+      <svg viewBox="0 0 400 220" fill="none">
+        <!-- left array -->
+        <g stroke="#5a6480" stroke-width="1.4" opacity=".9">
+          <rect x="8" y="78" width="118" height="64" rx="3" fill="#0b1020"/>
+          <path d="M47 78v64M86 78v64M8 110h118"/>
+        </g>
+        <!-- right array -->
+        <g stroke="#5a6480" stroke-width="1.4" opacity=".9">
+          <rect x="274" y="78" width="118" height="64" rx="3" fill="#0b1020"/>
+          <path d="M313 78v64M352 78v64M274 110h118"/>
+        </g>
+        <!-- trusses -->
+        <path d="M126 110h34M240 110h34" stroke="#7e88a3" stroke-width="3"/>
+        <!-- bus -->
+        <rect x="160" y="72" width="80" height="76" rx="8" fill="#101528" stroke="#8890a8" stroke-width="1.6"/>
+        <rect x="172" y="84" width="56" height="20" rx="3" fill="#0a0f1f" stroke="#5a6480" stroke-width="1"/>
+        <!-- dish -->
+        <ellipse cx="200" cy="52" rx="26" ry="10" fill="#0d1226" stroke="#8890a8" stroke-width="1.4"/>
+        <path d="M200 52v20" stroke="#8890a8" stroke-width="1.4"/>
+        <!-- thruster -->
+        <path d="M188 148h24l-5 14h-14z" fill="#0d1226" stroke="#5a6480" stroke-width="1.2"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- the intelligence layer, revealed only inside the screening beam -->
+  <div class="hero__evidence" id="evidence" aria-hidden="true">
+    <div class="ev-grid"></div><div class="ev-tint"></div><div class="scanline"></div>
+    <div class="ann" style="left:47.5%;top:32%;width:12.5%;height:22%">
+      <span class="box"><i></i><i></i><i></i><i></i></span>
+      <span class="tag" style="left:0;top:-46px">BUS · THERMAL <b class="ok">NOMINAL</b> · CONF 0.94</span>
+    </div>
+    <div class="ann" style="left:56.5%;top:52%;width:9%;height:13%">
+      <span class="box"><i></i><i></i><i></i><i></i></span>
+      <span class="tag" style="left:-8px;top:calc(100% + 10px)">THRUSTER · PLUME RESIDUE <b class="warn">REVIEW</b></span>
+    </div>
+    <div class="ann" style="left:66.5%;top:38.5%;width:9.5%;height:15%">
+      <span class="box"><i></i><i></i><i></i><i></i></span>
+      <span class="tag" style="left:-10px;top:calc(100% + 12px)">ARRAY-B · DEGRADATION <b class="hot">0.72</b><br>TREND −2.1%/90d · <b class="warn">T-THRESHOLD 210d</b></span>
+    </div>
+    <div class="ann" style="left:8%;top:74%">
+      <span class="tag">SRC LEOLABS ✓ · SENTINEL-2 ✓ · TLE 18 SPD ✓ &nbsp;|&nbsp; GAP: SAR (LAST 14d) → <b class="warn">FURTHER_INVESTIGATION</b></span>
+    </div>
+    <div class="ann" style="right:4%;top:16%">
+      <span class="tag">SCREEN 00:41 / 45 · PIPELINE 5/5 · <b class="ok">FAIL-CLOSED ARMED</b></span>
+    </div>
+  </div>
+
+  <div class="hero__copy">
+    <span class="eyebrow anim a-fade" style="animation-delay:.15s">Public-source satellite risk intelligence</span>
+    <h1>
+      <span class="anim a-reveal" style="display:block;animation-delay:.25s">Evidence out</span>
+      <span class="anim a-reveal" style="display:block;animation-delay:.42s">of darkness, <em>in 45 seconds.</em></span>
+    </h1>
+    <p class="sub anim a-fade" style="animation-delay:.65s">Upload satellite imagery. Get a public-data risk screen — <b>source quality, evidence gaps, review-required actions</b> — before any operational or underwriting decision. Built for operators, insurers, and defense primes in the $630B space economy.</p>
+    <div class="ctas anim a-fade" style="animation-delay:.8s">
+      <a class="btn btn-p" href="#cta">Request a screening</a>
+      <a class="btn btn-g" href="#pipeline">Watch the pipeline</a>
+    </div>
+  </div>
+  <div class="beamhint anim a-fade" style="animation-delay:1.15s"><i></i>The beam is the screening — move your cursor</div>
+</header>
+
+<div class="stats" id="stats">
+  <div class="stat rv"><b data-count="630" data-prefix="$" data-suffix="B">$0B</b><span>Space economy screened</span></div>
+  <div class="stat rv"><b data-count="45" data-prefix="&lt;&thinsp;" data-suffix="s">&lt;&thinsp;0s</b><span>p95 screening latency</span></div>
+  <div class="stat rv"><b data-count="99.5" data-suffix="%" data-dec="1">0%</b><span>Pipeline completion SLO</span></div>
+  <div class="stat rv"><b data-count="5">0</b><span>Specialist AI agents per screen</span></div>
+</div>
+
+<section>
+  <div class="wrap">
+    <span class="sec-eyebrow rv">The platform</span>
+    <h2 class="sec-title rv">Bloomberg Terminal <em>meets</em> SpaceX Mission Control.</h2>
+    <p class="sec-sub rv">A decision-intelligence platform — not a generic AI image analyzer. Real public data, provable methodology, a human in the loop, and a trust mechanism that fails closed.</p>
+    <div class="pillars">
+      <div class="pillar rv">
+        <svg class="glyph" viewBox="0 0 38 38" fill="none"><circle cx="19" cy="19" r="9" stroke="#00d4ff" stroke-width="1.6"/><path d="M19 2v8M19 28v8M2 19h8M28 19h8" stroke="#00d4ff" stroke-width="1.6"/></svg>
+        <h3>INSPECT</h3><h4>Five agents, one verdict.</h4>
+        <p>Orbital classification → visual damage assessment → environmental hazard → failure-mode analysis → insurance risk synthesis. Every stage cites its public sources.</p>
+        <div class="foot"><b>●</b> STREAMED LIVE · SSE</div>
+      </div>
+      <div class="pillar rv">
+        <svg class="glyph" viewBox="0 0 38 38" fill="none"><path d="M4 30 14 20l7 5L34 8" stroke="#8b5cf6" stroke-width="1.8" stroke-linecap="round"/><path d="M26 8h8v8" stroke="#8b5cf6" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <h3>PREDICT</h3><h4>Degradation, with a deadline.</h4>
+        <p>Trend analysis with time-to-threshold predictions per asset, and fleet-wide risk forecasting — so review happens before the anomaly, not after the claim.</p>
+        <div class="foot"><b>●</b> TIME-TO-THRESHOLD · FLEET VIEW</div>
+      </div>
+      <div class="pillar rv">
+        <svg class="glyph" viewBox="0 0 38 38" fill="none"><path d="M19 3l13 5v9c0 8-5.5 14.5-13 18C11.5 31.5 6 25 6 17V8z" stroke="#22c55e" stroke-width="1.7"/><path d="M13 18.5l4.4 4L26 13" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <h3>PROTECT</h3><h4>Classification is a feature.</h4>
+        <p>ITAR/CUI marking with highest-classification-wins propagation, full audit trail, role-based access. Self-host the app; default screening uses a model API unless you bring your own endpoint.</p>
+        <div class="foot"><b>●</b> ITAR · CUI · SELF-HOSTED APP</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pipeline" style="background:var(--bg1);border-top:1px solid var(--hair)">
+  <div class="wrap">
+    <span class="sec-eyebrow rv">The pipeline</span>
+    <h2 class="sec-title rv">Forty-five seconds, <em>fully witnessed.</em></h2>
+    <p class="sec-sub rv">Each screening streams its reasoning live. You watch every agent commit to its evidence — and to what it could not find.</p>
+    <div class="rail" id="rail">
+      <div class="line"></div>
+      <div class="stages">
+        <div class="stage" style="transition-delay:.05s"><span class="n">01</span><h5>Orbital classification</h5><p>Regime, attitude, and configuration against public catalogs.</p></div>
+        <div class="stage" style="transition-delay:.17s"><span class="n">02</span><h5>Visual damage assessment</h5><p>Structural anomalies located and graded on the imagery itself.</p></div>
+        <div class="stage" style="transition-delay:.29s"><span class="n">03</span><h5>Environmental hazard</h5><p>Debris flux, radiation, and conjunction context for the orbit.</p></div>
+        <div class="stage" style="transition-delay:.41s"><span class="n">04</span><h5>Failure-mode analysis</h5><p>Component-level pathways ranked by observed evidence.</p></div>
+        <div class="stage" style="transition-delay:.53s"><span class="n">05</span><h5>Insurance risk synthesis</h5><p>Composite screening priority with underwriting authority boundaries.</p></div>
+      </div>
+      <div class="sse rv">▶ live stream · server-sent events · <b>99.5% completion</b> · p95 &lt; 45s</div>
+    </div>
+  </div>
+</section>
+
+<section class="trust" id="trust">
+  <div class="wrap">
+    <span class="sec-eyebrow rv">The trust mechanism</span>
+    <blockquote class="rv">When evidence is incomplete, the verdict is <span class="fc">FURTHER_INVESTIGATION</span> — <em>never invented certainty.</em></blockquote>
+    <div class="chips rv">
+      <span class="chip">UNCLASSIFIED</span><span class="chip warn">CUI</span><span class="chip hot">ITAR_CONTROLLED</span><span class="chip">PROPRIETARY</span>
+    </div>
+    <ul>
+      <li class="rv"><b>Fail-closed by design</b>Any stage failure or evidence gap escalates to human review. The system cannot bluff.</li>
+      <li class="rv"><b>Provable methodology</b>Every claim carries its public source and confidence — auditable end to end, exportable as a signed PDF.</li>
+      <li class="rv"><b>Yours to deploy</b>Helm chart and DB-backed feature flags. The app self-hosts; default screening still calls a model API unless you supply an endpoint.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="final" id="cta">
+  <div class="wrap">
+    <span class="sec-eyebrow rv">Get screened</span>
+    <h2 class="sec-title rv">Your fleet has public evidence. <em>Read it first.</em></h2>
+    <div class="ctas rv" style="margin-top:34px">
+      <a class="btn btn-p" href="mailto:hello@orbitalinspect.example">Request a screening</a>
+      <a class="btn btn-g" href="#hero">Back to the beam</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>ORBITAL INSPECT · BSL 1.1</span>
+  <span class="pos">Satellite risk intelligence, screened in 45 seconds.</span>
+  <span>INSPECT · PREDICT · PROTECT</span>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- starfield (tier-A procedural atmosphere) ---- */
+  var cv = document.getElementById('stars'), cx = cv.getContext('2d'), stars = [];
+  function seedStars(){
+    cv.width = innerWidth; cv.height = innerHeight; stars = [];
+    var n = Math.floor(innerWidth * innerHeight / 6500);
+    for (var i = 0; i < n; i++) stars.push({
+      x: Math.random()*cv.width, y: Math.random()*cv.height,
+      r: Math.random()*1.15 + .25, a: Math.random()*.55 + .18, p: Math.random()*6.28
+    });
+    paintStars(0);
+  }
+  function paintStars(t){
+    cx.clearRect(0,0,cv.width,cv.height);
+    for (var i = 0; i < stars.length; i++){
+      var s = stars[i], tw = reduce ? 1 : (.72 + .28*Math.sin(t/1400 + s.p));
+      cx.globalAlpha = s.a * tw;
+      cx.fillStyle = i % 9 === 0 ? '#9fd9ff' : '#dfe6f5';
+      cx.beginPath(); cx.arc(s.x, s.y, s.r, 0, 6.283); cx.fill();
+    }
+  }
+  seedStars();
+  var lastW = innerWidth;
+  addEventListener('resize', function(){ if (innerWidth !== lastW || !('ontouchstart' in window)) { lastW = innerWidth; seedStars(); } });
+
+  /* ---- the screening beam (signature mechanic) ----
+     Autonomous slow orbit around the satellite until the first real mouse move;
+     always autonomous on touch. Lerped, never snapped. */
+  var ev = document.getElementById('evidence');
+  var hero = document.getElementById('hero');
+  var mx = innerWidth*.66, my = innerHeight*.45, sx = mx, sy = my;
+  var manual = false, t0 = 0;
+  addEventListener('mousemove', function(e){
+    if (e.target && hero.contains(e.target) || e.clientY < innerHeight) { manual = true; mx = e.clientX; my = e.clientY; }
+  }, {passive:true});
+  function beam(t){
+    if (!manual){
+      var cxp = innerWidth*.60, cyp = innerHeight*.46;
+      mx = cxp + Math.sin(t/2600)*innerWidth*.14;
+      my = cyp + Math.cos(t/3400)*innerHeight*.13;
+    }
+    sx += (mx - sx)*(reduce ? 1 : .08);
+    sy += (my - sy)*(reduce ? 1 : .08);
+    ev.style.setProperty('--mx', sx.toFixed(1) + 'px');
+    ev.style.setProperty('--my', sy.toFixed(1) + 'px');
+    paintStars(t);
+    requestAnimationFrame(beam);
+  }
+  if (reduce){
+    ev.style.setProperty('--mx', (innerWidth*.63)+'px');
+    ev.style.setProperty('--my', (innerHeight*.45)+'px');
+    paintStars(0);
+  } else requestAnimationFrame(beam);
+
+  /* ---- nav scrolled state ---- */
+  var navEl = document.querySelector('nav');
+  addEventListener('scroll', function(){ navEl.classList.toggle('scrolled', scrollY > innerHeight*.7); }, {passive:true});
+
+  /* ---- scroll reveals ---- */
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add('on'); io.unobserve(e.target); } });
+  }, {threshold:.18, rootMargin:'0px 0px -8% 0px'});
+  document.querySelectorAll('.rv').forEach(function(el){ io.observe(el); });
+  var rail = document.getElementById('rail');
+  new IntersectionObserver(function(es,ob){ es.forEach(function(e){ if (e.isIntersecting){ rail.classList.add('on'); ob.disconnect(); } }); }, {threshold:.3}).observe(rail);
+
+  /* ---- stat count-up ---- */
+  function countUp(el){
+    var target = parseFloat(el.dataset.count), dec = +(el.dataset.dec||0);
+    var pre = el.dataset.prefix||'', suf = el.dataset.suffix||'', t0 = null;
+    function frame(ts){
+      if (!t0) t0 = ts;
+      var p = Math.min(1, (ts - t0)/1300); p = 1 - Math.pow(1-p, 3);
+      el.innerHTML = pre + (target*p).toFixed(dec) + '<span class="unit">' + suf + '</span>';
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    if (reduce) el.innerHTML = pre + target.toFixed(dec) + '<span class="unit">' + suf + '</span>';
+    else requestAnimationFrame(frame);
+  }
+  new IntersectionObserver(function(es,ob){
+    es.forEach(function(e){ if (e.isIntersecting){ e.target.querySelectorAll('b[data-count]').forEach(countUp); ob.disconnect(); } });
+  }, {threshold:.4}).observe(document.getElementById('stats'));
+})();
+</script>
+</body>
+</html>

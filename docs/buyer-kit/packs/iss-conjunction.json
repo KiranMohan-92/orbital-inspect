@@ -1,0 +1,102 @@
+{
+  "schema": "orbital-inspect.evidence_pack.v1",
+  "report_title": "Public Risk Screen",
+  "assessment_mode": "PUBLIC_SCREEN",
+  "decision_authority": "SCREENING_ONLY",
+  "asset": {
+    "name": "ISS \u2014 public conjunction fixture",
+    "norad_id": "25544",
+    "satellite_type": "space_station",
+    "operator": "NASA, Roscosmos, ESA, JAXA, CSA",
+    "orbital_regime": "LEO"
+  },
+  "evidence_ledger": [
+    {
+      "id": "operator_telemetry",
+      "label": "Operator telemetry",
+      "status": "missing",
+      "description": "Power, thermal, attitude, command, and anomaly telemetry are required before underwriting conclusions."
+    },
+    {
+      "id": "calibrated_imagery",
+      "label": "Calibrated imagery",
+      "status": "missing",
+      "description": "Imagery needs range, scale, calibration, and image-quality metadata before physical damage dimensions are defensible."
+    },
+    {
+      "id": "camera_range_metadata",
+      "label": "Camera and range metadata",
+      "status": "missing",
+      "description": "Focal length, sensor pitch, GSD/range, pose, illumination, and scale reference are missing or incomplete."
+    },
+    {
+      "id": "spacecraft_geometry",
+      "label": "Spacecraft geometry",
+      "status": "missing",
+      "description": "Mass, projected area, subsystem geometry, materials, and exposed components are required for exposure modeling."
+    },
+    {
+      "id": "shielding_materials",
+      "label": "Shielding and materials",
+      "status": "missing",
+      "description": "Shielding depth and material stackups are required for MMOD/radiation vulnerability estimates."
+    },
+    {
+      "id": "covariance_cdm_quality",
+      "label": "Covariance/CDM quality",
+      "status": "present",
+      "description": "Buyer-supplied CDM accepted; Pc computed with foster_akella_alfriend_2d."
+    },
+    {
+      "id": "operator_anomaly_logs",
+      "label": "Operator anomaly logs",
+      "status": "missing",
+      "description": "Private anomaly, maintenance, and operations logs are required to connect public observations to spacecraft health."
+    },
+    {
+      "id": "actuarial_priors",
+      "label": "Actuarial priors",
+      "status": "missing",
+      "description": "Validated fleet loss priors, policy context, and claims history are required for loss probability and financial exposure."
+    }
+  ],
+  "blocked_claims": [
+    "financial_exposure_without_policy_or_operator_financials",
+    "physical_damage_dimensions_without_calibrated_imagery",
+    "power_impact_without_telemetry_or_measurement_chain",
+    "total_loss_probability_without_actuarial_model",
+    "underwriting_recommendation_without_private_evidence"
+  ],
+  "next_human_action": "request_telemetry",
+  "next_human_action_rationale": "Operator power, thermal, and attitude telemetry is required before any health or underwriting conclusion.",
+  "collision_probability": {
+    "collision_probability": 0.01074398255212092,
+    "null_reason": null,
+    "method": "foster_akella_alfriend_2d",
+    "hard_body_radius_m": 20.0,
+    "covariance_quality": "usable_psd",
+    "tca": "2026-06-01T12:34:56.789",
+    "miss_distance_m": 184.0,
+    "primary_designator": "25544",
+    "secondary_designator": "39208"
+  },
+  "public_source_notes": [
+    "NASA ORDEM 4.0",
+    "NOAA SWPC",
+    "MSIS-E-90 Atmospheric Model",
+    "AP-8/AE-8 Radiation Model"
+  ],
+  "visual_findings": [
+    {
+      "type": "debris_strike",
+      "severity": "SEVERE",
+      "description": "Significant structural puncture and substrate tearing in the central region of the solar array blanket. The damage involves loss of multiple photovoltaic cell segments and exposure of the underlying support matrix. Dimensions cannot be determined without calibrated scale reference."
+    }
+  ],
+  "summary": "Public Risk Screen result; screening-only authority. This pack lists what public evidence shows, what is missing, and what a human should request next. It is not an underwriting or bind decision.",
+  "reproducibility": {
+    "input_hash": "334f5e6eea3bbe1b296ef31ca3f109985e687a23e6080625885b2b1b5b0a6401",
+    "software_sha": "330df6552d116ea447dc5f24790de1b9a882026f",
+    "generated_at": "2026-08-12T00:00:00+00:00"
+  }
+}

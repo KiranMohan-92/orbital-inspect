@@ -93,7 +93,7 @@ Open `http://localhost:3017/#project/public-risk-screen`. To render the MP4, ins
 |---|---|---|
 | **Satellite operators** | anomaly triage, degradation tracking, attention queue, operator context | deep insurance language |
 | **Insurers / underwriters** | screening priority, missing evidence, PDF report, auditable review actions | low-level frontend details |
-| **Defense / national security** | deployment flexibility, classification controls, audit trail, no SaaS dependency | commercial-market framing |
+| **Defense / national security** | deployment flexibility, classification controls, audit trail, self-hosted app | commercial-market framing |
 | **Technical evaluators** | public data fusion, fail-closed pipeline, SSE flow, deployment path | marketing language |
 
 ## Shot list for recorded media

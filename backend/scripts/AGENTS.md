@@ -13,6 +13,7 @@ Backend maintenance and codegen scripts — schema snapshotting, type sync with 
 | `generate_types.py` | Generates `frontend/src/generated-types.ts` from OpenAPI (Audit Rec #9) |
 | `backfill_decisions.py` | Backfills decision records for legacy analyses |
 | `seed_benchmark_datasets.py` | Seeds the benchmark/eval dataset registry |
+| `generate_evidence_pack.py` | Concierge Evidence Pack (PDF+JSON) from demo cache or analysis JSON |
 
 ## For AI Agents
 

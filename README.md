@@ -13,6 +13,8 @@
 
 Upload satellite imagery. Get a public-data risk screen with source quality, evidence gaps, and review-required actions in under 45 seconds. Track degradation across your fleet and know what evidence is needed next.
 
+**Buyer kit (attachable Evidence Packs + pilot SOW):** [`docs/buyer-kit/`](docs/buyer-kit/README.md) — public-data credit report, not a bind decision. Generate packs with `python -m scripts.generate_evidence_pack` from `backend/`.
+
 ```
                         ┌─────────────────────────────────────────────────────┐
                         │              ORBITAL INSPECT                       │
@@ -49,7 +51,7 @@ Orbital Inspect answers that question with AI, real data, and provable methodolo
 | **Monitor a fleet** | Continuous ingestion of orbital, conjunction, and weather data |
 | **Predict degradation** | Linear regression trends with time-to-threshold predictions |
 | **Prove reliability** | SLO dashboard: 99.5% pipeline completion, p95 < 45s |
-| **Deploy anywhere** | Helm chart, air-gap compatible, no SaaS dependencies |
+| **Deploy anywhere** | Helm chart for self-hosted screening. Default analysis uses a hosted model API; air-gapped operation needs your own model endpoint. |
 
 ---
 
@@ -229,20 +231,20 @@ Open `http://localhost:5173`, launch a built-in demo case, let the pipeline fini
     Image Upload                    5-Agent Pipeline                      Output
   ┌─────────────┐    ┌──────────────────────────────────────────┐    ┌──────────────┐
   │             │    │                                          │    │              │
-  │  Satellite  │    │  Stage 1: ORBITAL CLASSIFICATION         │    │  Risk Matrix │
-  │  Image      │───>│  - Satellite type, bus platform          │───>│  - Composite │
-  │  + Context  │    │  - Orbital regime (LEO/MEO/GEO/HEO)     │    │    score     │
-  │  + NORAD ID │    │  - Fail-closed: invalid -> REJECTED      │    │  - Risk tier │
-  │             │    │                                          │    │  - Financial │
-  └─────────────┘    │  Stage 2: SATELLITE VISION               │    │    exposure  │
+  │  Satellite  │    │  Stage 1: ORBITAL CLASSIFICATION         │    │  Evidence    │
+  │  Image      │───>│  - Satellite type, bus platform          │───>│  Pack        │
+  │  + Context  │    │  - Orbital regime (LEO/MEO/GEO/HEO)     │    │  - Gaps      │
+  │  + NORAD ID │    │  - Fail-closed: invalid -> REJECTED      │    │  - Blocked   │
+  │             │    │                                          │    │    claims    │
+  └─────────────┘    │  Stage 2: SATELLITE VISION               │    │              │
                      │  - Micrometeorite damage detection        │    │              │
-  ┌─────────────┐    │  - Solar cell degradation assessment     │    │  Underwriting│
-  │ Free Data   │    │  - Thermal anomaly identification        │    │  Recommend.  │
-  │ Enrichment  │    │                                          │    │  - INSURABLE │
-  │             │    │  Stage 3: ORBITAL ENVIRONMENT             │    │  - ELEVATED  │
-  │ CelesTrak   │───>│  - ORDEM debris flux at altitude         │    │  - HIGH_RISK │
-  │ SOCRATES    │    │  - NOAA space weather conditions          │    │  - FURTHER   │
-  │ NOAA SWPC   │    │  - Radiation and thermal environment     │    │    INVEST.   │
+  ┌─────────────┐    │  - Solar cell degradation assessment     │    │  Authority   │
+  │ Free Data   │    │  - Thermal anomaly identification        │    │  - SCREENING │
+  │ Enrichment  │    │                                          │    │    _ONLY     │
+  │             │    │  Stage 3: ORBITAL ENVIRONMENT             │    │  - FURTHER   │
+  │ CelesTrak   │───>│  - ORDEM debris flux at altitude         │    │    INVEST.   │
+  │ SOCRATES    │    │  - NOAA space weather conditions          │    │  - request_  │
+  │ NOAA SWPC   │    │  - Radiation and thermal environment     │    │    evidence  │
   │ SatNOGS     │    │                                          │    │              │
   │ UCS         │    │  Stage 4: FAILURE MODE ANALYSIS           │    │  Triage      │
   │ ORDEM       │    │  - Historical precedent matching          │    │  - Band      │

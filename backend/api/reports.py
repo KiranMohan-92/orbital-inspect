@@ -38,6 +38,9 @@ def _report_payload(analysis) -> dict:
         "assessment_mode": insurance.get("assessment_mode") or capture_metadata.get("assessment_mode", "PUBLIC_SCREEN"),
         "decision_authority": insurance.get("decision_authority") or evidence_contract.get("decision_authority", "SCREENING_ONLY"),
         "report_title": insurance.get("report_title") or evidence_contract.get("report_title", "Public Risk Screen"),
+        "capture_metadata": capture_metadata,
+        "norad_id": getattr(analysis, "norad_id", None) or capture_metadata.get("norad_id"),
+        "asset_name": getattr(analysis, "asset_name", None),
         "classification": analysis.classification_result,
         "vision": analysis.vision_result,
         "environment": analysis.environment_result,
@@ -303,9 +306,15 @@ async def generate_inline_pdf(
     _rate_limit=Depends(require_rate_limit("report")),
 ):
     try:
-        from services.pdf_report_service import generate_html_report
+        from services.evidence_pack_service import build_evidence_pack, render_pack_html
 
-        html = generate_html_report(data)
+        pack = build_evidence_pack(
+            analysis=data,
+            cdm_text=(data.get("capture_metadata") or {}).get("cdm_text"),
+            asset_name=data.get("asset_name"),
+            norad_id=data.get("norad_id"),
+        )
+        html = render_pack_html(pack)
         return HTMLResponse(content=html, media_type="text/html")
     except Exception as e:
         log.error("Inline PDF generation failed: %s", e)
@@ -321,7 +330,11 @@ async def generate_pdf(
     try:
         from db.base import async_session_factory
         from db.repository import AnalysisRepository, ReportRepository, AuditLogRepository
-        from services.pdf_report_service import generate_html_report, generate_pdf_report
+        from services.evidence_pack_service import (
+            build_evidence_pack,
+            render_pack_html,
+            render_pack_pdf,
+        )
         from services.storage_service import get_storage_backend
 
         async with async_session_factory() as session:
@@ -345,8 +358,14 @@ async def generate_pdf(
                 )
 
             report_data = _report_payload(analysis)
-            html = generate_html_report(report_data, report_id=report.id[:12])
-            pdf_bytes = generate_pdf_report(report_data, report_id=report.id[:12])
+            pack = build_evidence_pack(
+                analysis=report_data,
+                cdm_text=(report_data.get("capture_metadata") or {}).get("cdm_text"),
+                asset_name=report_data.get("asset_name"),
+                norad_id=report_data.get("norad_id"),
+            )
+            html = render_pack_html(pack)
+            pdf_bytes = render_pack_pdf(pack, html=html)
             artifact_bytes = pdf_bytes if pdf_bytes else html.encode("utf-8")
             artifact_kind = "pdf" if pdf_bytes else "html"
             artifact_content_type = "application/pdf" if pdf_bytes else "text/html; charset=utf-8"

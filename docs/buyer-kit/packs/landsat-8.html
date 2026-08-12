@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Public Risk Screen — LANDSAT-8</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm; }
+  body { font-family: Georgia, "Times New Roman", serif; color: #111827; font-size: 10.5pt; line-height: 1.45; }
+  h1 { font-size: 18pt; margin: 0 0 4px; }
+  h2 { font-size: 12pt; letter-spacing: 0.08em; text-transform: uppercase; margin: 22px 0 8px; border-bottom: 1px solid #d1d5db; padding-bottom: 4px; }
+  .kicker { font-family: "Courier New", monospace; font-size: 8pt; letter-spacing: 0.18em; color: #6b7280; }
+  .banner { background: #111827; color: #f9fafb; padding: 10px 12px; margin: 12px 0 18px; font-family: "Courier New", monospace; font-size: 9pt; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin-bottom: 12px; }
+  .meta div { font-size: 9.5pt; }
+  .label { font-family: "Courier New", monospace; font-size: 7.5pt; color: #6b7280; text-transform: uppercase; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 6px; border-bottom: 1px solid #e5e7eb; }
+  th { font-family: "Courier New", monospace; font-size: 7.5pt; letter-spacing: 0.08em; color: #6b7280; }
+  .missing { color: #b45309; }
+  .present { color: #166534; }
+  .null { background: #fff7ed; padding: 10px 12px; border: 1px solid #fdba74; }
+  .stamp { font-family: "Courier New", monospace; font-size: 7.5pt; color: #6b7280; word-break: break-all; }
+  .disclaimer { margin-top: 22px; font-size: 9pt; border-top: 1px solid #111827; padding-top: 10px; }
+</style>
+</head>
+<body>
+  <div class="kicker">Orbital Inspect · Evidence Pack v1</div>
+  <h1>Public Risk Screen</h1>
+  <p>LANDSAT-8 · NORAD 39084</p>
+  <div class="banner">
+    DECISION AUTHORITY: SCREENING_ONLY · MODE: PUBLIC_SCREEN<br>
+    This is a public-data screen. It is not an underwriting determination and must not be used to bind coverage.
+  </div>
+  <div class="meta">
+    <div><div class="label">Operator / type</div>USGS / NASA / earth_observation</div>
+    <div><div class="label">Regime</div>SSO</div>
+    <div><div class="label">Next human action</div>request_cdm</div>
+    <div><div class="label">Generated</div>2026-08-12T00:00:00+00:00</div>
+  </div>
+  <p>A usable Conjunction Data Message with positive-semidefinite covariance is required before collision probability can be computed.</p>
+
+  <h2>Collision probability</h2>
+  
+  
+    <div class="null"><strong>Pc = NULL</strong><br>Pc is NULL because no buyer-supplied CDM was provided. Public SOCRATES/CelesTrak columns are not a computed collision probability.</div>
+  
+
+  <h2>Evidence ledger</h2>
+  <table>
+    <thead><tr><th>Class</th><th>Status</th><th>Why it matters</th></tr></thead>
+    <tbody>
+    
+      <tr>
+        <td>Operator telemetry</td>
+        <td class="missing">missing</td>
+        <td>Power, thermal, attitude, command, and anomaly telemetry are required before underwriting conclusions.</td>
+      </tr>
+    
+      <tr>
+        <td>Calibrated imagery</td>
+        <td class="missing">missing</td>
+        <td>Imagery needs range, scale, calibration, and image-quality metadata before physical damage dimensions are defensible.</td>
+      </tr>
+    
+      <tr>
+        <td>Camera and range metadata</td>
+        <td class="missing">missing</td>
+        <td>Focal length, sensor pitch, GSD/range, pose, illumination, and scale reference are missing or incomplete.</td>
+      </tr>
+    
+      <tr>
+        <td>Spacecraft geometry</td>
+        <td class="missing">missing</td>
+        <td>Mass, projected area, subsystem geometry, materials, and exposed components are required for exposure modeling.</td>
+      </tr>
+    
+      <tr>
+        <td>Shielding and materials</td>
+        <td class="missing">missing</td>
+        <td>Shielding depth and material stackups are required for MMOD/radiation vulnerability estimates.</td>
+      </tr>
+    
+      <tr>
+        <td>Covariance/CDM quality</td>
+        <td class="missing">missing</td>
+        <td>Conjunction conclusions require state covariance, CDM quality, hard-body radius, and uncertainty realism.</td>
+      </tr>
+    
+      <tr>
+        <td>Operator anomaly logs</td>
+        <td class="missing">missing</td>
+        <td>Private anomaly, maintenance, and operations logs are required to connect public observations to spacecraft health.</td>
+      </tr>
+    
+      <tr>
+        <td>Actuarial priors</td>
+        <td class="missing">missing</td>
+        <td>Validated fleet loss priors, policy context, and claims history are required for loss probability and financial exposure.</td>
+      </tr>
+    
+    </tbody>
+  </table>
+
+  <h2>Blocked claims</h2>
+  <ul>
+    
+      <li>financial_exposure_without_policy_or_operator_financials</li>
+    
+      <li>physical_damage_dimensions_without_calibrated_imagery</li>
+    
+      <li>power_impact_without_telemetry_or_measurement_chain</li>
+    
+      <li>total_loss_probability_without_actuarial_model</li>
+    
+      <li>underwriting_recommendation_without_private_evidence</li>
+    
+  </ul>
+
+  
+
+  <h2>Summary</h2>
+  <p>Public Risk Screen result; screening-only authority. This pack lists what public evidence shows, what is missing, and what a human should request next. It is not an underwriting or bind decision.</p>
+
+  <h2>Reproducibility</h2>
+  <p class="stamp">
+    input_hash e41ffb542b3ca37c334ede279ef8b3b07bab726ea3467aa7bac2834c55bc0401<br>
+    software_sha 330df6552d116ea447dc5f24790de1b9a882026f<br>
+    generated_at 2026-08-12T00:00:00+00:00
+  </p>
+
+  <div class="disclaimer">
+    Public Risk Screen result; screening-only authority. This pack lists what public evidence shows, what is missing, and what a human should request next. It is not an underwriting or bind decision. Do not treat this document as a quote, binder, or official inspection certificate.
+    Public catalog conjunction columns are not a computed collision probability.
+  </div>
+</body>
+</html>

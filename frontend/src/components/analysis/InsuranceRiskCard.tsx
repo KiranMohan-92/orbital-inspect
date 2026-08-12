@@ -37,14 +37,16 @@ interface Props {
 export default function InsuranceRiskCard({ report }: Props) {
   const tierColor = TIER_COLORS[report.risk_tier] || "var(--text-secondary)";
   const isHighRisk = report.risk_tier === "CRITICAL" || report.risk_tier === "HIGH";
-  const uwStyle = UW_STYLES[report.underwriting_recommendation as UnderwritingRecommendation] || UW_STYLES.FURTHER_INVESTIGATION;
   const authority = (report as InsuranceRiskReport & { decision_authority?: string }).decision_authority || "SCREENING_ONLY";
   const mode = (report as InsuranceRiskReport & { assessment_mode?: string }).assessment_mode || "PUBLIC_SCREEN";
+  const screeningOnly = authority === "SCREENING_ONLY" || mode === "PUBLIC_SCREEN";
+  const uwStyle = screeningOnly
+    ? { cls: "uw-investigate", label: "FURTHER INVESTIGATION — NOT A BIND DECISION" }
+    : (UW_STYLES[report.underwriting_recommendation as UnderwritingRecommendation] || UW_STYLES.FURTHER_INVESTIGATION);
 
   return (
     <div className="flex flex-col gap-4 font-body">
 
-      {/* Underwriting Recommendation — THE MONEY SHOT */}
       <div data-testid="underwriting-badge" className={`uw-badge text-center ${uwStyle.cls}`}>
         {uwStyle.label}
       </div>
@@ -68,7 +70,7 @@ export default function InsuranceRiskCard({ report }: Props) {
           {report.risk_tier}
         </p>
         <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-          COMPOSITE: {report.risk_matrix.composite} / 125
+          {screeningOnly ? "SCREENING PRIORITY ONLY — NOT A LOSS PROBABILITY" : `COMPOSITE: ${report.risk_matrix.composite} / 125`}
         </p>
       </div>
 

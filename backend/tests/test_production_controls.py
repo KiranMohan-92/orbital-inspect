@@ -344,8 +344,9 @@ async def test_report_artifact_generation_returns_signed_download_and_bytes(clie
          patch("db.repository.AnalysisRepository", return_value=analysis_repo), \
          patch("db.repository.ReportRepository", return_value=report_repo), \
          patch("db.repository.AuditLogRepository", return_value=audit_logs), \
-         patch("services.pdf_report_service.generate_html_report", return_value="<html>ok</html>"), \
-         patch("services.pdf_report_service.generate_pdf_report", return_value=artifact_bytes), \
+         patch("services.evidence_pack_service.build_evidence_pack", return_value={"decision_authority": "SCREENING_ONLY"}), \
+         patch("services.evidence_pack_service.render_pack_html", return_value="<html>ok</html>"), \
+         patch("services.evidence_pack_service.render_pack_pdf", return_value=artifact_bytes), \
          patch("services.storage_service.get_storage_backend", return_value=storage):
         generate = await client.post(
             "/api/reports/analysis-1/generate-pdf",

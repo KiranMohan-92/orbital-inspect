@@ -1,0 +1,47 @@
+{
+  "norad_id": "39084",
+  "asset_name": "LANDSAT-8",
+  "assessment_mode": "PUBLIC_SCREEN",
+  "classification": {
+    "valid": true,
+    "satellite_type": "earth_observation",
+    "bus_platform": "LDCM",
+    "orbital_regime": "SSO",
+    "operator": "USGS / NASA",
+    "design_life_years": 5.0,
+    "estimated_age_years": 13.0,
+    "notes": "Public catalog identity for Landsat-8 (NORAD 39084). No public impact imagery is attached to this screen.",
+    "degraded": false
+  },
+  "vision": {
+    "damages": [],
+    "overall_pattern": "No buyer imagery attached. Visual damage is not assessed.",
+    "overall_severity": "NONE",
+    "overall_confidence": 0.0,
+    "total_power_impact_pct": null,
+    "degraded": true,
+    "unsupported_claims_blocked": [
+      "physical_damage_dimensions_without_calibrated_imagery",
+      "power_impact_without_telemetry_or_measurement_chain"
+    ]
+  },
+  "environment": {
+    "orbital_regime": "SSO",
+    "altitude_km": 705.0,
+    "inclination_deg": 98.2,
+    "data_sources": ["CelesTrak", "UCS Satellite Database", "NOAA SWPC"],
+    "degraded": false
+  },
+  "failure_mode": {
+    "failure_mode": "Not assessed — no private anomaly logs or telemetry",
+    "degraded": true
+  },
+  "insurance_risk": {
+    "assessment_mode": "PUBLIC_SCREEN",
+    "decision_authority": "SCREENING_ONLY",
+    "report_title": "Public Risk Screen",
+    "underwriting_recommendation": "FURTHER_INVESTIGATION",
+    "summary": "Uneventful public-data screen. No public debris-strike imagery. Screening only.",
+    "degraded": true
+  }
+}

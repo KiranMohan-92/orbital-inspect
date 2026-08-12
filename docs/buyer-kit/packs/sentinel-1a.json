@@ -1,0 +1,102 @@
+{
+  "schema": "orbital-inspect.evidence_pack.v1",
+  "report_title": "Public Risk Screen",
+  "assessment_mode": "PUBLIC_SCREEN",
+  "decision_authority": "SCREENING_ONLY",
+  "asset": {
+    "name": "SENTINEL-1A",
+    "norad_id": "39634",
+    "satellite_type": "earth_observation",
+    "operator": "ESA",
+    "orbital_regime": "SSO"
+  },
+  "evidence_ledger": [
+    {
+      "id": "operator_telemetry",
+      "label": "Operator telemetry",
+      "status": "missing",
+      "description": "Power, thermal, attitude, command, and anomaly telemetry are required before underwriting conclusions."
+    },
+    {
+      "id": "calibrated_imagery",
+      "label": "Calibrated imagery",
+      "status": "missing",
+      "description": "Imagery needs range, scale, calibration, and image-quality metadata before physical damage dimensions are defensible."
+    },
+    {
+      "id": "camera_range_metadata",
+      "label": "Camera and range metadata",
+      "status": "missing",
+      "description": "Focal length, sensor pitch, GSD/range, pose, illumination, and scale reference are missing or incomplete."
+    },
+    {
+      "id": "spacecraft_geometry",
+      "label": "Spacecraft geometry",
+      "status": "missing",
+      "description": "Mass, projected area, subsystem geometry, materials, and exposed components are required for exposure modeling."
+    },
+    {
+      "id": "shielding_materials",
+      "label": "Shielding and materials",
+      "status": "missing",
+      "description": "Shielding depth and material stackups are required for MMOD/radiation vulnerability estimates."
+    },
+    {
+      "id": "covariance_cdm_quality",
+      "label": "Covariance/CDM quality",
+      "status": "missing",
+      "description": "Conjunction conclusions require state covariance, CDM quality, hard-body radius, and uncertainty realism."
+    },
+    {
+      "id": "operator_anomaly_logs",
+      "label": "Operator anomaly logs",
+      "status": "missing",
+      "description": "Private anomaly, maintenance, and operations logs are required to connect public observations to spacecraft health."
+    },
+    {
+      "id": "actuarial_priors",
+      "label": "Actuarial priors",
+      "status": "missing",
+      "description": "Validated fleet loss priors, policy context, and claims history are required for loss probability and financial exposure."
+    }
+  ],
+  "blocked_claims": [
+    "financial_exposure_without_policy_or_operator_financials",
+    "physical_damage_dimensions_without_calibrated_imagery",
+    "power_impact_without_telemetry_or_measurement_chain",
+    "total_loss_probability_without_actuarial_model",
+    "underwriting_recommendation_without_private_evidence"
+  ],
+  "next_human_action": "request_cdm",
+  "next_human_action_rationale": "A usable Conjunction Data Message with positive-semidefinite covariance is required before collision probability can be computed.",
+  "collision_probability": {
+    "collision_probability": null,
+    "null_reason": "Pc is NULL because no buyer-supplied CDM was provided. Public SOCRATES/CelesTrak columns are not a computed collision probability.",
+    "method": "foster_akella_alfriend_2d",
+    "hard_body_radius_m": null,
+    "covariance_quality": "absent",
+    "tca": null,
+    "miss_distance_m": null,
+    "primary_designator": null,
+    "secondary_designator": null
+  },
+  "public_source_notes": [
+    "NASA ORDEM 4.0",
+    "NOAA SWPC",
+    "AE-8/AP-8 Radiation Model",
+    "NRLMSISE-00"
+  ],
+  "visual_findings": [
+    {
+      "type": "solar_cell_cracking",
+      "severity": "MODERATE",
+      "description": "Visible light-colored radial patterns and discoloration on the solar array panel surface, localized at the position indicated by the red arrow. Morphology is consistent with localized cover glass fracturing or potential impact-induced substrate damage. Exact dimensions cannot be determined without range/GSD metadata."
+    }
+  ],
+  "summary": "Public Risk Screen result; screening-only authority. This pack lists what public evidence shows, what is missing, and what a human should request next. It is not an underwriting or bind decision.",
+  "reproducibility": {
+    "input_hash": "dd617beecc073f275223abe7680e0d60cd344ca3d0311a4d95228d2926d32c35",
+    "software_sha": "330df6552d116ea447dc5f24790de1b9a882026f",
+    "generated_at": "2026-08-12T00:00:00+00:00"
+  }
+}
